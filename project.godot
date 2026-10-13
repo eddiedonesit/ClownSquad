@@ -1,0 +1,21 @@
+; Engine configuration file.
+; Settings here are deliberate — see docs/adr/0002-hd2d-rendering-architecture.md
+
+config_version=5
+
+[application]
+
+config/name="Clown Squad"
+config/features=PackedStringArray("4.7", "C#", "Forward Plus")
+run/main_scene="res://scenes/Main.tscn"
+
+[dotnet]
+
+project/assembly_name="ClownSquad"
+
+[rendering]
+
+; Forward+ required for depth of field and volumetric fog (ADR 0002)
+renderer/rendering_method="forward_plus"
+; Nearest-neighbour: keeps pixel art crisp instead of blurring it
+textures/canvas_textures/default_texture_filter=0
