@@ -16,27 +16,64 @@ public partial class GameRoot : Node3D
     /// <summary>Devices already driving a fighter, so a pad is never bound twice.</summary>
     private readonly HashSet<int> _boundDevices = new();
     private readonly List<TrainingDummy> _dummies = new();
-    private Label _hud = null!;
+    private Label? _hud;
 
     public override void _Ready()
     {
+        if (System.Array.IndexOf(OS.GetCmdlineUserArgs(), "animtest") >= 0)
+        {
+            AddChild(new ClownSquad.Debug.AnimationProbe());
+            return;
+        }
+
         SpawnPlayers();
         SpawnDummies();
         BuildHud();
-        Godot.Input.JoyConnectionChanged += OnJoyConnectionChanged;
     }
 
     private void SpawnPlayers()
     {
-        var devices = new List<int> { LocalDeviceInput.Keyboard };
+        // Keyboard always joins. Pads join on a button press rather than on
+        // detection: tools like DS4Windows expose one physical controller as two
+        // devices, and auto-binding both drives two fighters from one stick.
+        AddPlayer(LocalDeviceInput.Keyboard, 0);
+
         foreach (int pad in Godot.Input.GetConnectedJoypads())
-            devices.Add(pad);
-
-        for (int i = 0; i < devices.Count; i++)
-            AddPlayer(devices[i], i);
-
-        GD.Print($"Spawned {devices.Count} player(s). Gamepads detected: {Godot.Input.GetConnectedJoypads().Count}");
+            GD.Print($"  pad {pad}: name=\"{Godot.Input.GetJoyName(pad)}\" guid={Godot.Input.GetJoyGuid(pad)}");
+        GD.Print("Press A / X on a controller to join.");
     }
+
+    private float _joinCooldown;
+
+    /// <summary>
+    /// Let an unbound pad join on a fresh button press. One join per cooldown
+    /// window, so two devices reporting the same physical press cannot both join.
+    /// </summary>
+    private void PollForJoins(float dt)
+    {
+        if (_joinCooldown > 0f) { _joinCooldown -= dt; return; }
+
+        foreach (int pad in Godot.Input.GetConnectedJoypads())
+        {
+            if (_boundDevices.Contains(pad)) continue;
+
+            bool held = Godot.Input.IsJoyButtonPressed(pad, JoyButton.A)
+                     || Godot.Input.IsJoyButtonPressed(pad, JoyButton.X)
+                     || Godot.Input.IsJoyButtonPressed(pad, JoyButton.Start);
+            bool wasHeld = _joinHeld.Contains(pad);
+            if (held) _joinHeld.Add(pad); else _joinHeld.Remove(pad);
+
+            if (held && !wasHeld)
+            {
+                GD.Print($"Player joined on pad {pad} ({Godot.Input.GetJoyName(pad)}).");
+                AddPlayer(pad, _players.Count);
+                _joinCooldown = 0.6f;
+                return;
+            }
+        }
+    }
+
+    private readonly HashSet<int> _joinHeld = new();
 
     private void AddPlayer(int device, int index)
     {
@@ -70,13 +107,6 @@ public partial class GameRoot : Node3D
         }
     }
 
-    private void OnJoyConnectionChanged(long device, bool connected)
-    {
-        if (!connected) return;
-        GD.Print($"Gamepad {device} connected; binding a new fighter.");
-        AddPlayer((int)device, _players.Count);
-    }
-
     private void BuildHud()
     {
         var layer = new CanvasLayer();
@@ -95,13 +125,18 @@ public partial class GameRoot : Node3D
 
     public override void _Process(double delta)
     {
+        if (_hud is null) return;   // probe mode builds no HUD
+
+        PollForJoins((float)delta);
+
         var sb = new StringBuilder();
         sb.AppendLine("CLOWN SQUAD - combat test");
         sb.AppendLine("Keyboard: WASD move | J or Space attack | K or Shift dodge");
         sb.AppendLine("Gamepad:  stick move | X or A attack | B or RB dodge");
+        sb.AppendLine("Unjoined pad? Press A / X to join.");
         sb.AppendLine();
         foreach (PlayerFighter p in _players)
-            sb.AppendLine($"P{p.PlayerIndex + 1} [{p.Source.Describe()}]  hp {p.Health:F0}  {p.DebugState}");
+            sb.AppendLine($"P{p.PlayerIndex + 1} [{p.Source.Describe()}]  hp {p.Health:F0}  {p.DebugState}  clip={p.CurrentClip}");
         sb.AppendLine();
         for (int i = 0; i < _dummies.Count; i++)
             sb.AppendLine($"Dummy {i + 1}  hp {_dummies[i].Health:F0} / {_dummies[i].MaxHealth:F0}");

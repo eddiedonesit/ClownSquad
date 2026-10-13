@@ -18,6 +18,12 @@ public partial class Fighter : CharacterBody3D
     [Export] public float Friction { get; set; } = 45f;
 
     public float Health { get; private set; }
+
+    /// <summary>Which animation clip is playing. Exposed for the HUD and tests.</summary>
+    public string CurrentClip => Sprite is null ? "-" : Sprite.Animation.ToString();
+
+    /// <summary>Whether the sprite is mirrored. Exposed for tests.</summary>
+    public bool SpriteFlipped => Sprite is not null && Sprite.FlipH;
     public bool IsDead => Health <= 0f;
     public Vector3 Facing { get; protected set; } = Vector3.Back;
 
