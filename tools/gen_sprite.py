@@ -69,7 +69,8 @@ class Canvas:
 
 NEUTRAL = dict(body_dy=0, lean=0, head_dy=0,
                larm=(10, 53), rarm=(37, 53),
-               lleg_dy=0, rleg_dy=0, hat_dx=0)
+               lleg_dy=0, rleg_dy=0, lleg_dx=0, rleg_dx=0,
+               hat_dx=0, mallet=None)
 
 
 def pose(**over):
@@ -84,16 +85,18 @@ def draw(p):
     lx, ly = p["larm"]
     rx, ry = p["rarm"]
 
-    # shoes and legs
-    c.ellipse(15, 60 + p["lleg_dy"], 8, 4, 8)
-    c.ellipse(33, 60 + p["rleg_dy"], 8, 4, 8)
-    c.ellipse(14, 59 + p["lleg_dy"], 6, 2, 1)
-    c.ellipse(34, 59 + p["rleg_dy"], 6, 2, 1)
-    c.rect(18, 52 + by, 23, 59 + p["lleg_dy"], 6)
-    c.rect(25, 52 + by, 30, 59 + p["rleg_dy"], 6)
-    for y in range(52 + by, 60, 3):
-        c.rect(18, y, 23, y + 1, 1)
-        c.rect(25, y, 30, y + 1, 1)
+    # shoes and legs, striding horizontally as well as lifting
+    ldx, rdx = p["lleg_dx"], p["rleg_dx"]
+    ldy, rdy = p["lleg_dy"], p["rleg_dy"]
+    c.limb(20 + ln, 50 + by, 20 + ldx, 57 + ldy, 6, half=2)
+    c.limb(28 + ln, 50 + by, 28 + rdx, 57 + rdy, 6, half=2)
+    for i in range(3):
+        c.rect(18 + ldx, 52 + ldy + i * 3, 22 + ldx, 53 + ldy + i * 3, 1)
+        c.rect(26 + rdx, 52 + rdy + i * 3, 30 + rdx, 53 + rdy + i * 3, 1)
+    c.ellipse(16 + ldx, 60 + ldy, 8, 4, 8)
+    c.ellipse(32 + rdx, 60 + rdy, 8, 4, 8)
+    c.ellipse(15 + ldx, 59 + ldy, 6, 2, 1)
+    c.ellipse(33 + rdx, 59 + rdy, 6, 2, 1)
 
     # torso
     c.rect(16 + ln, 37 + by, 31 + ln, 50 + by, 5)
@@ -140,6 +143,13 @@ def draw(p):
                 c.buf[y][x] = 4
     c.ellipse(hx, hy - 9, 12, 2, 1)
     c.ellipse(hx, top, 3, 3, 6)
+
+    # mallet, drawn last so the arc stays visible across the body
+    if p["mallet"] is not None:
+        mx, my = p["mallet"]
+        c.limb(rx, ry, mx, my, 8, half=1)
+        c.ellipse(mx, my, 5, 4, 1)
+        c.rect(mx - 2, my - 3, mx + 2, my + 3, 4)
     return c.buf
 
 
@@ -173,20 +183,33 @@ def add(name, p):
     FRAMES.append((name, draw(p)))
 
 
-# idle: a slow breath
+# idle: a visible breath, shoulders and head rise
 add("idle", pose())
-add("idle", pose(body_dy=1, larm=(10, 54), rarm=(37, 54), head_dy=1))
-# walk: 4-frame cycle, body bob, alternating legs, counter-swinging arms
-add("walk", pose(lleg_dy=-3, rleg_dy=1, larm=(12, 50), rarm=(36, 56), body_dy=-1))
-add("walk", pose())
-add("walk", pose(lleg_dy=1, rleg_dy=-3, larm=(11, 56), rarm=(35, 50), body_dy=-1))
-add("walk", pose())
-# attack: windup, swing, follow-through
-add("attack", pose(lean=-2, larm=(8, 44), rarm=(36, 40), body_dy=1, hat_dx=-1))
-add("attack", pose(lean=3, larm=(16, 50), rarm=(44, 46), body_dy=-1, hat_dx=2))
-add("attack", pose(lean=2, larm=(18, 54), rarm=(40, 56), body_dy=1, hat_dx=1))
+add("idle", pose(body_dy=2, larm=(10, 55), rarm=(37, 55), head_dy=1))
+
+# walk: a real stride. Legs swing through, body bobs, arms counter-swing.
+add("walk", pose(lleg_dx=6, lleg_dy=-7, rleg_dx=-5, rleg_dy=1,
+                 body_dy=-2, larm=(8, 47), rarm=(39, 58), lean=1))
+add("walk", pose(lleg_dx=3, lleg_dy=-2, rleg_dx=-2,
+                 body_dy=0, larm=(9, 50), rarm=(38, 55)))
+add("walk", pose(lleg_dx=-5, lleg_dy=1, rleg_dx=6, rleg_dy=-7,
+                 body_dy=-2, larm=(8, 58), rarm=(39, 47), lean=-1))
+add("walk", pose(lleg_dx=-2, rleg_dx=3, rleg_dy=-2,
+                 body_dy=0, larm=(9, 55), rarm=(38, 50)))
+
+# attack: an overhead mallet arc, upper right down to lower left
+add("attack", pose(lean=-4, body_dy=2, head_dy=1, hat_dx=-2,
+                   larm=(9, 56), rarm=(41, 34), mallet=(44, 26)))
+add("attack", pose(lean=1, body_dy=-1, hat_dx=1,
+                   larm=(10, 52), rarm=(40, 38), mallet=(39, 5)))
+add("attack", pose(lean=5, body_dy=0, head_dy=1, hat_dx=3,
+                   larm=(13, 50), rarm=(34, 46), mallet=(11, 7)))
+add("attack", pose(lean=3, body_dy=2, hat_dx=2,
+                   larm=(12, 54), rarm=(31, 54), mallet=(4, 36)))
+
 # hit recoil
-add("hit", pose(lean=-3, head_dy=-2, larm=(6, 48), rarm=(34, 44), body_dy=1, hat_dx=-3))
+add("hit", pose(lean=-4, head_dy=-3, larm=(5, 47), rarm=(34, 42),
+                body_dy=2, hat_dx=-4, lleg_dx=-2, rleg_dx=2))
 
 SHEET_W = W * len(FRAMES)
 shaded = [shade(b) for _, b in FRAMES]

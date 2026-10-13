@@ -120,7 +120,13 @@ public partial class PlayerFighter : Fighter
 
         // Pin the swing frame to the phase, so the visible swing is the hitbox.
         if (!InHitAnim)
-            PinClipFrame("attack", _phaseTime < activeStart ? 0 : _phaseTime < activeEnd ? 1 : 2);
+        {
+            int frame = _phaseTime < activeStart ? 0
+                      : _phaseTime < activeStart + step.Active * 0.5f ? 1
+                      : _phaseTime < activeEnd ? 2
+                      : 3;
+            PinClipFrame("attack", frame);
+        }
         if (_phaseTime > activeStart && prev < activeEnd)
             ResolveHits(step);
 
