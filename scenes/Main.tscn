@@ -1,6 +1,6 @@
 [gd_scene load_steps=8 format=3]
 
-[ext_resource type="Texture2D" path="res://assets/sprites/placeholder_clown.png" id="1_clown"]
+[ext_resource type="Texture2D" path="res://assets/sprites/clown_16bit.png" id="1_clown"]
 
 [sub_resource type="Environment" id="Env_1"]
 background_mode = 1
@@ -82,7 +82,7 @@ transparent = true
 shaded = true
 alpha_cut = 1
 billboard = 2
-pixel_size = 0.03
+pixel_size = 0.0225
 texture = ExtResource("1_clown")
 
 [node name="ClownFar" type="Sprite3D" parent="."]
@@ -93,7 +93,7 @@ transparent = true
 shaded = true
 alpha_cut = 1
 billboard = 2
-pixel_size = 0.03
+pixel_size = 0.0225
 texture = ExtResource("1_clown")
 
 [node name="ClownBehindProp" type="Sprite3D" parent="."]
@@ -104,5 +104,5 @@ transparent = true
 shaded = true
 alpha_cut = 1
 billboard = 2
-pixel_size = 0.03
+pixel_size = 0.0225
 texture = ExtResource("1_clown")

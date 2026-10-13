@@ -57,8 +57,15 @@ which the HD-2D look depends on.
 - Pixel-art sprites clash with detailed 3D. Environment art must stay low-detail
   and stylized to sit alongside them.
 
-## Open questions
+## Open questions — DEFERRED
 
-- Is Steam Deck a launch target? Determines the performance budget.
-- Sprite resolution and the texel-to-world ratio, which must be locked before any
-  character art is produced.
+Both were deliberately deferred on 2026-10-13. Revisit as release approaches;
+neither blocks current work, but both get more expensive the longer they wait.
+
+| Question | Why it matters | Revisit when |
+| --- | --- | --- |
+| Is Steam Deck a launch target? | DOF + volumetric fog are cheap on desktop GPUs and expensive on a Deck. Decides whether a quality-settings path is needed. | Before performance work, and before any Steam store page commits to Deck Verified |
+| Lock sprite resolution and texel-to-world ratio | Every piece of commissioned art is authored against it; changing it later rescales every character. | Before commissioning art beyond placeholders |
+
+**Current working values (provisional, not locked):** character sprites are
+48x64 px with `pixel_size = 0.0225`, giving a character 1.44 world units tall.

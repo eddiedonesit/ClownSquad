@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://ha1ujoakl2vy"
-path="res://.godot/imported/placeholder_clown.png-9ab5f2d3ef355908405cead0f7d8a06e.ctex"
+uid="uid://doddj6npd8vgv"
+path="res://.godot/imported/clown_16bit.png-3fda8ce07d310b16d46781e7164c1a61.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://assets/sprites/placeholder_clown.png"
-dest_files=["res://.godot/imported/placeholder_clown.png-9ab5f2d3ef355908405cead0f7d8a06e.ctex"]
+source_file="res://assets/sprites/clown_16bit.png"
+dest_files=["res://.godot/imported/clown_16bit.png-3fda8ce07d310b16d46781e7164c1a61.ctex"]
 
 [params]
 
