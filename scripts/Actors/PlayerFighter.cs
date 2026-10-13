@@ -98,7 +98,7 @@ public partial class PlayerFighter : Fighter
             // Profile frames whenever travel is mostly horizontal. A front-facing
             // cycle cannot read as walking left or right, however many frames it has.
             float speed = new Vector3(Velocity.X, 0f, Velocity.Z).Length();
-            PlayClip(DirPrefix + (speed > 0.6f ? "walk" : "idle"));
+            PlayClip(speed > 0.6f ? "walk" : "idle");
         }
     }
 
@@ -130,7 +130,7 @@ public partial class PlayerFighter : Fighter
                       : _phaseTime < activeStart + step.Active * 0.5f ? 1
                       : _phaseTime < activeEnd ? 2
                       : 3;
-            PinClipFrame(DirPrefix + "attack", frame);
+            PinClipFrame("attack", frame);
         }
         if (_phaseTime > activeStart && prev < activeEnd)
             ResolveHits(step);
@@ -181,7 +181,7 @@ public partial class PlayerFighter : Fighter
     {
         _dodgeTime += dt;
         float t = _dodgeTime / DodgeDuration;
-        if (!InHitAnim) PlayClip(DirPrefix + "walk");
+        if (!InHitAnim) PlayClip("walk");
         ApplyGroundMovement(_dodgeDir * DodgeSpeed * (1f - t * 0.75f), dt);
 
         if (_dodgeTime >= DodgeDuration)

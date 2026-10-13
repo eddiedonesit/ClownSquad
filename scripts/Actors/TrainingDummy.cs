@@ -12,13 +12,12 @@ public partial class TrainingDummy : Fighter
         MaxHealth = 200f;
         BaseTint = new Color(0.65f, 0.8f, 1.0f);
         base._Ready();
-        Sprite.Modulate = BaseTint;
     }
 
     protected override void Tick(float dt)
     {
         ApplyGroundMovement(Vector3.Zero, dt);
-        if (!InHitAnim) PlayClip(DirPrefix + "idle");
+        if (!InHitAnim) PlayClip("idle");
 
         if (IsDead)
         {

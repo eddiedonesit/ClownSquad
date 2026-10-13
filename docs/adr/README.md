@@ -8,3 +8,4 @@ alternatives weighed, and the consequences accepted.
 | [0001](0001-engine-godot-4-with-csharp.md) | Use Godot 4 with C# as the engine | Accepted |
 | [0002](0002-hd2d-rendering-architecture.md) | 2.5D rendering: 3D scene root with billboarded sprites | Accepted |
 | [0003](0003-coop-architecture.md) | Co-op architecture: host-authoritative with input-source abstraction | Accepted |
+| [0004](0004-directional-sprites.md) | Everything that moves uses directional sprites | Accepted |

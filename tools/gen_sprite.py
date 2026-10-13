@@ -6,7 +6,7 @@ Emits a horizontal strip to assets/sprites/clown_16bit.png plus a frame map.
 
 Run: python tools/gen_sprite.py
 """
-import zlib, struct, os, json
+import zlib, struct, os, json, math
 
 W, H = 72, 64
 # Body art is authored in a 48-wide space; this offset centres it in the wider
@@ -29,6 +29,14 @@ MATS = {
     13: ((176, 40, 48),   (120, 26, 34),   (206, 86, 84)),    # far-side shoe
 }
 OUTLINE = (26, 18, 34)
+
+
+
+def mallet_tip(hx, hy, spec):
+    """Resolve a (angle_deg, length) mallet spec into a tip position."""
+    ang, length = spec
+    r = math.radians(ang)
+    return int(round(hx + math.cos(r) * length)), int(round(hy - math.sin(r) * length))
 
 
 class Canvas:
@@ -165,7 +173,7 @@ def draw(p, back=False):
 
     # mallet, drawn last so the arc stays visible across the body
     if p["mallet"] is not None:
-        mx, my = p["mallet"]
+        mx, my = mallet_tip(rx, ry, p["mallet"])
         c.limb(rx, ry, mx, my, 8, half=2)
         c.ellipse(mx, my, 13, 11, 1)
         c.rect(mx - 4, my - 11, mx + 4, my + 11, 4)
@@ -271,8 +279,9 @@ def draw_side(p):
     c.ellipse(hx - 2, top, 3, 3, 6)
 
     if p.get("mallet") is not None:
-        mx, my = p["mallet"]
-        c.limb(26 + na, 53 - lift, mx, my, 8, half=2)
+        hx, hy = 26 + na, 53 - lift
+        mx, my = mallet_tip(hx, hy, p["mallet"])
+        c.limb(hx, hy, mx, my, 8, half=2)
         c.ellipse(mx, my, 13, 11, 1)
         c.rect(mx - 4, my - 11, mx + 4, my + 11, 4)
     return c.buf
@@ -307,13 +316,13 @@ WALK_POSES = [
 ]
 ATTACK_POSES = [
     pose(lean=-4, body_dy=2, head_dy=1, hat_dx=-2,
-         larm=(9, 56), rarm=(41, 34), mallet=(44, 26)),
+         larm=(9, 56), rarm=(41, 34), mallet=(45, 30)),
     pose(lean=1, body_dy=-1, hat_dx=1,
-         larm=(10, 52), rarm=(40, 38), mallet=(39, 5)),
+         larm=(10, 52), rarm=(40, 38), mallet=(90, 32)),
     pose(lean=5, body_dy=0, head_dy=1, hat_dx=3,
-         larm=(13, 50), rarm=(34, 46), mallet=(11, 7)),
+         larm=(13, 50), rarm=(34, 46), mallet=(135, 32)),
     pose(lean=3, body_dy=2, hat_dx=2,
-         larm=(12, 54), rarm=(31, 54), mallet=(4, 36)),
+         larm=(12, 54), rarm=(31, 54), mallet=(190, 28)),
 ]
 HIT_POSE = pose(lean=-4, head_dy=-3, larm=(5, 47), rarm=(34, 42),
                 body_dy=2, hat_dx=-4, lleg_dx=-2, rleg_dx=2)
@@ -350,13 +359,13 @@ add("side_walk", spose(near_leg=-2, far_leg=3, near_arm=4, far_arm=-4,
 
 # profile attack: mallet arcs from behind the head forward past the nose
 add("side_attack", spose(lean=-3, body_dy=1, near_arm=-6, far_arm=-4,
-                         arm_lift=5, mallet=(6, 20)), "side")
+                         arm_lift=5, mallet=(150, 28)), "side")
 add("side_attack", spose(lean=0, body_dy=-1, near_arm=-2, far_arm=-1,
-                         arm_lift=9, mallet=(19, 3)), "side")
+                         arm_lift=9, mallet=(100, 32)), "side")
 add("side_attack", spose(lean=3, body_dy=-1, near_arm=6, far_arm=3,
-                         arm_lift=5, mallet=(38, 10)), "side")
+                         arm_lift=5, mallet=(45, 32)), "side")
 add("side_attack", spose(lean=4, body_dy=1, near_arm=9, far_arm=5,
-                         arm_lift=-2, mallet=(43, 34)), "side")
+                         arm_lift=-2, mallet=(-10, 28)), "side")
 
 add("side_hit", spose(lean=-4, head_dy=-2, body_dy=2,
                       near_arm=-7, far_arm=-5, arm_lift=-2), "side")
