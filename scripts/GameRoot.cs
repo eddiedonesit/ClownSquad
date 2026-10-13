@@ -13,6 +13,8 @@ using ClownSquad.Input;
 public partial class GameRoot : Node3D
 {
     private readonly List<PlayerFighter> _players = new();
+    /// <summary>Devices already driving a fighter, so a pad is never bound twice.</summary>
+    private readonly HashSet<int> _boundDevices = new();
     private readonly List<TrainingDummy> _dummies = new();
     private Label _hud = null!;
 
@@ -38,6 +40,14 @@ public partial class GameRoot : Node3D
 
     private void AddPlayer(int device, int index)
     {
+        // Godot raises JoyConnectionChanged for pads that were already present
+        // at startup, so without this guard one pad drives two fighters.
+        if (!_boundDevices.Add(device))
+        {
+            GD.Print($"Device {device} already bound; ignoring duplicate.");
+            return;
+        }
+
         var p = new PlayerFighter
         {
             Name = $"Player{index}",
