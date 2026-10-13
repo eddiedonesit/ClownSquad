@@ -36,3 +36,7 @@ Thumbs.db
 desktop.ini
 .DS_Store
 debug/
+
+# C# build output
+*.sln
+.vs/
