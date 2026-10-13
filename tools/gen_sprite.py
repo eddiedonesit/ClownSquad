@@ -27,6 +27,7 @@ MATS = {
     11: ((48, 72, 140),   (30, 46, 96),    (80, 110, 180)),   # far-side suit
     12: ((186, 192, 208), (146, 152, 172), (220, 224, 236)),  # far-side glove
     13: ((176, 40, 48),   (120, 26, 34),   (206, 86, 84)),    # far-side shoe
+    14: ((170, 96, 54),   (118, 62, 32),   (206, 136, 86)),   # mallet handle
 }
 OUTLINE = (26, 18, 34)
 
@@ -93,6 +94,42 @@ def spose(**over):
     return p
 
 
+
+def draw_mallet(c, hx, hy, spec, head_len=24, head_rad=9):
+    """Draw a mallet: a cylinder whose axis is perpendicular to the handle.
+
+    A plain disc reads as a lollipop. What makes a mallet legible is the barrel
+    running across the handle plus a contrasting end cap showing its circular
+    face, which is what the reference art does.
+    """
+    ang, length = spec
+    r = math.radians(ang)
+    mx = hx + math.cos(r) * length
+    my = hy - math.sin(r) * length
+
+    # handle, from the hand to the centre of the head
+    c.limb(hx, hy, int(round(mx)), int(round(my)), 14, half=2)
+
+    # barrel, swept along the axis perpendicular to the handle
+    pr = r + math.pi / 2.0
+    ax, ay = math.cos(pr), -math.sin(pr)
+    half = head_len / 2.0
+    t = -half
+    while t <= half:
+        c.ellipse(int(round(mx + ax * t)), int(round(my + ay * t)), head_rad, head_rad, 1)
+        t += 0.5
+
+    # far face, lighter, so the cylinder reads as 3D rather than flat
+    ex = mx + ax * half
+    ey = my + ay * half
+    c.ellipse(int(round(ex)), int(round(ey)), head_rad - 1, head_rad - 1, 4)
+
+    # near rim, a darker lip that separates barrel from handle
+    nx = mx - ax * half
+    ny = my - ay * half
+    c.ellipse(int(round(nx)), int(round(ny)), head_rad - 2, head_rad - 2, 13)
+
+
 def draw_side(p):
     """Profile view facing RIGHT. Flipped horizontally for leftward movement."""
     c = Canvas()
@@ -102,13 +139,13 @@ def draw_side(p):
 
     # far leg first, in darker tones so the near leg reads in front
     c.limb(23 + ln, 49 + by, 23 + fl, 57, 11, half=2)
-    c.ellipse(26 + fl, 60, 10, 4, 13)
+    c.ellipse(26 + fl, 60, 9, 4, 13)
     # near leg
     c.limb(25 + ln, 49 + by, 25 + nl, 57, 5, half=2)
     for i in range(2):
         c.rect(23 + nl, 52 + i * 3, 27 + nl, 53 + i * 3, 1)
-    c.ellipse(28 + nl, 60, 12, 4, 8)
-    c.ellipse(30 + nl, 59, 9, 2, 1)
+    c.ellipse(28 + nl, 60, 10, 4, 8)
+    c.ellipse(29 + nl, 59, 8, 2, 1)
 
     # far arm behind the torso
     c.limb(22 + ln, 40 + by, 22 + fa, 53 - lift, 11, half=2)
@@ -157,11 +194,7 @@ def draw_side(p):
     c.ellipse(hx - 2, top, 3, 3, 6)
 
     if p.get("mallet") is not None:
-        hx, hy = 26 + na, 53 - lift
-        mx, my = mallet_tip(hx, hy, p["mallet"])
-        c.limb(hx, hy, mx, my, 8, half=2)
-        c.ellipse(mx, my, 13, 11, 1)
-        c.rect(mx - 4, my - 11, mx + 4, my + 11, 4)
+        draw_mallet(c, 26 + na, 53 - lift, p["mallet"])
     return c.buf
 
 
