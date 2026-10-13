@@ -1,12 +1,22 @@
-# 2. HD-2D rendering: 3D scene root with billboarded sprites
+# 2. 2.5D rendering: 3D scene root with billboarded sprites
 
 - **Status:** Accepted
 - **Date:** 2026-10-13
 
 ## Context
 
-The target look is Octopath Traveler's "HD-2D": pixel-art character sprites
-standing inside lit 3D dioramas, under heavy tilt-shift depth of field and bloom.
+The target look is 16-bit pixel-art character sprites standing inside lit 3D
+environments.
+
+**Art direction settled 2026-10-13 (supersedes the initial Octopath reference):**
+after comparing four renders of the same scene, the chosen direction is "Crisp
+2.5D" — the Sea of Stars / Eastward register. Real 3D lighting and shadows, but
+**no depth of field** and only trace fog, with the camera close enough that the
+sprite reads at full fidelity.
+
+Octopath's heavy tilt-shift was rejected: side by side it flattened the character
+into a smudge and destroyed the 26-colour shading the sprites are built around.
+Dropping DOF and most fog also removes the main Steam Deck performance risk.
 
 Godot offers two incompatible ways to combine 2D and 3D, and the choice
 determines the whole scene tree. Reversing it later means rebuilding every scene:

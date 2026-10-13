@@ -4,26 +4,26 @@
 
 [sub_resource type="Environment" id="Env_1"]
 background_mode = 1
-background_color = Color(0.043, 0.047, 0.08, 1)
+background_color = Color(0.09, 0.11, 0.16, 1)
 ambient_light_source = 2
-ambient_light_color = Color(0.35, 0.4, 0.6, 1)
-ambient_light_energy = 0.4
+ambient_light_color = Color(0.55, 0.6, 0.75, 1)
+ambient_light_energy = 0.7
 tonemap_mode = 2
 glow_enabled = true
-glow_intensity = 0.8
+glow_intensity = 0.4
 glow_bloom = 0.15
 volumetric_fog_enabled = true
-volumetric_fog_density = 0.045
-volumetric_fog_emission = Color(0.12, 0.1, 0.18, 1)
+volumetric_fog_density = 0.008
+volumetric_fog_emission = Color(0.2, 0.22, 0.3, 1)
 
 [sub_resource type="CameraAttributesPractical" id="CamAttr_1"]
-dof_blur_far_enabled = true
-dof_blur_far_distance = 13.5
+dof_blur_far_enabled = false
+dof_blur_far_distance = 20.0
 dof_blur_far_transition = 3.0
-dof_blur_near_enabled = true
-dof_blur_near_distance = 8.5
+dof_blur_near_enabled = false
+dof_blur_near_distance = 3.0
 dof_blur_near_transition = 2.5
-dof_blur_amount = 0.3
+dof_blur_amount = 0.1
 
 [sub_resource type="PlaneMesh" id="Plane_1"]
 size = Vector2(24, 24)
@@ -45,14 +45,14 @@ environment = SubResource("Env_1")
 camera_attributes = SubResource("CamAttr_1")
 
 [node name="Camera3D" type="Camera3D" parent="."]
-transform = Transform3D(1, 0, 0, 0, 0.8192, 0.5736, 0, -0.5736, 0.8192, 0, 7, 10)
+transform = Transform3D(1, 0, 0, 0, 0.8192, 0.5736, 0, -0.5736, 0.8192, 0, 5.162, 7.372)
 attributes = SubResource("CamAttr_1")
-fov = 25.0
+fov = 30.0
 
 [node name="DirectionalLight3D" type="DirectionalLight3D" parent="."]
 transform = Transform3D(0.866, -0.383, 0.3214, 0, 0.6428, 0.766, -0.5, -0.6634, 0.5567, 0, 10, 0)
 light_color = Color(1, 0.93, 0.82, 1)
-light_energy = 1.6
+light_energy = 1.8
 shadow_enabled = true
 
 [node name="Ground" type="MeshInstance3D" parent="."]
