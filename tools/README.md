@@ -18,3 +18,10 @@ edge, shadow on the lower-right. Edit the drawing block to change the character.
 `preview_sprite.py <in.png> <out.png> [scale]` — nearest-neighbour upscale onto
 a checkerboard so a 48x64 sprite can actually be inspected. Defaults write to
 `debug/sprite_preview.png` at 8x.
+
+`refresh_sprites.sh` — **use this instead of running gen_sprite.py directly.**
+Running the Godot binary does not reimport changed assets; it loads the cached
+`.ctex`. Regenerating a sheet without a reimport pass leaves the game rendering
+stale art while all the code looks correct. That is exactly how the directional
+sprites appeared broken: clip selection was right, but the texture the atlas
+regions sampled predated the frames.
