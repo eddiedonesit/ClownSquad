@@ -20,21 +20,15 @@ conventional fantasy ones.
 
 ## 2. Open decisions — these block architecture
 
-### 2.1 Co-op: how many players, and over what? UNRESOLVED — blocks everything
+### 2.1 Co-op: RESOLVED — co-op is in
 
-The brief says monsters scale to "the primary player or **host's** level," which
-implies networked multiplayer. This must be settled before systems are built.
+Co-op is confirmed. Architecture is recorded in
+[ADR 0003](../adr/0003-coop-architecture.md): host-authoritative simulation with
+an input-source abstraction, so **local co-op works first and online layers on
+additively** rather than requiring a rewrite.
 
-| Option | Cost | Consequence |
-| --- | --- | --- |
-| **Single-player only** | Lowest | Fastest to ship. Diverges from both references. Adding co-op later means rewriting every system that rolls a random result. |
-| **Local co-op (shared screen)** | Low-medium | No networking. Multiple inputs, shared camera. Rampage Knights supports this. Camera constrains level design. |
-| **Online co-op (P2P host)** | High | Matches the brief's "host" language. Requires authority rules for every roll, plus Steamworks P2P. Roughly doubles the cost of each system below. |
-
-**Why this cannot wait:** every system in this document produces a random result —
-loot rolls, affix rolls, capture chance, rare spawn chance. In multiplayer each
-needs a defined authority and replication rule. Deciding later means revisiting
-all of them.
+The only remaining question is scheduling, not architecture: does online ship at
+launch, or after? That affects when Steamworks P2P work lands, nothing else.
 
 ### 2.2 Run structure
 
@@ -76,8 +70,16 @@ A small chance, on kill, to capture the monster and absorb its power or abilitie
 - Capture chance improved by gear affixes and possibly a dedicated class
 - A captured monster grants either a **passive stat bonus** or an **active ability**
   lifted from its own kit
-- Players have limited capture slots, forcing choice — otherwise this becomes
-  strictly additive power creep
+- **Capture slots are limited and earned by level.** Level cap is 50. Players
+  start with 1 slot at level 1 and gain 1 more every 10 levels:
+
+  | Level | 1 | 10 | 20 | 30 | 40 | 50 |
+  | --- | --- | --- | --- | --- | --- | --- |
+  | Slots | 1 | 2 | 3 | 4 | 5 | 6 |
+
+  Six slots at cap keeps captures a question of *choice* rather than
+  accumulation. Swapping a capture should be free, so experimenting is cheap and
+  the decision stays interesting all game.
 
 **Open:** are captures permanent or per-run? Depends on 2.2.
 
@@ -85,31 +87,77 @@ A small chance, on kill, to capture the monster and absorb its power or abilitie
 
 ## 5. Job classes
 
+Seven classes. Healer and Buffer are **cut for now** — pure support is miserable
+to play solo and doubles the balance surface. Revisit only if online co-op proves
+to be how people actually play.
+
 Each class needs a stat template, a starting kit, equipment affinities, and a
-distinct role in co-op.
+skill tree (section 5.2).
 
 | Class | Role | Hook |
 | --- | --- | --- |
-| Warrior | Melee bruiser | Balanced, high survivability |
-| Berserker | Melee burst | Damage scales as health drops; high risk |
+| Warrior | Melee bruiser | Balanced, high survivability. The baseline everything else is tuned against. |
+| Berserker | Melee burst | Damage scales as health drops; high risk, high reward |
 | Assassin | Melee burst | Crits, positioning, backstabs |
-| Ranger | Ranged sustained | Kiting, mobility |
-| Monk | Melee combo | Speed, chains, low weapon dependency |
-| Healer | Support | Sustain; needs offence to be fun solo |
-| Buffer | Support | Team amplification; hardest to make fun solo |
+| Ranger | Ranged sustained | Kiting, mobility, consistent damage |
+| Monk | Melee combo | Speed and chains, low weapon dependency |
+| Juggler | Ranged burst | See 5.1 |
+| Illusionist | Control | Clones, confusion, crowd control |
+| Acrobat | Mobile skirmisher | High-mobility aerial combat, repositioning |
+| Ringmaster | Summoner | See 5.1 |
 
-**Additions worth considering:**
+### 5.1 The two classes that need care
 
-| Class | Hook |
-| --- | --- |
-| Ringmaster | Commands captured monsters as summons — ties the capture system to a class |
-| Juggler | Throws weapons, ricochet and multi-target |
-| Illusionist | Clones, confusion, crowd control |
-| Beast Tamer | Capture specialist; higher capture rates |
-| Acrobat | High-mobility aerial combat |
+**Juggler.** Juggles a held set of items or weapons, then releases the whole set
+at once for burst damage. The juggle is a resource: items accumulate while
+juggling, and the release spends them. This gives the class a natural rhythm —
+build, hold, dump — and a real decision about when to cash out. Juggled items
+should be drawn from actual weapons and pickups so the fantasy reads visually.
 
-**Design risk:** pure support classes (Healer, Buffer) are miserable to play solo.
-Either guarantee co-op, or give them self-sufficient offensive kits.
+**Ringmaster.** Commands captured monsters as summons. This is the class most at
+risk of overshadowing the others, because it stacks its own power on top of
+captured power while everyone else gets only one of those.
+
+Proposed constraints, to be validated in play:
+
+- **Summons replace personal damage, they do not add to it.** Ringmaster base
+  weapon damage is substantially below other classes — roughly 50-60%.
+- **Summons draw from the same capture slots everyone has.** No private extra
+  slots. The Ringmaster converts captures into summons; other classes convert
+  them into abilities or passives.
+- **Only one summon active at a time** at base; additional concurrent summons are
+  a deep skill-tree investment paid for with other power.
+- **Summons are time-limited or health-limited**, so the class plays actively
+  rather than deploying and idling.
+- Summon strength scales off the captured monster, not off the Ringmaster, so the
+  ceiling is bounded by what has been captured rather than by levels.
+
+The guiding rule: a Ringmaster should be *different*, not *more*. If a Ringmaster
+with a good capture beats a Warrior with a good weapon, the constraints are wrong.
+
+### 5.2 Skill trees
+
+Every class has its own tree of active abilities and passive traits.
+
+**Proposed structure:**
+
+- Points earned per level — 1 per level, 50 total at cap
+- Three branches per class, each expressing a different read on the class (for
+  example Berserker: sustained rage / burst detonation / survivability-through-aggression)
+- **Passive traits** are the majority of nodes: stat shifts, conditional bonuses,
+  behaviour modifiers
+- **Active abilities** are sparse and expensive — a handful per tree, each a real
+  change in how the class plays
+- **Capstone nodes** deep in each branch, costly enough that a full build reaches
+  at most one or two
+
+**Design constraints:**
+
+- A full 50 points should *not* fill a tree. Builds must exclude things.
+- Respec should be cheap or free. Build experimentation is the point; punishing it
+  makes people pick safe nodes and play less.
+- Trees must interact with loot affixes and captures without multiplying them.
+  Three multiplicative power sources is how balance dies.
 
 ## 6. Equipment and affixes
 
@@ -155,7 +203,8 @@ Affixes should be tagged so they can be restricted by item type, class, or level
 
 ## 7. Progression and scaling
 
-- Players gain levels through combat
+- **Level cap is 50.** Players gain levels through combat, earning 1 skill point
+  per level and a capture slot every 10 levels
 - **Enemies scale to the host/primary player's level**, so co-op partners of
   different levels can play together
 - **Open:** does a level-5 player joining a level-40 host get flattened? Options:
