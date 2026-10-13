@@ -8,7 +8,10 @@ Run: python tools/gen_sprite.py
 """
 import zlib, struct, os, json
 
-W, H = 48, 64
+W, H = 72, 64
+# Body art is authored in a 48-wide space; this offset centres it in the wider
+# canvas so the oversized mallet head has room either side.
+DRAW_X = 12
 
 MATS = {
     1:  ((214, 58, 66),   (150, 36, 48),   (242, 112, 104)),  # hat red
@@ -33,6 +36,7 @@ class Canvas:
         self.buf = [[0] * W for _ in range(H)]
 
     def put(self, x, y, m):
+        x += DRAW_X
         if 0 <= x < W and 0 <= y < H:
             self.buf[y][x] = m
 
@@ -162,9 +166,9 @@ def draw(p, back=False):
     # mallet, drawn last so the arc stays visible across the body
     if p["mallet"] is not None:
         mx, my = p["mallet"]
-        c.limb(rx, ry, mx, my, 8, half=1)
-        c.ellipse(mx, my, 5, 4, 1)
-        c.rect(mx - 2, my - 3, mx + 2, my + 3, 4)
+        c.limb(rx, ry, mx, my, 8, half=2)
+        c.ellipse(mx, my, 13, 11, 1)
+        c.rect(mx - 4, my - 11, mx + 4, my + 11, 4)
     return c.buf
 
 
@@ -268,9 +272,9 @@ def draw_side(p):
 
     if p.get("mallet") is not None:
         mx, my = p["mallet"]
-        c.limb(26 + na, 53 - lift, mx, my, 8, half=1)
-        c.ellipse(mx, my, 5, 4, 1)
-        c.rect(mx - 2, my - 3, mx + 2, my + 3, 4)
+        c.limb(26 + na, 53 - lift, mx, my, 8, half=2)
+        c.ellipse(mx, my, 13, 11, 1)
+        c.rect(mx - 4, my - 11, mx + 4, my + 11, 4)
     return c.buf
 
 
