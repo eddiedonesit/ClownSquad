@@ -18,7 +18,7 @@ public partial class TrainingDummy : Fighter
     protected override void Tick(float dt)
     {
         ApplyGroundMovement(Vector3.Zero, dt);
-        if (!InHitAnim) PlayClip("idle");
+        if (!InHitAnim) PlayClip(DirPrefix + "idle");
 
         if (IsDead)
         {

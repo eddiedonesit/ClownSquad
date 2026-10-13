@@ -21,6 +21,14 @@ public partial class Fighter : CharacterBody3D
     public bool IsDead => Health <= 0f;
     public Vector3 Facing { get; protected set; } = Vector3.Back;
 
+    /// <summary>
+    /// Which directional clip set to use. The camera looks down -Z, so +Z faces
+    /// the viewer. Horizontal travel wins over depth, since profile frames read
+    /// far better than a front view sliding sideways.
+    /// </summary>
+    protected string DirPrefix =>
+        Mathf.Abs(Facing.X) > 0.5f ? "side_" : Facing.Z < 0f ? "back_" : "";
+
     protected float HitstopRemaining;
     protected bool InHitstop => HitstopRemaining > 0f;
 
@@ -45,7 +53,7 @@ public partial class Fighter : CharacterBody3D
             Shape = new CapsuleShape3D { Radius = 0.35f, Height = 1.4f },
             Position = new Vector3(0, 0.7f, 0),
         });
-        PlayClip("idle");
+        PlayClip(DirPrefix + "idle");
     }
 
     /// <summary>
@@ -71,14 +79,14 @@ public partial class Fighter : CharacterBody3D
         {
             string name = key.AsString();
             frames.AddAnimation(name);
-            frames.SetAnimationLoop(name, name is "idle" or "walk");
-            frames.SetAnimationSpeed(name, name switch
-            {
-                "idle" or "side_idle" => 3.0,
-                "walk" or "side_walk" => 11.0,
-                "attack" => 14.0,
-                _ => 8.0,
-            });
+            // Match on the suffix so every direction prefix (front, back_, side_)
+            // gets the same looping and playback rate.
+            frames.SetAnimationLoop(name, name.EndsWith("idle") || name.EndsWith("walk"));
+            frames.SetAnimationSpeed(name,
+                  name.EndsWith("idle") ? 3.0
+                : name.EndsWith("walk") ? 11.0
+                : name.EndsWith("attack") ? 14.0
+                : 8.0);
             foreach (Variant idx in clips[key].AsGodotArray())
             {
                 frames.AddFrame(name, new AtlasTexture
@@ -160,7 +168,8 @@ public partial class Fighter : CharacterBody3D
         }
 
         // Face the way we are travelling, so the sprite never moonwalks.
-        if (Mathf.Abs(Facing.X) > 0.05f) Sprite.FlipH = Facing.X < 0f;
+        // Only profile frames are flipped; front and back are drawn face-on.
+        Sprite.FlipH = DirPrefix == "side_" && Facing.X < 0f;
 
         MoveAndSlide();
     }
@@ -190,7 +199,7 @@ public partial class Fighter : CharacterBody3D
         _hitAnimRemaining = 0.22f;
         _squash = 0.35f;
         Sprite.Modulate = new Color(3f, 2f, 2f);
-        PlayClip("hit", restart: true);
+        PlayClip(DirPrefix + "hit", restart: true);
 
         if (IsDead) Died?.Invoke(this);
     }
