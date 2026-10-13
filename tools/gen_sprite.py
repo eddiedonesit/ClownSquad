@@ -8,10 +8,10 @@ Run: python tools/gen_sprite.py
 """
 import zlib, struct, os, json, math
 
-W, H = 72, 64
+W, H = 104, 64
 # Body art is authored in a 48-wide space; this offset centres it in the wider
 # canvas so the oversized mallet head has room either side.
-DRAW_X = 12
+DRAW_X = 28
 
 MATS = {
     1:  ((214, 58, 66),   (150, 36, 48),   (242, 112, 104)),  # hat red
@@ -102,13 +102,13 @@ def draw_side(p):
 
     # far leg first, in darker tones so the near leg reads in front
     c.limb(23 + ln, 49 + by, 23 + fl, 57, 11, half=2)
-    c.ellipse(24 + fl, 60, 7, 4, 13)
+    c.ellipse(26 + fl, 60, 10, 4, 13)
     # near leg
     c.limb(25 + ln, 49 + by, 25 + nl, 57, 5, half=2)
     for i in range(2):
         c.rect(23 + nl, 52 + i * 3, 27 + nl, 53 + i * 3, 1)
-    c.ellipse(26 + nl, 60, 8, 4, 8)
-    c.ellipse(27 + nl, 59, 6, 2, 1)
+    c.ellipse(28 + nl, 60, 12, 4, 8)
+    c.ellipse(30 + nl, 59, 9, 2, 1)
 
     # far arm behind the torso
     c.limb(22 + ln, 40 + by, 22 + fa, 53 - lift, 11, half=2)
@@ -147,13 +147,13 @@ def draw_side(p):
 
     # hat, tipped back off the brow
     hx = 22 + ln
-    top = hy - 22
-    c.tri(hx - 2, top, hx - 10, hy - 9, hx + 11, hy - 9, 1)
-    for y in range(max(0, top), hy - 8):
+    top = hy - 19
+    c.tri(hx - 2, top, hx - 10, hy - 6, hx + 11, hy - 6, 1)
+    for y in range(max(0, top), hy - 5):
         for x in range(W):
             if c.buf[y][x] == 1 and (x + y) % 7 < 2:
                 c.buf[y][x] = 4
-    c.ellipse(hx + 1, hy - 9, 11, 2, 1)
+    c.ellipse(hx + 1, hy - 6, 11, 2, 1)
     c.ellipse(hx - 2, top, 3, 3, 6)
 
     if p.get("mallet") is not None:
@@ -217,13 +217,13 @@ add("walk", spose(near_leg=-2, far_leg=3, near_arm=4, far_arm=-4,
 
 # attack: mallet arcs from behind the head, out to 45 degrees on impact
 add("attack", spose(lean=-3, body_dy=1, near_arm=-6, far_arm=-4,
-                    arm_lift=5, mallet=(150, 28)))
+                    arm_lift=5, mallet=(165, 26)))
 add("attack", spose(lean=0, body_dy=-1, near_arm=-2, far_arm=-1,
-                    arm_lift=9, mallet=(100, 32)))
+                    arm_lift=9, mallet=(120, 30)))
 add("attack", spose(lean=3, body_dy=-1, near_arm=6, far_arm=3,
-                    arm_lift=5, mallet=(45, 32)))
+                    arm_lift=5, mallet=(45, 30)))
 add("attack", spose(lean=4, body_dy=1, near_arm=9, far_arm=5,
-                    arm_lift=-2, mallet=(-10, 28)))
+                    arm_lift=-2, mallet=(0, 26)))
 
 # hit recoil
 add("hit", spose(lean=-4, head_dy=-2, body_dy=2,
