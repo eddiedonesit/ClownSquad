@@ -35,6 +35,12 @@ public partial class PlayerFighter : Fighter
     private const float IFrameStart = 0.05f;
     private const float IFrameEnd = 0.26f;
 
+    // Where the mallet head sits on the strike frame, derived from the sprite
+    // geometry rather than guessed: the head lands 29.2px right of and 5.2px
+    // above the sprite centre, at pixel_size 0.0225 with the sprite 0.72 up.
+    private const float MalletForward = 0.657f;
+    private const float MalletHeight = 0.837f;
+
     public IInputSource Source { get; set; } = null!;
     public int PlayerIndex { get; set; }
 
@@ -128,13 +134,15 @@ public partial class PlayerFighter : Fighter
         float activeStart = step.Startup;
         float activeEnd = step.Startup + step.Active;
 
-        // Ground impact fires once, as the mallet lands, whether or not it
-        // connected with anything. The swing should feel like it hit the world.
-        if (!_impactSpawned && _phaseTime >= activeStart)
+        // Impact fires once per swing, whether or not it connected: the swing
+        // should feel like it hit the world. Timed to the second half of the
+        // active window, which is where the sprite shows the 45-degree strike
+        // rather than the mallet still raised behind the head.
+        if (!_impactSpawned && _phaseTime >= activeStart + step.Active * 0.5f)
         {
             _impactSpawned = true;
-            Vector3 at = GlobalPosition + Facing * 1.35f + new Vector3(0f, 0.12f, 0f);
-            ImpactEffect.Spawn(GetParent(), at, 0.85f + _comboIndex * 0.35f);
+            Vector3 at = GlobalPosition + Facing * MalletForward + new Vector3(0f, MalletHeight, 0f);
+            ImpactEffect.Spawn(GetParent(), at, 0.7f + _comboIndex * 0.25f);
             CameraShake.Request(this, 0.035f + _comboIndex * 0.03f, 0.16f + _comboIndex * 0.04f);
         }
 

@@ -27,7 +27,7 @@ public partial class ImpactEffect : Node3D
         var sprite = new AnimatedSprite3D
         {
             SpriteFrames = FrameLibrary.Load(Sheet, Frames),
-            PixelSize = 0.05f * _scale,
+            PixelSize = 0.04f * _scale,
             Billboard = BaseMaterial3D.BillboardModeEnum.FixedY,
             TextureFilter = BaseMaterial3D.TextureFilterEnum.Nearest,
             // Blended, not alpha-cut: the later frames fade out, and discarding
