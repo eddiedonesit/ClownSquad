@@ -73,8 +73,10 @@ public partial class PlayerFighter : Fighter
     {
         Vector3 move = ToWorld(cmd.Move);
 
-        if (move.LengthSquared() > 0.001f)
-            Facing = move.Normalized();
+        // Depth movement is allowed, but never turns the fighter: facing stays
+        // on the X axis so attacks can only ever go left or right.
+        if (Mathf.Abs(move.X) > 0.1f)
+            Facing = new Vector3(Mathf.Sign(move.X), 0f, 0f);
 
         if (_bufferedAttack)
         {

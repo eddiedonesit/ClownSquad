@@ -24,7 +24,11 @@ public partial class Fighter : CharacterBody3D
 
     public float Health { get; private set; }
     public bool IsDead => Health <= 0f;
-    public Vector3 Facing { get; protected set; } = Vector3.Back;
+    /// <summary>
+    /// Heading, horizontal only. Attacks resolve along it, so locking it to the
+    /// X axis is what prevents attacking up or down (ADR 0004).
+    /// </summary>
+    public Vector3 Facing { get; protected set; } = Vector3.Right;
 
     public string CurrentClip => Visual?.CurrentClip ?? "-";
     public bool SpriteFlipped => Visual?.Flipped ?? false;

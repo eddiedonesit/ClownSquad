@@ -82,128 +82,6 @@ class Canvas:
             self.rect(x - half, y - half, x + half, y + half, m)
 
 
-NEUTRAL = dict(body_dy=0, lean=0, head_dy=0,
-               larm=(10, 53), rarm=(37, 53),
-               lleg_dy=0, rleg_dy=0, lleg_dx=0, rleg_dx=0,
-               hat_dx=0, mallet=None)
-
-
-def pose(**over):
-    p = dict(NEUTRAL)
-    p.update(over)
-    return p
-
-
-def draw(p, back=False):
-    c = Canvas()
-    by, ln, hd = p["body_dy"], p["lean"], p["head_dy"]
-    lx, ly = p["larm"]
-    rx, ry = p["rarm"]
-
-    # shoes and legs, striding horizontally as well as lifting
-    ldx, rdx = p["lleg_dx"], p["rleg_dx"]
-    ldy, rdy = p["lleg_dy"], p["rleg_dy"]
-    c.limb(20 + ln, 50 + by, 20 + ldx, 57 + ldy, 6, half=2)
-    c.limb(28 + ln, 50 + by, 28 + rdx, 57 + rdy, 6, half=2)
-    for i in range(3):
-        c.rect(18 + ldx, 52 + ldy + i * 3, 22 + ldx, 53 + ldy + i * 3, 1)
-        c.rect(26 + rdx, 52 + rdy + i * 3, 30 + rdx, 53 + rdy + i * 3, 1)
-    c.ellipse(16 + ldx, 60 + ldy, 8, 4, 8)
-    c.ellipse(32 + rdx, 60 + rdy, 8, 4, 8)
-    c.ellipse(15 + ldx, 59 + ldy, 6, 2, 1)
-    c.ellipse(33 + rdx, 59 + rdy, 6, 2, 1)
-
-    # torso
-    c.rect(16 + ln, 37 + by, 31 + ln, 50 + by, 5)
-    c.ellipse(24 + ln, 50 + by, 8, 3, 5)
-    c.ellipse(24 + ln, 37 + by, 8, 3, 5)
-    if back:
-        c.ellipse(20 + ln, 41 + by, 4, 3, 4)
-        c.ellipse(28 + ln, 41 + by, 4, 3, 4)
-        c.ellipse(24 + ln, 41 + by, 2, 2, 1)
-    else:
-        for b in (43, 49):
-            for dy in range(-3, 4):
-                w = 3 - abs(dy)
-                c.rect(24 + ln - w, b + dy + by, 24 + ln + w, b + dy + by, 10)
-
-    # arms
-    c.limb(17 + ln, 40 + by, lx, ly, 5)
-    c.limb(30 + ln, 40 + by, rx, ry, 5)
-    c.ellipse(lx, ly, 4, 4, 6)
-    c.ellipse(rx, ry, 4, 4, 6)
-
-    # ruff collar
-    c.ellipse(24 + ln, 36 + by, 13, 4, 4)
-    for cx in range(12, 37, 6):
-        c.ellipse(cx + ln, 38 + by, 3, 3, 4)
-
-    # hair and head
-    hy = 24 + by + hd
-    if back:
-        # rear view: hair covers the skull, no face, a bow on the collar
-        c.ellipse(24 + ln, hy, 9, 10, 2)
-        c.ellipse(24 + ln, hy + 2, 9, 8, 7)
-        c.ellipse(12 + ln, hy + 5, 5, 4, 7)
-        c.ellipse(36 + ln, hy + 5, 5, 4, 7)
-    else:
-        c.ellipse(13 + ln, hy + 5, 4, 4, 7)
-        c.ellipse(35 + ln, hy + 5, 4, 4, 7)
-        c.ellipse(24 + ln, hy, 9, 10, 2)
-        c.ellipse(20 + ln, hy, 1, 2, 9)
-        c.ellipse(28 + ln, hy, 1, 2, 9)
-        c.put(20 + ln, hy - 1, 6)
-        c.put(28 + ln, hy - 1, 6)
-        c.ellipse(18 + ln, hy + 4, 2, 1, 3)
-        c.ellipse(30 + ln, hy + 4, 2, 1, 3)
-        c.ellipse(24 + ln, hy + 4, 3, 3, 3)
-        for x in range(20, 29):
-            c.put(x + ln, hy + 7 + (0 if 22 <= x <= 26 else -1), 9)
-
-    # hat
-    hx = 24 + ln + p["hat_dx"]
-    top = hy - 22
-    c.tri(hx, top, hx - 11, hy - 9, hx + 11, hy - 9, 1)
-    for y in range(max(0, top), hy - 8):
-        for x in range(W):
-            if c.buf[y][x] == 1 and (x + y) % 7 < 2:
-                c.buf[y][x] = 4
-    c.ellipse(hx, hy - 9, 12, 2, 1)
-    c.ellipse(hx, top, 3, 3, 6)
-
-    # mallet, drawn last so the arc stays visible across the body
-    if p["mallet"] is not None:
-        mx, my = mallet_tip(rx, ry, p["mallet"])
-        c.limb(rx, ry, mx, my, 8, half=2)
-        c.ellipse(mx, my, 13, 11, 1)
-        c.rect(mx - 4, my - 11, mx + 4, my + 11, 4)
-    return c.buf
-
-
-def shade(buf):
-    def op(x, y):
-        return 0 <= x < W and 0 <= y < H and buf[y][x] != 0
-    px = [[(0, 0, 0, 0)] * W for _ in range(H)]
-    for y in range(H):
-        for x in range(W):
-            m = buf[y][x]
-            if m == 0:
-                continue
-            if not all(op(x + dx, y + dy) for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1))):
-                px[y][x] = OUTLINE + (255,)
-                continue
-            base, dark, light = MATS[m]
-            if not op(x + 2, y + 2) or not op(x + 1, y + 2):
-                col = dark
-            elif not op(x - 2, y - 2) or not op(x - 1, y - 2):
-                col = light
-            else:
-                col = base
-            px[y][x] = col + (255,)
-    return px
-
-
-
 SIDE = dict(body_dy=0, lean=0, head_dy=0,
             near_leg=0, far_leg=0, near_arm=0, far_arm=0, arm_lift=0,
             mallet=None)
@@ -287,88 +165,69 @@ def draw_side(p):
     return c.buf
 
 
+
+def shade(buf):
+    """Pixel-art passes: dark silhouette outline, rim light upper-left,
+    shadow lower-right. This is what gives the flat regions a 16-bit read."""
+    def op(x, y):
+        return 0 <= x < W and 0 <= y < H and buf[y][x] != 0
+    px = [[(0, 0, 0, 0)] * W for _ in range(H)]
+    for y in range(H):
+        for x in range(W):
+            m = buf[y][x]
+            if m == 0:
+                continue
+            if not all(op(x + dx, y + dy) for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1))):
+                px[y][x] = OUTLINE + (255,)
+                continue
+            base, dark, light = MATS[m]
+            if not op(x + 2, y + 2) or not op(x + 1, y + 2):
+                col = dark
+            elif not op(x - 2, y - 2) or not op(x - 1, y - 2):
+                col = light
+            else:
+                col = base
+            px[y][x] = col + (255,)
+    return px
+
+
 FRAMES = []
 
 
-def add(name, p, mode="front"):
-    if mode == "side":
-        FRAMES.append((name, draw_side(p)))
-    elif mode == "back":
-        FRAMES.append((name, draw(p, back=True)))
-    else:
-        FRAMES.append((name, draw(p)))
+def add(name, p):
+    FRAMES.append((name, draw_side(p)))
 
 
-# Front and back share pose data: the same body motion seen from either side.
-IDLE_POSES = [
-    pose(),
-    pose(body_dy=2, larm=(10, 55), rarm=(37, 55), head_dy=1),
-]
-WALK_POSES = [
-    pose(lleg_dx=6, lleg_dy=-7, rleg_dx=-5, rleg_dy=1,
-         body_dy=-2, larm=(8, 47), rarm=(39, 58), lean=1),
-    pose(lleg_dx=3, lleg_dy=-2, rleg_dx=-2,
-         body_dy=0, larm=(9, 50), rarm=(38, 55)),
-    pose(lleg_dx=-5, lleg_dy=1, rleg_dx=6, rleg_dy=-7,
-         body_dy=-2, larm=(8, 58), rarm=(39, 47), lean=-1),
-    pose(lleg_dx=-2, rleg_dx=3, rleg_dy=-2,
-         body_dy=0, larm=(9, 55), rarm=(38, 50)),
-]
-ATTACK_POSES = [
-    pose(lean=-4, body_dy=2, head_dy=1, hat_dx=-2,
-         larm=(9, 56), rarm=(41, 34), mallet=(45, 30)),
-    pose(lean=1, body_dy=-1, hat_dx=1,
-         larm=(10, 52), rarm=(40, 38), mallet=(90, 32)),
-    pose(lean=5, body_dy=0, head_dy=1, hat_dx=3,
-         larm=(13, 50), rarm=(34, 46), mallet=(135, 32)),
-    pose(lean=3, body_dy=2, hat_dx=2,
-         larm=(12, 54), rarm=(31, 54), mallet=(190, 28)),
-]
-HIT_POSE = pose(lean=-4, head_dy=-3, larm=(5, 47), rarm=(34, 42),
-                body_dy=2, hat_dx=-4, lleg_dx=-2, rleg_dx=2)
+# Profile only. Characters face left or right and never toward or away from the
+# camera, so there is one set of frames, mirrored for leftward travel (ADR 0004).
 
-for q in IDLE_POSES:
-    add("idle", q)
-for q in WALK_POSES:
-    add("walk", q)
-for q in ATTACK_POSES:
-    add("attack", q)
-add("hit", HIT_POSE)
+# idle: breathing
+add("idle", spose())
+add("idle", spose(body_dy=2, head_dy=1, arm_lift=-1))
 
-for q in IDLE_POSES:
-    add("back_idle", q, "back")
-for q in WALK_POSES:
-    add("back_walk", q, "back")
-for q in ATTACK_POSES:
-    add("back_attack", q, "back")
-add("back_hit", HIT_POSE, "back")
+# walk: legs scissor hard, arms counter-swing
+add("walk", spose(near_leg=8, far_leg=-7, near_arm=-9, far_arm=10,
+                  body_dy=-2, lean=1, arm_lift=1))
+add("walk", spose(near_leg=3, far_leg=-2, near_arm=-4, far_arm=4,
+                  body_dy=0))
+add("walk", spose(near_leg=-7, far_leg=8, near_arm=10, far_arm=-9,
+                  body_dy=-2, lean=1, arm_lift=1))
+add("walk", spose(near_leg=-2, far_leg=3, near_arm=4, far_arm=-4,
+                  body_dy=0))
 
-# profile idle: breathing, facing right
-add("side_idle", spose(), "side")
-add("side_idle", spose(body_dy=2, head_dy=1, arm_lift=-1), "side")
+# attack: mallet arcs from behind the head, out to 45 degrees on impact
+add("attack", spose(lean=-3, body_dy=1, near_arm=-6, far_arm=-4,
+                    arm_lift=5, mallet=(150, 28)))
+add("attack", spose(lean=0, body_dy=-1, near_arm=-2, far_arm=-1,
+                    arm_lift=9, mallet=(100, 32)))
+add("attack", spose(lean=3, body_dy=-1, near_arm=6, far_arm=3,
+                    arm_lift=5, mallet=(45, 32)))
+add("attack", spose(lean=4, body_dy=1, near_arm=9, far_arm=5,
+                    arm_lift=-2, mallet=(-10, 28)))
 
-# profile walk: legs scissor hard, arms counter-swing
-add("side_walk", spose(near_leg=8, far_leg=-7, near_arm=-9, far_arm=10,
-                       body_dy=-2, lean=1, arm_lift=1), "side")
-add("side_walk", spose(near_leg=3, far_leg=-2, near_arm=-4, far_arm=4,
-                       body_dy=0), "side")
-add("side_walk", spose(near_leg=-7, far_leg=8, near_arm=10, far_arm=-9,
-                       body_dy=-2, lean=1, arm_lift=1), "side")
-add("side_walk", spose(near_leg=-2, far_leg=3, near_arm=4, far_arm=-4,
-                       body_dy=0), "side")
-
-# profile attack: mallet arcs from behind the head forward past the nose
-add("side_attack", spose(lean=-3, body_dy=1, near_arm=-6, far_arm=-4,
-                         arm_lift=5, mallet=(150, 28)), "side")
-add("side_attack", spose(lean=0, body_dy=-1, near_arm=-2, far_arm=-1,
-                         arm_lift=9, mallet=(100, 32)), "side")
-add("side_attack", spose(lean=3, body_dy=-1, near_arm=6, far_arm=3,
-                         arm_lift=5, mallet=(45, 32)), "side")
-add("side_attack", spose(lean=4, body_dy=1, near_arm=9, far_arm=5,
-                         arm_lift=-2, mallet=(-10, 28)), "side")
-
-add("side_hit", spose(lean=-4, head_dy=-2, body_dy=2,
-                      near_arm=-7, far_arm=-5, arm_lift=-2), "side")
+# hit recoil
+add("hit", spose(lean=-4, head_dy=-2, body_dy=2,
+                 near_arm=-7, far_arm=-5, arm_lift=-2))
 
 SHEET_W = W * len(FRAMES)
 shaded = [shade(b) for _, b in FRAMES]
