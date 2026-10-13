@@ -92,6 +92,9 @@ public partial class PlayerFighter : Fighter
         }
 
         ApplyGroundMovement(move * MoveSpeed, dt);
+
+        if (!InHitAnim)
+            PlayClip(new Vector3(Velocity.X, 0f, Velocity.Z).Length() > 0.6f ? "walk" : "idle");
     }
 
     private void StartAttack()
@@ -114,6 +117,10 @@ public partial class PlayerFighter : Fighter
 
         float activeStart = step.Startup;
         float activeEnd = step.Startup + step.Active;
+
+        // Pin the swing frame to the phase, so the visible swing is the hitbox.
+        if (!InHitAnim)
+            PinClipFrame("attack", _phaseTime < activeStart ? 0 : _phaseTime < activeEnd ? 1 : 2);
         if (_phaseTime > activeStart && prev < activeEnd)
             ResolveHits(step);
 
@@ -163,6 +170,7 @@ public partial class PlayerFighter : Fighter
     {
         _dodgeTime += dt;
         float t = _dodgeTime / DodgeDuration;
+        if (!InHitAnim) PlayClip("walk");
         ApplyGroundMovement(_dodgeDir * DodgeSpeed * (1f - t * 0.75f), dt);
 
         if (_dodgeTime >= DodgeDuration)

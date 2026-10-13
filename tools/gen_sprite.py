@@ -1,15 +1,15 @@
-"""Generate a 16-bit-style character sprite (48x64) with palette shading.
+"""Generate a 16-bit-style character sprite sheet with animation frames.
 
-Draws flat material regions, then applies pixel-art passes that give the
-SNES/Genesis look: a dark silhouette outline, rim light on the upper-left,
-and shadow on the lower-right. No external dependencies.
+Draws the clown from a parameterised pose, so idle breathing, a walk cycle,
+an attack swing and a hit recoil are all the same artwork at different offsets.
+Emits a horizontal strip to assets/sprites/clown_16bit.png plus a frame map.
+
+Run: python tools/gen_sprite.py
 """
-import zlib, struct, os
+import zlib, struct, os, json
 
 W, H = 48, 64
-TRANSPARENT = 0
 
-# material id -> (base, shadow, light)
 MATS = {
     1:  ((214, 58, 66),   (150, 36, 48),   (242, 112, 104)),  # hat red
     2:  ((247, 214, 188), (198, 158, 140), (255, 240, 226)),  # skin
@@ -24,148 +24,202 @@ MATS = {
 }
 OUTLINE = (26, 18, 34)
 
-buf = [[TRANSPARENT] * W for _ in range(H)]
 
-def put(x, y, m):
-    if 0 <= x < W and 0 <= y < H:
-        buf[y][x] = m
+class Canvas:
+    def __init__(self):
+        self.buf = [[0] * W for _ in range(H)]
 
-def ellipse(cx, cy, rx, ry, m):
-    for y in range(cy - ry, cy + ry + 1):
-        for x in range(cx - rx, cx + rx + 1):
-            dx, dy = (x - cx) / max(rx, .5), (y - cy) / max(ry, .5)
-            if dx * dx + dy * dy <= 1.0:
-                put(x, y, m)
+    def put(self, x, y, m):
+        if 0 <= x < W and 0 <= y < H:
+            self.buf[y][x] = m
 
-def rect(x0, y0, x1, y1, m):
-    for y in range(y0, y1 + 1):
-        for x in range(x0, x1 + 1):
-            put(x, y, m)
+    def ellipse(self, cx, cy, rx, ry, m):
+        for y in range(cy - ry, cy + ry + 1):
+            for x in range(cx - rx, cx + rx + 1):
+                dx, dy = (x - cx) / max(rx, .5), (y - cy) / max(ry, .5)
+                if dx * dx + dy * dy <= 1.0:
+                    self.put(x, y, m)
 
-def tri(ax, ay, bx, by, cx_, cy_, m):
-    minx, maxx = min(ax, bx, cx_), max(ax, bx, cx_)
-    miny, maxy = min(ay, by, cy_), max(ay, by, cy_)
-    def sign(x1, y1, x2, y2, x3, y3):
-        return (x1 - x3) * (y2 - y3) - (x2 - x3) * (y1 - y3)
-    for y in range(miny, maxy + 1):
-        for x in range(minx, maxx + 1):
-            d1 = sign(x, y, ax, ay, bx, by)
-            d2 = sign(x, y, bx, by, cx_, cy_)
-            d3 = sign(x, y, cx_, cy_, ax, ay)
-            neg = (d1 < 0) or (d2 < 0) or (d3 < 0)
-            pos = (d1 > 0) or (d2 > 0) or (d3 > 0)
-            if not (neg and pos):
-                put(x, y, m)
+    def rect(self, x0, y0, x1, y1, m):
+        for y in range(y0, y1 + 1):
+            for x in range(x0, x1 + 1):
+                self.put(x, y, m)
 
-# ---- shoes (oversized, clown-like) ----
-ellipse(15, 60, 8, 4, 8)
-ellipse(33, 60, 8, 4, 8)
-ellipse(14, 59, 6, 2, 1)
-ellipse(34, 59, 6, 2, 1)
-# ---- legs with stripes ----
-rect(18, 52, 23, 59, 6)
-rect(25, 52, 30, 59, 6)
-for y in range(52, 60, 3):
-    rect(18, y, 23, y + 1, 1)
-    rect(25, y, 30, y + 1, 1)
-# ---- torso ----
-rect(16, 37, 31, 50, 5)
-ellipse(24, 50, 8, 3, 5)
-ellipse(24, 37, 8, 3, 5)
-# diamond accents down the front
-for by in (43, 49):
-    for dy in range(-3, 4):
-        w = 3 - abs(dy)
-        rect(24 - w, by + dy, 24 + w, by + dy, 10)
-# ---- arms (after torso so they read on top) ----
-for sx, ex in ((16, 10), (31, 37)):
-    for t in range(13):
-        f = t / 12.0
-        x = int(sx + (ex - sx) * f)
-        rect(x - 2, 39 + t, x + 2, 41 + t, 5)
-ellipse(10, 53, 4, 4, 6)
-ellipse(37, 53, 4, 4, 6)
-# ---- ruff collar ----
-ellipse(24, 36, 13, 4, 4)
-for cx in range(12, 37, 6):
-    ellipse(cx, 38, 3, 3, 4)
-# ---- hair tufts, low at the sides ----
-ellipse(13, 29, 4, 4, 7)
-ellipse(35, 29, 4, 4, 7)
-# ---- head ----
-ellipse(24, 24, 9, 10, 2)
-# eyes, clear of the hat brim
-ellipse(20, 24, 1, 2, 9)
-ellipse(28, 24, 1, 2, 9)
-put(20, 23, 6)
-put(28, 23, 6)
-# cheeks
-ellipse(18, 28, 2, 1, 3)
-ellipse(30, 28, 2, 1, 3)
-# nose
-ellipse(24, 28, 3, 3, 3)
-# smile
-for x in range(20, 29):
-    put(x, 31 + (0 if 22 <= x <= 26 else -1), 9)
-# ---- hat, sitting high above the eyes ----
-tri(24, 2, 13, 15, 35, 15, 1)
-for y in range(2, 16):
-    for x in range(W):
-        if buf[y][x] == 1 and (x + y) % 7 < 2:
-            buf[y][x] = 4
-ellipse(24, 15, 12, 2, 1)
-ellipse(24, 2, 3, 3, 6)
+    def tri(self, ax, ay, bx, by, cx_, cy_, m):
+        def sign(x1, y1, x2, y2, x3, y3):
+            return (x1 - x3) * (y2 - y3) - (x2 - x3) * (y1 - y3)
+        for y in range(min(ay, by, cy_), max(ay, by, cy_) + 1):
+            for x in range(min(ax, bx, cx_), max(ax, bx, cx_) + 1):
+                d1 = sign(x, y, ax, ay, bx, by)
+                d2 = sign(x, y, bx, by, cx_, cy_)
+                d3 = sign(x, y, cx_, cy_, ax, ay)
+                neg = (d1 < 0) or (d2 < 0) or (d3 < 0)
+                pos = (d1 > 0) or (d2 > 0) or (d3 > 0)
+                if not (neg and pos):
+                    self.put(x, y, m)
 
-# ---------- pixel-art passes ----------
-def opaque(x, y):
-    return 0 <= x < W and 0 <= y < H and buf[y][x] != TRANSPARENT
+    def limb(self, sx, sy, ex, ey, m, half=2):
+        steps = max(abs(ex - sx), abs(ey - sy), 1)
+        for t in range(steps + 1):
+            f = t / steps
+            x = int(round(sx + (ex - sx) * f))
+            y = int(round(sy + (ey - sy) * f))
+            self.rect(x - half, y - half, x + half, y + half, m)
 
-outline = [[False] * W for _ in range(H)]
-for y in range(H):
-    for x in range(W):
-        if buf[y][x] == TRANSPARENT:
-            continue
-        if not all(opaque(x + dx, y + dy) for dx, dy in ((1,0),(-1,0),(0,1),(0,-1))):
-            outline[y][x] = True
 
-px = [[(0, 0, 0, 0)] * W for _ in range(H)]
-for y in range(H):
-    for x in range(W):
-        m = buf[y][x]
-        if m == TRANSPARENT:
-            continue
-        if outline[y][x]:
-            px[y][x] = OUTLINE + (255,)
-            continue
-        base, dark, light = MATS[m]
-        c = base
-        # shadow: near the lower-right silhouette edge
-        if not opaque(x + 2, y + 2) or not opaque(x + 1, y + 2):
-            c = dark
-        # rim light: near the upper-left silhouette edge
-        elif not opaque(x - 2, y - 2) or not opaque(x - 1, y - 2):
-            c = light
-        px[y][x] = c + (255,)
+NEUTRAL = dict(body_dy=0, lean=0, head_dy=0,
+               larm=(10, 53), rarm=(37, 53),
+               lleg_dy=0, rleg_dy=0, hat_dx=0)
 
+
+def pose(**over):
+    p = dict(NEUTRAL)
+    p.update(over)
+    return p
+
+
+def draw(p):
+    c = Canvas()
+    by, ln, hd = p["body_dy"], p["lean"], p["head_dy"]
+    lx, ly = p["larm"]
+    rx, ry = p["rarm"]
+
+    # shoes and legs
+    c.ellipse(15, 60 + p["lleg_dy"], 8, 4, 8)
+    c.ellipse(33, 60 + p["rleg_dy"], 8, 4, 8)
+    c.ellipse(14, 59 + p["lleg_dy"], 6, 2, 1)
+    c.ellipse(34, 59 + p["rleg_dy"], 6, 2, 1)
+    c.rect(18, 52 + by, 23, 59 + p["lleg_dy"], 6)
+    c.rect(25, 52 + by, 30, 59 + p["rleg_dy"], 6)
+    for y in range(52 + by, 60, 3):
+        c.rect(18, y, 23, y + 1, 1)
+        c.rect(25, y, 30, y + 1, 1)
+
+    # torso
+    c.rect(16 + ln, 37 + by, 31 + ln, 50 + by, 5)
+    c.ellipse(24 + ln, 50 + by, 8, 3, 5)
+    c.ellipse(24 + ln, 37 + by, 8, 3, 5)
+    for b in (43, 49):
+        for dy in range(-3, 4):
+            w = 3 - abs(dy)
+            c.rect(24 + ln - w, b + dy + by, 24 + ln + w, b + dy + by, 10)
+
+    # arms
+    c.limb(17 + ln, 40 + by, lx, ly, 5)
+    c.limb(30 + ln, 40 + by, rx, ry, 5)
+    c.ellipse(lx, ly, 4, 4, 6)
+    c.ellipse(rx, ry, 4, 4, 6)
+
+    # ruff collar
+    c.ellipse(24 + ln, 36 + by, 13, 4, 4)
+    for cx in range(12, 37, 6):
+        c.ellipse(cx + ln, 38 + by, 3, 3, 4)
+
+    # hair and head
+    hy = 24 + by + hd
+    c.ellipse(13 + ln, hy + 5, 4, 4, 7)
+    c.ellipse(35 + ln, hy + 5, 4, 4, 7)
+    c.ellipse(24 + ln, hy, 9, 10, 2)
+    c.ellipse(20 + ln, hy, 1, 2, 9)
+    c.ellipse(28 + ln, hy, 1, 2, 9)
+    c.put(20 + ln, hy - 1, 6)
+    c.put(28 + ln, hy - 1, 6)
+    c.ellipse(18 + ln, hy + 4, 2, 1, 3)
+    c.ellipse(30 + ln, hy + 4, 2, 1, 3)
+    c.ellipse(24 + ln, hy + 4, 3, 3, 3)
+    for x in range(20, 29):
+        c.put(x + ln, hy + 7 + (0 if 22 <= x <= 26 else -1), 9)
+
+    # hat
+    hx = 24 + ln + p["hat_dx"]
+    top = hy - 22
+    c.tri(hx, top, hx - 11, hy - 9, hx + 11, hy - 9, 1)
+    for y in range(max(0, top), hy - 8):
+        for x in range(W):
+            if c.buf[y][x] == 1 and (x + y) % 7 < 2:
+                c.buf[y][x] = 4
+    c.ellipse(hx, hy - 9, 12, 2, 1)
+    c.ellipse(hx, top, 3, 3, 6)
+    return c.buf
+
+
+def shade(buf):
+    def op(x, y):
+        return 0 <= x < W and 0 <= y < H and buf[y][x] != 0
+    px = [[(0, 0, 0, 0)] * W for _ in range(H)]
+    for y in range(H):
+        for x in range(W):
+            m = buf[y][x]
+            if m == 0:
+                continue
+            if not all(op(x + dx, y + dy) for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1))):
+                px[y][x] = OUTLINE + (255,)
+                continue
+            base, dark, light = MATS[m]
+            if not op(x + 2, y + 2) or not op(x + 1, y + 2):
+                col = dark
+            elif not op(x - 2, y - 2) or not op(x - 1, y - 2):
+                col = light
+            else:
+                col = base
+            px[y][x] = col + (255,)
+    return px
+
+
+FRAMES = []
+
+
+def add(name, p):
+    FRAMES.append((name, draw(p)))
+
+
+# idle: a slow breath
+add("idle", pose())
+add("idle", pose(body_dy=1, larm=(10, 54), rarm=(37, 54), head_dy=1))
+# walk: 4-frame cycle, body bob, alternating legs, counter-swinging arms
+add("walk", pose(lleg_dy=-3, rleg_dy=1, larm=(12, 50), rarm=(36, 56), body_dy=-1))
+add("walk", pose())
+add("walk", pose(lleg_dy=1, rleg_dy=-3, larm=(11, 56), rarm=(35, 50), body_dy=-1))
+add("walk", pose())
+# attack: windup, swing, follow-through
+add("attack", pose(lean=-2, larm=(8, 44), rarm=(36, 40), body_dy=1, hat_dx=-1))
+add("attack", pose(lean=3, larm=(16, 50), rarm=(44, 46), body_dy=-1, hat_dx=2))
+add("attack", pose(lean=2, larm=(18, 54), rarm=(40, 56), body_dy=1, hat_dx=1))
+# hit recoil
+add("hit", pose(lean=-3, head_dy=-2, larm=(6, 48), rarm=(34, 44), body_dy=1, hat_dx=-3))
+
+SHEET_W = W * len(FRAMES)
+shaded = [shade(b) for _, b in FRAMES]
 rows = []
 for y in range(H):
     row = bytearray()
-    for x in range(W):
-        row.extend(px[y][x])
+    for f in shaded:
+        for x in range(W):
+            row.extend(f[y][x])
     rows.append(row)
+
 
 def write_png(path, w, h, rows):
     raw = b"".join(b"\x00" + bytes(r) for r in rows)
-    def chunk(t, d):
+
+    def ch(t, d):
         return struct.pack(">I", len(d)) + t + d + struct.pack(">I", zlib.crc32(t + d) & 0xffffffff)
-    data = b"\x89PNG\r\n\x1a\n"
-    data += chunk(b"IHDR", struct.pack(">IIBBBBB", w, h, 8, 6, 0, 0, 0))
-    data += chunk(b"IDAT", zlib.compress(raw, 9))
-    data += chunk(b"IEND", b"")
-    with open(path, "wb") as f:
-        f.write(data)
+
+    data = (b"\x89PNG\r\n\x1a\n"
+            + ch(b"IHDR", struct.pack(">IIBBBBB", w, h, 8, 6, 0, 0, 0))
+            + ch(b"IDAT", zlib.compress(raw, 9)) + ch(b"IEND", b""))
+    open(path, "wb").write(data)
+
 
 out = os.path.join("assets", "sprites", "clown_16bit.png")
-write_png(out, W, H, rows)
-cols = len({p for r in px for p in r if p[3]})
-print(f"wrote {out}  {W}x{H}  {os.path.getsize(out)} bytes  {cols} distinct colors")
+write_png(out, SHEET_W, H, rows)
+
+clips = {}
+for i, (name, _) in enumerate(FRAMES):
+    clips.setdefault(name, []).append(i)
+meta = {"frame_width": W, "frame_height": H, "count": len(FRAMES), "clips": clips}
+with open(os.path.join("assets", "sprites", "clown_16bit.frames.json"), "w") as f:
+    json.dump(meta, f, indent=2)
+
+print("wrote {}  {}x{}  {} frames  {} bytes".format(out, SHEET_W, H, len(FRAMES), os.path.getsize(out)))
+print("clips: " + ", ".join("{}={}".format(k, len(v)) for k, v in clips.items()))
