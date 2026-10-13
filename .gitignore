@@ -1,0 +1,37 @@
+# Godot 4+ engine cache
+.godot/
+/android/
+
+# Godot import cache (pre-4.0 layout, kept for safety)
+.import/
+
+# Export artifacts and presets (presets can contain local paths / signing config)
+export.cfg
+export_presets.cfg
+build/
+*.exe
+*.pck
+*.zip
+
+# Imported translations (generated from CSV)
+*.translation
+
+# Mono / .NET
+.mono/
+data_*/
+mono_crash.*.json
+
+# C# build output
+[Bb]in/
+[Oo]bj/
+*.user
+*.userprefs
+*.sln.DotSettings.user
+
+# Steam
+steam_appid.txt
+
+# OS cruft
+Thumbs.db
+desktop.ini
+.DS_Store
