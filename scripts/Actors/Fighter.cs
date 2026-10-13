@@ -74,8 +74,8 @@ public partial class Fighter : CharacterBody3D
             frames.SetAnimationLoop(name, name is "idle" or "walk");
             frames.SetAnimationSpeed(name, name switch
             {
-                "idle" => 3.0,
-                "walk" => 12.0,
+                "idle" or "side_idle" => 3.0,
+                "walk" or "side_walk" => 11.0,
                 "attack" => 14.0,
                 _ => 8.0,
             });

@@ -94,7 +94,15 @@ public partial class PlayerFighter : Fighter
         ApplyGroundMovement(move * MoveSpeed, dt);
 
         if (!InHitAnim)
-            PlayClip(new Vector3(Velocity.X, 0f, Velocity.Z).Length() > 0.6f ? "walk" : "idle");
+        {
+            // Profile frames whenever travel is mostly horizontal. A front-facing
+            // cycle cannot read as walking left or right, however many frames it has.
+            float speed = new Vector3(Velocity.X, 0f, Velocity.Z).Length();
+            bool sideways = Mathf.Abs(Facing.X) > 0.5f;
+            PlayClip(speed > 0.6f
+                ? (sideways ? "side_walk" : "walk")
+                : (sideways ? "side_idle" : "idle"));
+        }
     }
 
     private void StartAttack()
@@ -176,7 +184,7 @@ public partial class PlayerFighter : Fighter
     {
         _dodgeTime += dt;
         float t = _dodgeTime / DodgeDuration;
-        if (!InHitAnim) PlayClip("walk");
+        if (!InHitAnim) PlayClip(Mathf.Abs(Facing.X) > 0.5f ? "side_walk" : "walk");
         ApplyGroundMovement(_dodgeDir * DodgeSpeed * (1f - t * 0.75f), dt);
 
         if (_dodgeTime >= DodgeDuration)

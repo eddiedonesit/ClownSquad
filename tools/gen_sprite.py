@@ -21,6 +21,9 @@ MATS = {
     8:  ((70, 56, 76),    (44, 34, 50),    (104, 88, 110)),   # shoe
     9:  ((40, 30, 48),    (40, 30, 48),    (40, 30, 48)),     # eye
     10: ((150, 60, 150),  (104, 38, 108),  (196, 108, 196)),  # accent purple
+    11: ((48, 72, 140),   (30, 46, 96),    (80, 110, 180)),   # far-side suit
+    12: ((186, 192, 208), (146, 152, 172), (220, 224, 236)),  # far-side glove
+    13: ((176, 40, 48),   (120, 26, 34),   (206, 86, 84)),    # far-side shoe
 }
 OUTLINE = (26, 18, 34)
 
@@ -176,11 +179,87 @@ def shade(buf):
     return px
 
 
+
+SIDE = dict(body_dy=0, lean=0, head_dy=0,
+            near_leg=0, far_leg=0, near_arm=0, far_arm=0, arm_lift=0)
+
+
+def spose(**over):
+    p = dict(SIDE)
+    p.update(over)
+    return p
+
+
+def draw_side(p):
+    """Profile view facing RIGHT. Flipped horizontally for leftward movement."""
+    c = Canvas()
+    by, ln = p["body_dy"], p["lean"]
+    nl, fl = p["near_leg"], p["far_leg"]
+    na, fa, lift = p["near_arm"], p["far_arm"], p["arm_lift"]
+
+    # far leg first, in darker tones so the near leg reads in front
+    c.limb(23 + ln, 49 + by, 23 + fl, 57, 11, half=2)
+    c.ellipse(24 + fl, 60, 7, 4, 13)
+    # near leg
+    c.limb(25 + ln, 49 + by, 25 + nl, 57, 5, half=2)
+    for i in range(2):
+        c.rect(23 + nl, 52 + i * 3, 27 + nl, 53 + i * 3, 1)
+    c.ellipse(26 + nl, 60, 8, 4, 8)
+    c.ellipse(27 + nl, 59, 6, 2, 1)
+
+    # far arm behind the torso
+    c.limb(22 + ln, 40 + by, 22 + fa, 53 - lift, 11, half=2)
+    c.ellipse(22 + fa, 53 - lift, 3, 3, 12)
+
+    # torso, narrower than the front view
+    c.rect(19 + ln, 37 + by, 29 + ln, 50 + by, 5)
+    c.ellipse(24 + ln, 50 + by, 5, 3, 5)
+    for b in (43, 48):
+        for dy in range(-2, 3):
+            w = 2 - abs(dy)
+            c.rect(24 + ln - w, b + dy + by, 24 + ln + w, b + dy + by, 10)
+
+    # near arm in front
+    c.limb(26 + ln, 40 + by, 26 + na, 53 - lift, 5, half=2)
+    c.ellipse(26 + na, 53 - lift, 3, 3, 6)
+
+    # ruff, narrower in profile
+    c.ellipse(24 + ln, 36 + by, 9, 4, 4)
+    for cx in (17, 24, 31):
+        c.ellipse(cx + ln, 38 + by, 3, 3, 4)
+
+    hy = 24 + by + p["head_dy"]
+    # hair tuft trails at the back
+    c.ellipse(15 + ln, hy + 4, 5, 4, 7)
+    # head
+    c.ellipse(24 + ln, hy, 9, 10, 2)
+    # single visible eye, set forward
+    c.ellipse(28 + ln, hy, 1, 2, 9)
+    c.put(28 + ln, hy - 1, 6)
+    # nose juts out to the right, the key profile read
+    c.ellipse(33 + ln, hy + 3, 3, 3, 3)
+    c.ellipse(30 + ln, hy + 5, 2, 1, 3)
+    for x in range(26, 32):
+        c.put(x + ln, hy + 8, 9)
+
+    # hat, tipped back off the brow
+    hx = 22 + ln
+    top = hy - 22
+    c.tri(hx - 2, top, hx - 10, hy - 9, hx + 11, hy - 9, 1)
+    for y in range(max(0, top), hy - 8):
+        for x in range(W):
+            if c.buf[y][x] == 1 and (x + y) % 7 < 2:
+                c.buf[y][x] = 4
+    c.ellipse(hx + 1, hy - 9, 11, 2, 1)
+    c.ellipse(hx - 2, top, 3, 3, 6)
+    return c.buf
+
+
 FRAMES = []
 
 
-def add(name, p):
-    FRAMES.append((name, draw(p)))
+def add(name, p, side=False):
+    FRAMES.append((name, draw_side(p) if side else draw(p)))
 
 
 # idle: a visible breath, shoulders and head rise
@@ -210,6 +289,21 @@ add("attack", pose(lean=3, body_dy=2, hat_dx=2,
 # hit recoil
 add("hit", pose(lean=-4, head_dy=-3, larm=(5, 47), rarm=(34, 42),
                 body_dy=2, hat_dx=-4, lleg_dx=-2, rleg_dx=2))
+
+# profile idle: breathing, facing right
+add("side_idle", spose(), side=True)
+add("side_idle", spose(body_dy=2, head_dy=1, arm_lift=-1), side=True)
+
+# profile walk: legs scissor hard, arms counter-swing. This is the clip that
+# actually reads as walking, because the stride is seen side-on.
+add("side_walk", spose(near_leg=8, far_leg=-7, near_arm=-9, far_arm=10,
+                       body_dy=-2, lean=1, arm_lift=1), side=True)
+add("side_walk", spose(near_leg=3, far_leg=-2, near_arm=-4, far_arm=4,
+                       body_dy=0), side=True)
+add("side_walk", spose(near_leg=-7, far_leg=8, near_arm=10, far_arm=-9,
+                       body_dy=-2, lean=1, arm_lift=1), side=True)
+add("side_walk", spose(near_leg=-2, far_leg=3, near_arm=4, far_arm=-4,
+                       body_dy=0), side=True)
 
 SHEET_W = W * len(FRAMES)
 shaded = [shade(b) for _, b in FRAMES]

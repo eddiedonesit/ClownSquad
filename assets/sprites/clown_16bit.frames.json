@@ -1,7 +1,7 @@
 {
   "frame_width": 48,
   "frame_height": 64,
-  "count": 11,
+  "count": 17,
   "clips": {
     "idle": [
       0,
@@ -21,6 +21,16 @@
     ],
     "hit": [
       10
+    ],
+    "side_idle": [
+      11,
+      12
+    ],
+    "side_walk": [
+      13,
+      14,
+      15,
+      16
     ]
   }
 }
