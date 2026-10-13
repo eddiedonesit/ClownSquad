@@ -1,0 +1,14 @@
+{
+  "frame_width": 64,
+  "frame_height": 40,
+  "count": 5,
+  "clips": {
+    "burst": [
+      0,
+      1,
+      2,
+      3,
+      4
+    ]
+  }
+}

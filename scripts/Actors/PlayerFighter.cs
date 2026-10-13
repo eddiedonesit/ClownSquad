@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using Godot;
 using ClownSquad.Combat;
 using ClownSquad.Input;
+using ClownSquad.Visuals;
 
 /// <summary>
 /// A fighter driven by an <see cref="IInputSource"/>. Knows nothing about where
@@ -45,6 +46,7 @@ public partial class PlayerFighter : Fighter
     private float _dodgeTime;
     private Vector3 _dodgeDir;
     private readonly HashSet<Fighter> _hitThisSwing = new();
+    private bool _impactSpawned;
 
     public string DebugState => _state switch
     {
@@ -109,6 +111,7 @@ public partial class PlayerFighter : Fighter
         _state = State.Attacking;
         _phaseTime = 0f;
         _hitThisSwing.Clear();
+        _impactSpawned = false;
         _sinceCombo = 0f;
     }
 
@@ -124,6 +127,16 @@ public partial class PlayerFighter : Fighter
 
         float activeStart = step.Startup;
         float activeEnd = step.Startup + step.Active;
+
+        // Ground impact fires once, as the mallet lands, whether or not it
+        // connected with anything. The swing should feel like it hit the world.
+        if (!_impactSpawned && _phaseTime >= activeStart)
+        {
+            _impactSpawned = true;
+            Vector3 at = GlobalPosition + Facing * 1.35f + new Vector3(0f, 0.12f, 0f);
+            ImpactEffect.Spawn(GetParent(), at, 0.85f + _comboIndex * 0.35f);
+            CameraShake.Request(this, 0.035f + _comboIndex * 0.03f, 0.16f + _comboIndex * 0.04f);
+        }
 
         // Pin the swing frame to the phase, so the visible swing is the hitbox.
         if (!InHitAnim)

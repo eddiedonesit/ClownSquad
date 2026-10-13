@@ -37,6 +37,7 @@ public static class FrameLibrary
                   name.EndsWith("idle") ? 3.0
                 : name.EndsWith("walk") ? 11.0
                 : name.EndsWith("attack") ? 14.0
+                : name.EndsWith("burst") ? 16.0
                 : 8.0);
             foreach (Variant idx in clips[key].AsGodotArray())
             {

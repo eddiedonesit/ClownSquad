@@ -26,6 +26,9 @@ public partial class GameRoot : Node3D
             return;
         }
 
+        if (GetNodeOrNull<Camera3D>("Camera3D") is Camera3D cam)
+            cam.AddChild(new ClownSquad.Visuals.CameraShake());
+
         SpawnPlayers();
         SpawnDummies();
         BuildHud();
