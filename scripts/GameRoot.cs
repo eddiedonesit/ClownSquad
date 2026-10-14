@@ -36,6 +36,8 @@ public partial class GameRoot : Node3D
 
     private Label? _hud;
     private Label? _banner;
+    private ClownSquad.UI.ClownHud? _clownHud;
+    private bool _f3Down;
     private WaveDirector? _director;
     private Camera3D? _arenaCamera;
     private Transform3D _arenaCameraRest;
@@ -55,6 +57,7 @@ public partial class GameRoot : Node3D
         GameClock.Reset();
         AttackTokens.Reset();
         Engine.TimeScale = GameClock.Speed;
+        AddChild(new ClownSquad.Audio.Sfx());
 
         // The arena is whatever the camera sees, captured before any shake, and
         // rebuilt whenever the window changes shape so the walls stay at the
@@ -79,6 +82,7 @@ public partial class GameRoot : Node3D
 
         SpawnPlayers();
         BuildHud();
+        ClownSquad.Audio.Sfx.PlayMusic("music_march");
 
         if (Has("sandbox") || _aiProbe)
         {
@@ -171,6 +175,7 @@ public partial class GameRoot : Node3D
             Name = $"Player{index}",
             Source = new LocalDeviceInput(device),
             PlayerIndex = index,
+            DisplayName = new[] { "PIP", "POPPY", "BINGO", "DOT" }[index % 4],
         };
         AddChild(p);
         Vector3 home = new(-1.5f + index * 1.5f, 0f, 1.5f);
@@ -293,6 +298,14 @@ public partial class GameRoot : Node3D
         _banner.SetAnchorsPreset(Control.LayoutPreset.TopWide);
         _banner.OffsetTop = 120;
         layer.AddChild(_banner);
+
+        // The old text readout survives as a debug overlay on F3; the circus HUD
+        // is what players see.
+        _hud.Visible = false;
+        _banner.Visible = false;
+        _clownHud = new ClownSquad.UI.ClownHud(() => _players, () => _director,
+            () => _endedAt >= 0 && GameClock.Seconds - _endedAt > 1.5);
+        AddChild(_clownHud);
     }
 
     private static Label MakeLabel(int size, int outline)
@@ -332,6 +345,10 @@ public partial class GameRoot : Node3D
             sb.AppendLine($"BOSS  hp {b.Health:F0} / {b.MaxHealth:F0}  {b.DebugState}");
 
         if (_comboHits > 0 && GameClock.Seconds > _comboExpires) _comboHits = 0;
+        if (_clownHud is not null) _clownHud.Combo = _comboHits;
+        bool f3 = Godot.Input.IsKeyPressed(Key.F3);
+        if (f3 && !_f3Down) _hud.Visible = !_hud.Visible;
+        _f3Down = f3;
         if (_comboHits > 1)
         {
             sb.AppendLine();
@@ -424,6 +441,12 @@ public partial class GameRoot : Node3D
         string got = d.Current == WaveDirector.Phase.Victory ? "win"
                    : d.Current == WaveDirector.Phase.Defeat ? "lose" : "timeout";
         bool ok = got == _outcomeProbe;
+        var heard = new List<string>();
+        foreach (var kv in ClownSquad.Audio.Sfx.Played) heard.Add($"{kv.Key}x{kv.Value}");
+        heard.Sort();
+        GD.Print($"  sound banks loaded: {ClownSquad.Audio.Sfx.BankCount}; played: {string.Join(" ", heard)}");
+        GD.Print($"  sound names with no file: {(ClownSquad.Audio.Sfx.Missing.Count == 0 ? "none" : string.Join(" ", ClownSquad.Audio.Sfx.Missing))}");
+        ok &= ClownSquad.Audio.Sfx.Missing.Count == 0;
         if (_outcomeProbe == "lose")
         {
             GD.Print($"  player blinked while lying dead: {_sawDeadBlink}");

@@ -16,6 +16,7 @@ public partial class TrainingDummy : Fighter
 
     public override void _Ready()
     {
+        DisplayName = "PRACTICE DUMMY";
         MaxHealth = 200f;
         BaseTint = new Color(0.65f, 0.8f, 1.0f);
         base._Ready();

@@ -30,11 +30,10 @@ additively** rather than requiring a rewrite.
 The only remaining question is scheduling, not architecture: does online ship at
 launch, or after? That affects when Steamworks P2P work lands, nothing else.
 
-### 2.2 Run structure
+### 2.2 Run structure: RESOLVED, persistent levels
 
-Is this run-based like Rampage Knights (die, restart, keep meta-progression), or
-level-based with persistent characters like Guardian Heroes? It changes whether
-loot and captures persist between sessions. Unresolved.
+Characters persist between sessions (level, gear, skills, captures) and the game
+is a sequence of authored stages. See [ADR 0006](../adr/0006-persistent-progression.md).
 
 ### 2.3 Deferred by agreement
 

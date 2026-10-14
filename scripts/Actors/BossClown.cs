@@ -1,6 +1,7 @@
 namespace ClownSquad.Actors;
 
 using Godot;
+using ClownSquad.Audio;
 using ClownSquad.Visuals;
 
 /// <summary>
@@ -21,6 +22,11 @@ public partial class BossClown : PlayerFighter
     protected override float SpritePixelSize => 0.034f;
 
     public override bool Hostile => true;
+
+    public override string AttackSound => "slap";
+    public override float AttackPitch => 0.7f;
+    public override string HurtSound => "honk_low";
+    public override string DeathSound => "kaboom";
     public override float BodyHeight => 2.25f;
     public override float BodyHalfWidth => 0.9f;
 
@@ -52,6 +58,7 @@ public partial class BossClown : PlayerFighter
 
     public override void _Ready()
     {
+        if (DisplayName.Length == 0) DisplayName = "BELLYFLOP BERTIE";
         MaxHealth = 320f;
         MoveSpeed = 2.9f;      // slow and inevitable rather than quick
         Acceleration = 22f;
@@ -65,6 +72,8 @@ public partial class BossClown : PlayerFighter
     {
         _slammed = false;
         _lungeDir = Facing;
+        // An audible tell as well as a visual one: hear the slam coming.
+        Sfx.Play("honk_low", 0.75f, 2f);
     }
 
     protected override bool TickSpecialMove(float dt)
@@ -99,6 +108,7 @@ public partial class BossClown : PlayerFighter
             // the boss rather than out at a weapon.
             ImpactEffect.Spawn(GetParent(), GlobalPosition + new Vector3(0f, 0.12f, 0f), 2.2f);
             CameraShake.Request(this, 0.16f, 0.34f);
+            Sfx.Play("kaboom");
             GD.Print($"Boss belly slam: {hits} hit(s).");
             return false;
         }

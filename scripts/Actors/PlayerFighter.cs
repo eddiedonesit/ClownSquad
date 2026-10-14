@@ -2,6 +2,7 @@ namespace ClownSquad.Actors;
 
 using System.Collections.Generic;
 using Godot;
+using ClownSquad.Audio;
 using ClownSquad.Combat;
 using ClownSquad.Input;
 using ClownSquad.Visuals;
@@ -70,6 +71,12 @@ public partial class PlayerFighter : Fighter
 
     // Players blink while floored and while invulnerable after respawning.
     protected override bool BlinkWhileDown => !Hostile;
+
+    public override string AttackSound => HasMalletMoves ? "bonk" : "slap";
+    public override string HurtSound => Hostile ? "squeak" : "honk";
+    public override string DeathSound => Hostile ? "slide_down" : "wah_short";
+
+    private AudioStreamPlayer? _chargeVoice;
 
     /// <summary>Scales all damage this fighter deals. Weak enemies sit below one.</summary>
     public float DamageMultiplier { get; set; } = 1f;
@@ -214,6 +221,7 @@ public partial class PlayerFighter : Fighter
             if (HasMalletMoves && Armed && !_chargeLock && _heldTime >= ChargeStart)
             {
                 _state = State.Charging;
+                _chargeVoice = Sfx.Play("kazoo_rise");
                 return;
             }
 
@@ -259,6 +267,7 @@ public partial class PlayerFighter : Fighter
         _impactSpawned = false;
         _sinceCombo = 0f;
         AssistLane();
+        Sfx.Play("whoosh", 1f + 0.12f * _comboIndex);
     }
 
     /// <summary>
@@ -309,6 +318,7 @@ public partial class PlayerFighter : Fighter
             {
                 Vector3 at = GlobalPosition + Facing * MalletForward + new Vector3(0f, MalletHeight, 0f);
                 ImpactEffect.Spawn(GetParent(), at, 0.7f + _comboIndex * 0.25f);
+                Sfx.Play("thump", 1.1f, -4f);
                 CameraShake.Request(this, 0.035f + _comboIndex * 0.03f, 0.16f + _comboIndex * 0.04f);
             }
         }
@@ -389,6 +399,7 @@ public partial class PlayerFighter : Fighter
         _dodgeTime = 0f;
         _bufferedAttack = false;
         Dust(0.3f);
+        Sfx.Play("zip");
     }
 
     private void TickDodge(float dt)
@@ -460,6 +471,8 @@ public partial class PlayerFighter : Fighter
 
     private void EndMalletMove(bool lockCharge = true)
     {
+        Sfx.Stop(_chargeVoice);
+        _chargeVoice = null;
         Visual.Tint = BaseTint;
         Visual.FlipOverride = null;
         _state = State.Free;
@@ -469,6 +482,9 @@ public partial class PlayerFighter : Fighter
     private void StartSpin()
     {
         Visual.Tint = BaseTint;
+        Sfx.Stop(_chargeVoice);
+        _chargeVoice = null;
+        Sfx.Play("whirr", 1.15f);
         _spinDir = Facing;
         _spinTime = 0f;
         _spinHitTimer = 0f;
@@ -509,6 +525,8 @@ public partial class PlayerFighter : Fighter
     private void StartThrow()
     {
         Visual.Tint = BaseTint;
+        Sfx.Stop(_chargeVoice);
+        _chargeVoice = null;
         _throwTime = 0f;
         _thrown = false;
         _state = State.Throwing;
@@ -528,6 +546,7 @@ public partial class PlayerFighter : Fighter
                 Armed = false;
                 Visual.ClipPrefix = "empty_";
                 MalletProjectile.Spawn(this, Facing);
+                Sfx.Play("fwee");
                 CameraShake.Request(this, 0.04f, 0.12f);
             }
         }
@@ -547,6 +566,7 @@ public partial class PlayerFighter : Fighter
         Visual.ClipPrefix = "";
         Visual.Squash(0.25f);
         _chargeLock = true;
+        Sfx.Play("clack");
     }
 
     private void StartFlip()
@@ -555,6 +575,7 @@ public partial class PlayerFighter : Fighter
         _flipTime = 0f;
         _hitThisSwing.Clear();
         _state = State.Flipping;
+        Sfx.Play("whoosh", 1.4f);
         // A little lift, so a flip started at the top of a jump still completes.
         Velocity = new Vector3(Facing.X * FlipForward, Mathf.Max(Velocity.Y, 3.5f), Velocity.Z * 0.5f);
     }
@@ -579,6 +600,7 @@ public partial class PlayerFighter : Fighter
         {
             ImpactEffect.Spawn(GetParent(), GlobalPosition + Facing * 0.7f + new Vector3(0f, 0.15f, 0f), 0.9f);
             CameraShake.Request(this, 0.06f, 0.2f);
+            Sfx.Play("thump");
             Visual.Squash(0.3f);
             EndMalletMove();
         }
@@ -618,6 +640,8 @@ public partial class PlayerFighter : Fighter
     protected override void OnInterrupted()
     {
         // Being hit drops whatever was in progress. A thrown mallet stays out.
+        Sfx.Stop(_chargeVoice);
+        _chargeVoice = null;
         Visual.Tint = BaseTint;
         Visual.FlipOverride = null;
         _state = State.Free;

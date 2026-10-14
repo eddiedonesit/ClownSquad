@@ -2,6 +2,7 @@ namespace ClownSquad.Actors;
 
 using System;
 using Godot;
+using ClownSquad.Audio;
 using ClownSquad.Combat;
 using ClownSquad.Visuals;
 using ClownSquad.World;
@@ -46,6 +47,12 @@ public partial class Fighter : CharacterBody3D
     /// signal for "this one is coming back" and "cannot be hurt yet".
     /// </summary>
     protected virtual bool BlinkWhileDown => false;
+
+    /// <summary>Sounds this fighter makes. The kit itself lives in tools/gen_audio.py.</summary>
+    public virtual string AttackSound => "slap";
+    public virtual float AttackPitch => 1f;
+    public virtual string HurtSound => "squeak";
+    public virtual string DeathSound => "slide_down";
     private const float BlinkPeriod = 0.09f;
     private float _deadTime;
 
@@ -65,6 +72,9 @@ public partial class Fighter : CharacterBody3D
     /// platforms or uneven terrain ever appear.
     /// </summary>
     public bool Grounded { get; private set; } = true;
+
+    /// <summary>Name shown on the HUD. Every thug gets one, Final Fight style.</summary>
+    public string DisplayName { get; set; } = "";
 
     public float Health { get; private set; }
     public bool IsDead => Health <= 0f;
@@ -148,7 +158,7 @@ public partial class Fighter : CharacterBody3D
         if (_despawnIn > 0f)
         {
             _despawnIn -= dt;
-            if (_despawnIn <= 0f) { QueueFree(); return; }
+            if (_despawnIn <= 0f) { Sfx.Play("pop"); QueueFree(); return; }
             // Blink out over the last moments, the way arcade bodies always have.
             if (_despawnIn < 0.7f) Visual.Visible = (int)(_despawnIn / 0.07f) % 2 == 0;
         }
@@ -259,6 +269,7 @@ public partial class Fighter : CharacterBody3D
         if (!Launched) return;
 
         Dust(0.5f);
+        Sfx.Play("thump", 0.9f);
         if (!_groundBounced && fallSpeed > 6.5f && !IsDead)
         {
             // One bounce off the floor: a last chance to extend the juggle.
@@ -298,6 +309,7 @@ public partial class Fighter : CharacterBody3D
             Visual?.Squash(0.4f);
             ImpactEffect.Spawn(GetParent(), GlobalPosition + new Vector3(0f, BodyHeight * 0.5f, 0f), 0.6f);
             CameraShake.Request(this, 0.05f, 0.18f);
+            Sfx.Play("boing");
             if (!IsDead)
             {
                 Health = Mathf.Max(0f, Health - WallBounceDamage);
@@ -334,6 +346,8 @@ public partial class Fighter : CharacterBody3D
         Visual?.Flash();
         Visual?.Squash(0.35f);
         PlayClip("hit", restart: true);
+        if (info.Source is Fighter attacker) Sfx.Play(attacker.AttackSound, attacker.AttackPitch);
+        Sfx.Play(HurtSound);
 
         if (!HasPoise || IsDead)
         {
@@ -351,6 +365,8 @@ public partial class Fighter : CharacterBody3D
                 launch *= Mathf.Max(0.4f, 1f - 0.17f * _juggleCount);
                 _pendingLaunch = launch;
                 _juggleCount++;
+                // Each extra juggle hit whistles a little higher.
+                Sfx.Play("slide_up", 1f + 0.1f * _juggleCount);
                 Launched = true;
                 _groundBounced = false;
             }
@@ -360,6 +376,7 @@ public partial class Fighter : CharacterBody3D
         }
 
         HitLanded?.Invoke(info.Source as Fighter, this, info.Amount);
+        if (IsDead) Sfx.Play(DeathSound);
         if (IsDead) Died?.Invoke(this);
     }
 
@@ -408,6 +425,7 @@ public partial class Fighter : CharacterBody3D
     {
         Velocity = new Vector3(Velocity.X, speed, Velocity.Z);
         Grounded = false;
+        Sfx.Play("boing_small", 1.2f);
     }
 
     /// <summary>Restore to full and place at a position. Used for respawns.</summary>
@@ -429,6 +447,7 @@ public partial class Fighter : CharacterBody3D
         _invulnerable = 1.0f;
         _deadTime = 0f;
         Visual.Visible = true;
+        if (BlinkWhileDown) Sfx.Play("ding");
         OnRevived();
         PlayClip("idle", restart: true);
     }

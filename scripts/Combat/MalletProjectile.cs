@@ -3,6 +3,7 @@ namespace ClownSquad.Combat;
 using System.Collections.Generic;
 using Godot;
 using ClownSquad.Actors;
+using ClownSquad.Audio;
 using ClownSquad.Visuals;
 using ClownSquad.World;
 
@@ -44,6 +45,7 @@ public partial class MalletProjectile : Node3D
         owner.GetParent().AddChild(mallet);
         Vector3 p = owner.GlobalPosition;
         mallet.GlobalPosition = new Vector3(p.X + mallet._dir.X * 0.8f, 0f, p.Z);
+        Sfx.Play("whirr");
     }
 
     public override void _Ready()

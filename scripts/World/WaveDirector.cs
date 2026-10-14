@@ -3,6 +3,7 @@ namespace ClownSquad.World;
 using System;
 using Godot;
 using ClownSquad.Actors;
+using ClownSquad.Audio;
 using ClownSquad.Input;
 
 /// <summary>
@@ -23,6 +24,12 @@ public partial class WaveDirector : Node
     private static readonly Wave[] Waves = { new(3, false), new(5, false), new(2, true) };
 
     private const float Intermission = 2.2f;
+
+    private static readonly string[] GruntNames =
+    {
+        "GIGGLES", "BONZO", "CHUCKLES", "WOBBLES", "SQUEAKY", "DOODLES",
+        "PICKLES", "BUTTONS", "SNIFFLES", "NOODLE", "KAZOO KEN", "LOLLY",
+    };
     private const float SpawnInterval = 0.7f;
 
     public ulong Seed { get; set; } = 20261014;
@@ -66,6 +73,12 @@ public partial class WaveDirector : Node
     {
         if (Current == phase) return;
         Current = phase;
+        switch (phase)
+        {
+            case Phase.Fighting: Sfx.Play("fanfare"); break;
+            case Phase.Victory: Sfx.StopMusic(); Sfx.Play("victory"); break;
+            case Phase.Defeat: Sfx.StopMusic(); Sfx.Play("sad_trombone"); break;
+        }
         PhaseChanged?.Invoke(phase);
     }
 
@@ -117,6 +130,7 @@ public partial class WaveDirector : Node
     private void Spawn(bool boss)
     {
         PlayerFighter enemy = boss ? new BossClown { Name = "BossClown" } : new GruntClown { Name = "Grunt" };
+        if (!boss) enemy.DisplayName = GruntNames[_rng.RandiRange(0, GruntNames.Length - 1)];
         enemy.Source = boss
             ? new BrawlerAi(enemy, attackRange: 2.2f, backoffRange: 1.2f, attackCooldownMs: 700,
                             specialCooldownMs: 5000, specialRange: 6.0f)

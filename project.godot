@@ -19,3 +19,8 @@ project/assembly_name="ClownSquad"
 renderer/rendering_method="forward_plus"
 ; Nearest-neighbour: keeps pixel art crisp instead of blurring it
 textures/canvas_textures/default_texture_filter=0
+
+[display]
+
+window/stretch/mode="canvas_items"
+window/stretch/aspect="expand"
