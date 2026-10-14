@@ -80,19 +80,29 @@ def draw_side(p):
     # torso
     c.rect(19 + ln, 37 + by, 29 + ln, 50 + by, 5)
     c.ellipse(24 + ln, 50 + by, 5, 3, 5)
-    for b in (43, 48):
-        for dy in range(-2, 3):
-            w = 2 - abs(dy)
-            c.rect(24 + ln - w, b + dy + by, 24 + ln + w, b + dy + by, 10)
+    # suit detail: polka dots, a diamond button, and a belt with a buckle
+    for dx, dy in ((20, 41), (21, 45)):
+        c.rect(dx + ln, dy + by, dx + 1 + ln, dy + 1 + by, 6)
+    for dy in range(-2, 3):
+        w = 2 - abs(dy)
+        c.rect(24 + ln - w, 44 + dy + by, 24 + ln + w, 44 + dy + by, 10)
+    c.rect(19 + ln, 48 + by, 29 + ln, 49 + by, 8)
+    c.rect(23 + ln, 48 + by, 25 + ln, 49 + by, 4)
 
     # near arm in front
     c.limb(26 + ln, 40 + by, 26 + na, 53 - lift, 5, half=2)
+    # a red stripe round the sleeve and a frilly yellow cuff at the wrist
+    for t, m, rx in ((0.4, 1, 2), (0.78, 4, 3)):
+        sx = 26 + ln + (na - ln) * t
+        sy = 40 + by + (13 - lift - by) * t
+        c.ellipse(int(round(sx)), int(round(sy)), rx, 1, m)
     c.ellipse(26 + na, 53 - lift, 3, 3, 6)
 
     # ruff
+    # ruff: two-tone scallops so it reads as pleated cloth, not a plate
     c.ellipse(24 + ln, 36 + by, 9, 4, 4)
-    for cx in (17, 24, 31):
-        c.ellipse(cx + ln, 38 + by, 3, 3, 4)
+    for cx, m in ((17, 6), (21, 4), (25, 6), (29, 4), (32, 6)):
+        c.ellipse(cx + ln, 38 + by, 2, 2, m)
 
     hy = 24 + by + p["head_dy"]
     c.ellipse(15 + ln, hy + 4, 5, 4, 7)          # hair tuft trailing behind
@@ -113,6 +123,8 @@ def draw_side(p):
             if c.get(x, y) == 1 and (x + y) % 7 < 2:
                 c.put(x, y, 4)
     c.ellipse(hx + 1, hy - 6, 11, 2, 1)
+    for x in range(hx - 7, hx + 10, 3):          # white stitching along the brim
+        c.put(x, hy - 6, 6)
     c.ellipse(hx - 2, top, 3, 3, 6)
 
     if p.get("mallet") is not None:

@@ -275,12 +275,13 @@ public partial class ClownHud : CanvasLayer
             Text = "MOVE  WASD / stick     ATTACK  J / X     JUMP  Space / A     DODGE  K / B\n" +
                    "hold ATTACK: throw the mallet  -  hold ATTACK + left/right: spin  -  ATTACK in the air: flip\n" +
                    "F1 controls   F3 debug",
-            HorizontalAlignment = HorizontalAlignment.Center,
-            LabelSettings = Style(13, new Color(1f, 1f, 1f, 0.95f), 4),
+            HorizontalAlignment = HorizontalAlignment.Right,
+            LabelSettings = Style(11, new Color(1f, 1f, 1f, 0.95f), 4),
         };
-        _hint.SetAnchorsPreset(Control.LayoutPreset.CenterBottom);
-        _hint.Position = new Vector2(-380, -66);
-        _hint.Size = new Vector2(760, 60);
+        // Top right: clear of the boss bar, the combo and the player panels.
+        _hint.SetAnchorsPreset(Control.LayoutPreset.TopRight);
+        _hint.Position = new Vector2(-652, 10);
+        _hint.Size = new Vector2(640, 60);
         AddChild(_hint);
         // Shown for the first moments of a fight, then out of the way.
         CreateTween().TweenProperty(_hint, "modulate:a", 0f, 1.2f).SetDelay(9.0);

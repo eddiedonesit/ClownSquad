@@ -26,9 +26,14 @@ procedurally generated run; the current wave fight is the shape of one stage.
 - Enemy scaling to the host level (GDD section 7) now matters for real, because
   co-op partners will arrive with characters of different levels.
 
+## Failing a stage (decided 2026-10-14)
+
+A failed stage keeps the XP earned in it and loses the loot. Levels always
+move forward, so a loss is never wasted time; gear only arrives on a clear,
+so every stage still has something at stake. Loot picked up mid-stage is
+held provisionally and banked to the character on the stage-clear screen.
+
 ## Open, needed before the save system
 
-- Failing a stage: keep XP and loot earned in it, or lose them? Keeping is
-  friendlier and normal for the genre; losing gives each stage stakes.
 - Slots per player, and whether a co-op guest brings their own character.
 - Whether gear rolls happen on the host only (ADR 0003 says yes for fairness).

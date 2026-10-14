@@ -384,6 +384,7 @@ public partial class GameRoot : Node3D
 
     private float _aiProbeTime;
     private int _aiProbeTick;
+    private bool _hangShot;
 
     /// <summary>Boss AI closes distance, swings and slams. "-- aitest"</summary>
     private void TickAiProbe(float dt)
@@ -396,6 +397,12 @@ public partial class GameRoot : Node3D
         PlayerFighter p = _players[0];
         float d = b.GlobalPosition.DistanceTo(p.GlobalPosition);
         GD.Print($"  t={_aiProbeTime:F1}  dist={d:F2}  boss={b.DebugState} clip={b.CurrentClip}  playerHp={p.Health:F0}");
+
+        if (b.Hanging && !_hangShot && !DisplayServer.GetName().Contains("headless"))
+        {
+            _hangShot = true;
+            GetViewport().GetTexture().GetImage().SavePng("C:/Claude/ClownSquad/debug/flop_hang.png");
+        }
 
         if (++_aiProbeTick > 26)
         {

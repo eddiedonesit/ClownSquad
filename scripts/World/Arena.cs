@@ -42,6 +42,9 @@ public sealed class Arena
         _nearZ = Bisect(z => InView(new Vector3(_eye.X, 0f, z)), 0f, 40f);
     }
 
+    /// <summary>Highest point still on screen at a depth. Bounds how high anything may jump.</summary>
+    public float MaxVisibleHeight(float z) => Bisect(h => InView(new Vector3(_eye.X, h, z)), 0f, 30f);
+
     /// <summary>Depth range a body of the given height may occupy: far (negative) to near.</summary>
     public (float Far, float Near) DepthRange(float height) => (FarZ(height), _nearZ);
 
