@@ -2,6 +2,7 @@
 
 | Document | What it covers |
 | --- | --- |
+| [Status](STATUS.md) | What is actually built, how to run it, and the traps |
 | [Design Document](design/GDD.md) | The game: references, enemies, capture, classes, loot, progression, weapons |
 | [Architecture Decision Records](adr/README.md) | Why the project is built the way it is |
 
