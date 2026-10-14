@@ -35,11 +35,13 @@ public partial class PlayerFighter : Fighter
     private const float IFrameStart = 0.05f;
     private const float IFrameEnd = 0.26f;
 
-    // Where the mallet head sits on the strike frame, derived from the sprite
-    // geometry rather than guessed: the head lands 29.2px right of and 5.2px
-    // above the sprite centre, at pixel_size 0.0225 with the sprite 0.72 up.
-    private const float MalletForward = 0.657f;
-    private const float MalletHeight = 0.837f;
+    // Where the mallet head sits on the GROUND-CONTACT frame, measured from the
+    // sprite geometry. The strike frame (45 deg) puts the head at 0.657/0.837,
+    // which is head height - centring the burst there made it bloom around the
+    // clown rather than at the floor. The follow-through frame is the one that
+    // actually meets the ground.
+    private const float MalletForward = 0.833f;
+    private const float MalletHeight = 0.203f;
 
     public IInputSource Source { get; set; } = null!;
     public int PlayerIndex { get; set; }
@@ -136,8 +138,8 @@ public partial class PlayerFighter : Fighter
 
         // Impact fires once per swing, whether or not it connected: the swing
         // should feel like it hit the world. Timed to the second half of the
-        // active window, which is where the sprite shows the 45-degree strike
-        // rather than the mallet still raised behind the head.
+        // active window, which is now the frame where the mallet meets the
+        // ground, so the burst and the visible contact coincide.
         if (!_impactSpawned && _phaseTime >= activeStart + step.Active * 0.5f)
         {
             _impactSpawned = true;
@@ -149,9 +151,12 @@ public partial class PlayerFighter : Fighter
         // Pin the swing frame to the phase, so the visible swing is the hitbox.
         if (!InHitAnim)
         {
-            int frame = _phaseTime < activeStart ? 0
-                      : _phaseTime < activeStart + step.Active * 0.5f ? 1
-                      : _phaseTime < activeEnd ? 2
+            // Startup covers the windup and raise; the active window carries the
+            // strike through to ground contact, so the frame the player reads as
+            // the hit is the frame the hitbox is live on.
+            int frame = _phaseTime < step.Startup * 0.5f ? 0
+                      : _phaseTime < activeStart ? 1
+                      : _phaseTime < activeStart + step.Active * 0.5f ? 2
                       : 3;
             PinClipFrame("attack", frame);
         }
