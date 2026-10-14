@@ -21,6 +21,14 @@ public partial class Fighter : CharacterBody3D
     [Export] public float MoveSpeed { get; set; } = 5.0f;
     [Export] public float Acceleration { get; set; } = 60f;
     [Export] public float Friction { get; set; } = 45f;
+    [Export] public float Gravity { get; set; } = 26f;
+
+    /// <summary>
+    /// The arena is a flat plane with no floor collider, so ground contact is a
+    /// clamp at y=0 rather than a physics query. Replace with real colliders if
+    /// platforms or uneven terrain ever appear.
+    /// </summary>
+    public bool Grounded { get; private set; } = true;
 
     public float Health { get; private set; }
     public bool IsDead => Health <= 0f;
@@ -96,10 +104,23 @@ public partial class Fighter : CharacterBody3D
             _knockback = _knockback.MoveToward(Vector3.Zero, 40f * dt);
         }
 
+        if (!Grounded) Velocity = new Vector3(Velocity.X, Velocity.Y - Gravity * dt, Velocity.Z);
+
         Visual?.SetFacing(Facing);
         Visual?.Tick(dt);
 
         MoveAndSlide();
+
+        if (GlobalPosition.Y <= 0f)
+        {
+            GlobalPosition = new Vector3(GlobalPosition.X, 0f, GlobalPosition.Z);
+            if (Velocity.Y < 0f) Velocity = new Vector3(Velocity.X, 0f, Velocity.Z);
+            Grounded = true;
+        }
+        else
+        {
+            Grounded = false;
+        }
     }
 
     protected virtual void Tick(float dt) { }
@@ -108,7 +129,7 @@ public partial class Fighter : CharacterBody3D
     {
         float rate = desired.LengthSquared() > 0.001f ? Acceleration : Friction;
         var flat = new Vector3(Velocity.X, 0, Velocity.Z).MoveToward(desired, rate * dt);
-        Velocity = new Vector3(flat.X, 0, flat.Z);
+        Velocity = new Vector3(flat.X, Velocity.Y, flat.Z);   // preserve vertical
     }
 
     public virtual bool CanBeHit() => !IsDead;
@@ -132,6 +153,13 @@ public partial class Fighter : CharacterBody3D
     {
         HitstopRemaining = Mathf.Max(HitstopRemaining, seconds);
         Visual?.Squash(0.18f);
+    }
+
+    /// <summary>Launch upward. Caller decides whether jumping is allowed.</summary>
+    protected void Jump(float speed)
+    {
+        Velocity = new Vector3(Velocity.X, speed, Velocity.Z);
+        Grounded = false;
     }
 
     public void Heal(float amount) => Health = Mathf.Min(MaxHealth, Health + amount);

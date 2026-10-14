@@ -1,7 +1,7 @@
 {
   "frame_width": 104,
   "frame_height": 64,
-  "count": 14,
+  "count": 16,
   "clips": {
     "idle": [
       0,
@@ -26,6 +26,10 @@
       11,
       12,
       13
+    ],
+    "jump": [
+      14,
+      15
     ]
   }
 }

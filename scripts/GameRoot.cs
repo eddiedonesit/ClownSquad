@@ -134,8 +134,8 @@ public partial class GameRoot : Node3D
 
         var sb = new StringBuilder();
         sb.AppendLine("CLOWN SQUAD - combat test");
-        sb.AppendLine("Keyboard: WASD move | J or Space attack | K or Shift dodge");
-        sb.AppendLine("Gamepad:  stick move | X or A attack | B or RB dodge");
+        sb.AppendLine("Keyboard: WASD move | J attack | Space jump | K or Shift dodge");
+        sb.AppendLine("Gamepad:  stick move | X attack | A jump | B or RB dodge");
         sb.AppendLine("Unjoined pad? Press A / X to join.");
         sb.AppendLine();
         foreach (PlayerFighter p in _players)

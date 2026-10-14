@@ -235,18 +235,18 @@ def add(name, p):
 # camera, so there is one set of frames, mirrored for leftward travel (ADR 0004).
 
 # idle: breathing
-add("idle", spose())
-add("idle", spose(body_dy=2, head_dy=1, arm_lift=-1))
+add("idle", spose(mallet=(143, 29)))
+add("idle", spose(body_dy=2, head_dy=1, arm_lift=-1, mallet=(143, 29)))
 
 # walk: legs scissor hard, arms counter-swing
 add("walk", spose(near_leg=8, far_leg=-7, near_arm=-9, far_arm=10,
-                  body_dy=-2, lean=1, arm_lift=1))
+                  body_dy=-2, lean=1, arm_lift=1, mallet=(143, 29)))
 add("walk", spose(near_leg=3, far_leg=-2, near_arm=-4, far_arm=4,
-                  body_dy=0))
+                  body_dy=0, mallet=(143, 29)))
 add("walk", spose(near_leg=-7, far_leg=8, near_arm=10, far_arm=-9,
-                  body_dy=-2, lean=1, arm_lift=1))
+                  body_dy=-2, lean=1, arm_lift=1, mallet=(143, 29)))
 add("walk", spose(near_leg=-2, far_leg=3, near_arm=4, far_arm=-4,
-                  body_dy=0))
+                  body_dy=0, mallet=(143, 29)))
 
 # attack: mallet arcs from behind the head, out to 45 degrees on impact
 add("attack", spose(lean=-3, body_dy=1, near_arm=-6, far_arm=-4,
@@ -260,18 +260,24 @@ add("attack", spose(lean=4, body_dy=1, near_arm=9, far_arm=5,
 
 # hit recoil
 add("hit", spose(lean=-4, head_dy=-2, body_dy=2,
-                 near_arm=-7, far_arm=-5, arm_lift=-2))
+                 near_arm=-7, far_arm=-5, arm_lift=-2, mallet=(143, 29)))
 
 # dodge slide: body drops, leading leg extends, arms trail behind
-add("dodge", spose(body_dy=3, lean=4, head_dy=1,
-                   near_leg=7, far_leg=-4,
-                   near_arm=-8, far_arm=-6, arm_lift=-3))
-add("dodge", spose(body_dy=7, lean=7, head_dy=2,
-                   near_leg=13, far_leg=-7,
-                   near_arm=-12, far_arm=-9, arm_lift=-6))
-add("dodge", spose(body_dy=3, lean=3, head_dy=1,
-                   near_leg=5, far_leg=-2,
-                   near_arm=-5, far_arm=-3, arm_lift=-2))
+add("dodge", spose(body_dy=8, lean=6, head_dy=3,
+                   near_leg=12, far_leg=-6,
+                   near_arm=-10, far_arm=-7, arm_lift=-6, mallet=(143, 29)))
+add("dodge", spose(body_dy=15, lean=10, head_dy=6,
+                   near_leg=20, far_leg=-10,
+                   near_arm=-15, far_arm=-11, arm_lift=-11, mallet=(143, 29)))
+add("dodge", spose(body_dy=8, lean=5, head_dy=3,
+                   near_leg=11, far_leg=-5,
+                   near_arm=-9, far_arm=-6, arm_lift=-6, mallet=(143, 29)))
+
+# jump: tuck on the rise, reach on the fall
+add("jump", spose(body_dy=-2, lean=2, near_leg=5, far_leg=-3,
+                  near_arm=-6, far_arm=-4, arm_lift=6, mallet=(143, 29)))
+add("jump", spose(body_dy=0, lean=-1, near_leg=-4, far_leg=6,
+                  near_arm=4, far_arm=-3, arm_lift=2, mallet=(143, 29)))
 
 SHEET_W = W * len(FRAMES)
 shaded = [shade(b) for _, b in FRAMES]

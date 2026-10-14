@@ -34,6 +34,7 @@ public partial class PlayerFighter : Fighter
     private const float DodgeSpeed = 11f;
     private const float IFrameStart = 0.05f;
     private const float IFrameEnd = 0.26f;
+    private const float JumpSpeed = 8.5f;
 
     // Where the mallet head sits on the GROUND-CONTACT frame, measured from the
     // sprite geometry. The strike frame (45 deg) puts the head at 0.657/0.837,
@@ -97,7 +98,15 @@ public partial class PlayerFighter : Fighter
             return;
         }
 
-        if (cmd.DodgePressed)
+        if (cmd.JumpPressed && Grounded)
+        {
+            Jump(JumpSpeed);
+            ImpactEffect.Spawn(GetParent(), GlobalPosition + new Vector3(0f, 0.1f, 0f), 0.25f);
+            return;
+        }
+
+        // Dodging is a ground slide, so it needs the floor.
+        if (cmd.DodgePressed && Grounded)
         {
             _dodgeDir = move.LengthSquared() > 0.001f ? move.Normalized() : Facing;
             // Turn into the slide, so the pose never reads as moonwalking when
@@ -115,10 +124,17 @@ public partial class PlayerFighter : Fighter
 
         if (!InHitAnim)
         {
-            // Profile frames whenever travel is mostly horizontal. A front-facing
-            // cycle cannot read as walking left or right, however many frames it has.
-            float speed = new Vector3(Velocity.X, 0f, Velocity.Z).Length();
-            PlayClip(speed > 0.6f ? "walk" : "idle");
+            if (!Grounded)
+            {
+                // Airborne pose overrides the ground clips: tuck while rising,
+                // reach while falling.
+                PinClipFrame("jump", Velocity.Y > 0f ? 0 : 1);
+            }
+            else
+            {
+                float speed = new Vector3(Velocity.X, 0f, Velocity.Z).Length();
+                PlayClip(speed > 0.6f ? "walk" : "idle");
+            }
         }
     }
 

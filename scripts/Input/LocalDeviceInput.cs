@@ -17,6 +17,7 @@ public sealed class LocalDeviceInput : IInputSource
     private readonly int _device;
     private bool _attackHeldLast;
     private bool _dodgeHeldLast;
+    private bool _jumpHeldLast;
 
     public LocalDeviceInput(int device) => _device = device;
 
@@ -25,15 +26,16 @@ public sealed class LocalDeviceInput : IInputSource
     public InputCommand Poll()
     {
         Vector2 move;
-        bool attackHeld, dodgeHeld;
+        bool attackHeld, dodgeHeld, jumpHeld;
 
         if (_device == Keyboard)
         {
             move = new Vector2(
                 (Godot.Input.IsKeyPressed(Key.D) ? 1f : 0f) - (Godot.Input.IsKeyPressed(Key.A) ? 1f : 0f),
                 (Godot.Input.IsKeyPressed(Key.S) ? 1f : 0f) - (Godot.Input.IsKeyPressed(Key.W) ? 1f : 0f));
-            attackHeld = Godot.Input.IsKeyPressed(Key.J) || Godot.Input.IsKeyPressed(Key.Space);
+            attackHeld = Godot.Input.IsKeyPressed(Key.J);
             dodgeHeld = Godot.Input.IsKeyPressed(Key.K) || Godot.Input.IsKeyPressed(Key.Shift);
+            jumpHeld = Godot.Input.IsKeyPressed(Key.Space);
         }
         else
         {
@@ -49,17 +51,19 @@ public sealed class LocalDeviceInput : IInputSource
                 // Rescale past the deadzone so slow walking stays available.
                 move = move.Normalized() * ((move.Length() - StickDeadzone) / (1f - StickDeadzone));
             }
-            attackHeld = Godot.Input.IsJoyButtonPressed(_device, JoyButton.X)
-                      || Godot.Input.IsJoyButtonPressed(_device, JoyButton.A);
+            attackHeld = Godot.Input.IsJoyButtonPressed(_device, JoyButton.X);
             dodgeHeld = Godot.Input.IsJoyButtonPressed(_device, JoyButton.B)
                      || Godot.Input.IsJoyButtonPressed(_device, JoyButton.RightShoulder);
+            jumpHeld = Godot.Input.IsJoyButtonPressed(_device, JoyButton.A);
         }
 
         bool attackPressed = attackHeld && !_attackHeldLast;
         bool dodgePressed = dodgeHeld && !_dodgeHeldLast;
+        bool jumpPressed = jumpHeld && !_jumpHeldLast;
         _attackHeldLast = attackHeld;
         _dodgeHeldLast = dodgeHeld;
+        _jumpHeldLast = jumpHeld;
 
-        return new InputCommand(move, attackPressed, dodgePressed);
+        return new InputCommand(move, attackPressed, dodgePressed, jumpPressed);
     }
 }

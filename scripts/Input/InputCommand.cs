@@ -13,13 +13,15 @@ public readonly struct InputCommand
     public readonly Vector2 Move;
     public readonly bool AttackPressed;
     public readonly bool DodgePressed;
+    public readonly bool JumpPressed;
 
-    public InputCommand(Vector2 move, bool attack, bool dodge)
+    public InputCommand(Vector2 move, bool attack, bool dodge, bool jump = false)
     {
         Move = move.LengthSquared() > 1f ? move.Normalized() : move;
         AttackPressed = attack;
         DodgePressed = dodge;
+        JumpPressed = jump;
     }
 
-    public static readonly InputCommand None = new(Vector2.Zero, false, false);
+    public static readonly InputCommand None = new(Vector2.Zero, false, false, false);
 }
