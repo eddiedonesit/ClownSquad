@@ -1,11 +1,15 @@
 namespace ClownSquad.Actors;
 
 using Godot;
+using ClownSquad.Visuals;
 
 /// <summary>
 /// The first enemy: a big, fat, grinning clown. Reuses the input-driven fighter
-/// wholesale and simply swaps the sheet, scale, stats and faction, so AI-driven
-/// and player-driven fighters share one combat implementation.
+/// wholesale and swaps sheet, scale, stats and faction, so AI-driven and
+/// player-driven fighters share one combat implementation.
+///
+/// Signature move: the belly slam. Rears back, launches forward, and crashes
+/// down with a radial shockwave that outreaches any normal swing.
 /// </summary>
 public partial class BossClown : PlayerFighter
 {
@@ -18,6 +22,19 @@ public partial class BossClown : PlayerFighter
 
     public override bool Hostile => true;
 
+    // Belly slam phases, in seconds.
+    private const float WindUp = 0.55f;
+    private const float Lunge = 0.28f;
+    private const float Recover = 0.60f;
+    private const float LungeSpeed = 13f;
+
+    private const float SlamRadius = 3.0f;
+    private const float SlamDamage = 26f;
+    private const float SlamKnockback = 11f;
+
+    private bool _slammed;
+    private Vector3 _lungeDir;
+
     public override void _Ready()
     {
         MaxHealth = 320f;
@@ -25,5 +42,53 @@ public partial class BossClown : PlayerFighter
         Acceleration = 22f;
         Friction = 26f;
         base._Ready();
+    }
+
+    protected override bool HasSpecial => true;
+
+    protected override void OnSpecialStart()
+    {
+        _slammed = false;
+        _lungeDir = Facing;
+    }
+
+    protected override bool TickSpecialMove(float dt)
+    {
+        float t = SpecialTime;
+
+        if (t < WindUp)
+        {
+            // Rear back: a readable tell, so the move can be dodged on sight.
+            PinClipFrame("attack", 0);
+            ApplyGroundMovement(-_lungeDir * 1.4f, dt);
+            return false;
+        }
+
+        if (t < WindUp + Lunge)
+        {
+            PinClipFrame("attack", 1);
+            ApplyGroundMovement(_lungeDir * LungeSpeed, dt);
+            return false;
+        }
+
+        if (!_slammed)
+        {
+            _slammed = true;
+            PinClipFrame("attack", 2);
+
+            int hits = DamageInRadius(SlamRadius, SlamDamage, SlamKnockback, 0.16f);
+            ApplyHitstop(0.16f);
+
+            // Shockwave reads as the whole body landing, so it is centred under
+            // the boss rather than out at a weapon.
+            ImpactEffect.Spawn(GetParent(), GlobalPosition + new Vector3(0f, 0.12f, 0f), 2.2f);
+            CameraShake.Request(this, 0.16f, 0.34f);
+            GD.Print($"Boss belly slam: {hits} hit(s).");
+            return false;
+        }
+
+        PinClipFrame("attack", 2);
+        ApplyGroundMovement(Vector3.Zero, dt);
+        return t >= WindUp + Lunge + Recover;
     }
 }

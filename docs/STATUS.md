@@ -33,6 +33,7 @@ immediately; pads join by pressing a button.
 | Effects | Ground impact burst and camera shake, scaled by combo step |
 | Enemy AI | `BrawlerAi` as an IInputSource: closes distance, holds swing range, attacks on cooldown |
 | Boss clown | Big fat grinning enemy, 320 hp, slow, own sprite sheet and larger scale |
+| Specials | `HasSpecial` / `OnSpecialStart` / `TickSpecialMove` hooks; boss belly slam with a radial shockwave |
 | Factions | `Fighter.Hostile` gates attacks, so there is no friendly fire |
 | Tooling | Procedural sprite/effect/enemy generators, animation probe, AI probe, variant renderer |
 

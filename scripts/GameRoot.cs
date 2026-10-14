@@ -116,8 +116,9 @@ public partial class GameRoot : Node3D
     private void SpawnBoss(Vector3 at)
     {
         var boss = new BossClown { Name = "BossClown" };
-        boss.Source = new BrawlerAi(boss, attackRange: 2.1f, backoffRange: 1.3f,
-                                    attackCooldownMs: 1600);
+        boss.Source = new BrawlerAi(boss, attackRange: 2.2f, backoffRange: 1.2f,
+                                    attackCooldownMs: 700,
+                                    specialCooldownMs: 5000, specialRange: 6.0f);
         AddChild(boss);
         boss.GlobalPosition = at;
         _bosses.Add(boss);

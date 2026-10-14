@@ -14,16 +14,24 @@ public sealed class BrawlerAi : IInputSource
     private readonly float _attackRange;
     private readonly float _backoffRange;
     private readonly ulong _attackCooldownMs;
+    private readonly ulong _specialCooldownMs;
+    private readonly float _specialRange;
 
     private ulong _nextAttackMs;
+    private ulong _nextSpecialMs;
 
     public BrawlerAi(Fighter self, float attackRange = 1.8f, float backoffRange = 1.1f,
-                     ulong attackCooldownMs = 1500)
+                     ulong attackCooldownMs = 800, ulong specialCooldownMs = 0,
+                     float specialRange = 5.5f)
     {
         _self = self;
         _attackRange = attackRange;
         _backoffRange = backoffRange;
         _attackCooldownMs = attackCooldownMs;
+        _specialCooldownMs = specialCooldownMs;
+        _specialRange = specialRange;
+        // Stagger the first special so it is not thrown the instant combat opens.
+        _nextSpecialMs = Time.GetTicksMsec() + specialCooldownMs / 2;
     }
 
     public string Describe() => "AI";
@@ -41,6 +49,15 @@ public sealed class BrawlerAi : IInputSource
         Vector3 dir = delta / dist;
         Vector2 move = Vector2.Zero;
         bool attack = false;
+        ulong nowMs = Time.GetTicksMsec();
+
+        // Specials reach further than a swing, so they are checked first and can
+        // open from outside melee range - that is what makes them threatening.
+        if (_specialCooldownMs > 0 && dist <= _specialRange && nowMs >= _nextSpecialMs)
+        {
+            _nextSpecialMs = nowMs + _specialCooldownMs;
+            return new InputCommand(Vector2.Zero, false, false, false, true);
+        }
 
         if (dist > _attackRange)
         {
@@ -53,11 +70,10 @@ public sealed class BrawlerAi : IInputSource
         }
         else
         {
-            ulong now = Time.GetTicksMsec();
-            if (now >= _nextAttackMs)
+            if (nowMs >= _nextAttackMs)
             {
                 attack = true;
-                _nextAttackMs = now + _attackCooldownMs;
+                _nextAttackMs = nowMs + _attackCooldownMs;
             }
         }
 

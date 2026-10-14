@@ -13,7 +13,7 @@ using ClownSquad.Visuals;
 /// </summary>
 public partial class PlayerFighter : Fighter
 {
-    private enum State { Free, Attacking, Dodging }
+    private enum State { Free, Attacking, Dodging, Special }
 
     /// <summary>One swing in the combo. Timings are in seconds.</summary>
     private readonly record struct AttackStep(
@@ -63,8 +63,17 @@ public partial class PlayerFighter : Fighter
     {
         State.Attacking => $"ATK{_comboIndex + 1}",
         State.Dodging => "DODGE",
+        State.Special => "SPECIAL",
         _ => "free",
     };
+
+    /// <summary>Subclasses with a signature move override these three.</summary>
+    protected virtual bool HasSpecial => false;
+    protected virtual void OnSpecialStart() { }
+    /// <summary>Advance the move; return true when it is finished.</summary>
+    protected virtual bool TickSpecialMove(float dt) => true;
+
+    protected float SpecialTime { get; private set; }
 
     protected override void Tick(float dt)
     {
@@ -79,6 +88,7 @@ public partial class PlayerFighter : Fighter
             case State.Free: TickFree(cmd, dt); break;
             case State.Attacking: TickAttack(dt); break;
             case State.Dodging: TickDodge(dt); break;
+            case State.Special: TickSpecial(dt); break;
         }
     }
 
@@ -95,6 +105,15 @@ public partial class PlayerFighter : Fighter
         {
             _bufferedAttack = false;
             StartAttack();
+            return;
+        }
+
+        if (cmd.SpecialPressed && HasSpecial && Grounded)
+        {
+            _state = State.Special;
+            SpecialTime = 0f;
+            _bufferedAttack = false;
+            OnSpecialStart();
             return;
         }
 
@@ -246,6 +265,16 @@ public partial class PlayerFighter : Fighter
         {
             _state = State.Free;
             _bufferedAttack = false;
+        }
+    }
+
+    private void TickSpecial(float dt)
+    {
+        SpecialTime += dt;
+        if (TickSpecialMove(dt))
+        {
+            _state = State.Free;
+            SpecialTime = 0f;
         }
     }
 

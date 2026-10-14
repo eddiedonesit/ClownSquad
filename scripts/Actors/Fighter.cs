@@ -101,10 +101,15 @@ public partial class Fighter : CharacterBody3D
 
         Tick(dt);
 
+        // Knockback is an impulse, applied once and then left to friction.
+        // Adding it every frame while it decayed compounded into enormous
+        // velocities - a heavy hit launched targets ~90 units across the map.
+        // It is held pending rather than applied in TakeDamage because hitstop
+        // zeroes velocity, which would swallow it.
         if (_knockback.LengthSquared() > 0.001f)
         {
             Velocity += _knockback;
-            _knockback = _knockback.MoveToward(Vector3.Zero, 40f * dt);
+            _knockback = Vector3.Zero;
         }
 
         if (!Grounded) Velocity = new Vector3(Velocity.X, Velocity.Y - Gravity * dt, Velocity.Z);
@@ -150,6 +155,30 @@ public partial class Fighter : CharacterBody3D
         PlayClip("hit", restart: true);
 
         if (IsDead) Died?.Invoke(this);
+    }
+
+    /// <summary>
+    /// Damage every opposing fighter within a radius, knocking them outward.
+    /// Used by area specials, where an arc query would be the wrong shape.
+    /// </summary>
+    protected int DamageInRadius(float radius, float amount, float knockback, float hitstop)
+    {
+        int hits = 0;
+        foreach (Node node in GetTree().GetNodesInGroup(Group))
+        {
+            if (node is not Fighter f || f == this || !f.CanBeHit()) continue;
+            if (f.Hostile == Hostile) continue;
+
+            Vector3 d = f.GlobalPosition - GlobalPosition;
+            d.Y = 0f;
+            float dist = d.Length();
+            if (dist > radius) continue;
+
+            Vector3 dir = dist < 0.01f ? Facing : d / dist;
+            f.TakeDamage(new DamageInfo(amount, dir, knockback, hitstop, this));
+            hits++;
+        }
+        return hits;
     }
 
     public void ApplyHitstop(float seconds)

@@ -18,6 +18,7 @@ public sealed class LocalDeviceInput : IInputSource
     private bool _attackHeldLast;
     private bool _dodgeHeldLast;
     private bool _jumpHeldLast;
+    private bool _specialHeldLast;
 
     public LocalDeviceInput(int device) => _device = device;
 
@@ -26,7 +27,7 @@ public sealed class LocalDeviceInput : IInputSource
     public InputCommand Poll()
     {
         Vector2 move;
-        bool attackHeld, dodgeHeld, jumpHeld;
+        bool attackHeld, dodgeHeld, jumpHeld, specialHeld;
 
         if (_device == Keyboard)
         {
@@ -36,6 +37,7 @@ public sealed class LocalDeviceInput : IInputSource
             attackHeld = Godot.Input.IsKeyPressed(Key.J);
             dodgeHeld = Godot.Input.IsKeyPressed(Key.K) || Godot.Input.IsKeyPressed(Key.Shift);
             jumpHeld = Godot.Input.IsKeyPressed(Key.Space);
+            specialHeld = Godot.Input.IsKeyPressed(Key.L);
         }
         else
         {
@@ -55,15 +57,18 @@ public sealed class LocalDeviceInput : IInputSource
             dodgeHeld = Godot.Input.IsJoyButtonPressed(_device, JoyButton.B)
                      || Godot.Input.IsJoyButtonPressed(_device, JoyButton.RightShoulder);
             jumpHeld = Godot.Input.IsJoyButtonPressed(_device, JoyButton.A);
+            specialHeld = Godot.Input.IsJoyButtonPressed(_device, JoyButton.Y);
         }
 
         bool attackPressed = attackHeld && !_attackHeldLast;
         bool dodgePressed = dodgeHeld && !_dodgeHeldLast;
         bool jumpPressed = jumpHeld && !_jumpHeldLast;
+        bool specialPressed = specialHeld && !_specialHeldLast;
         _attackHeldLast = attackHeld;
         _dodgeHeldLast = dodgeHeld;
         _jumpHeldLast = jumpHeld;
+        _specialHeldLast = specialHeld;
 
-        return new InputCommand(move, attackPressed, dodgePressed, jumpPressed);
+        return new InputCommand(move, attackPressed, dodgePressed, jumpPressed, specialPressed);
     }
 }
