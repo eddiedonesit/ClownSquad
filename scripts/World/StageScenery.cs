@@ -56,6 +56,10 @@ public partial class StageScenery : Node3D
 
     public (Color sky, Color sun, float sunEnergy, float ambient, Color lamp, string weather) Theme => Themes[_world - 1];
 
+    /// <summary>A world's colours and weather, for anything else dressed in its theme (the world map).</summary>
+    public static (Color sky, Color sun, float sunEnergy, float ambient, Color lamp, string weather) ThemeOf(int world) =>
+        Themes[Mathf.Clamp(world, 1, 10) - 1];
+
     private static Texture2D Tex(string name) => GD.Load<Texture2D>(Folder + name);
 
     private static StandardMaterial3D Tiled(string texture, float tileWidth, float totalWidth, bool cutout = false, bool unlit = false) => new()
@@ -231,7 +235,18 @@ public partial class StageScenery : Node3D
 
     private void BuildWeather()
     {
-        (Color a, Color b, Vector2 size, Vector3 gravity, int amount, bool glow) = Theme.weather switch
+        _weather = MakeWeather(Theme.weather, new Vector3(10f, 3f, 5f), 1f);
+        _weather.Position = new Vector3(0f, 3f, -1f);
+        AddChild(_weather);
+    }
+
+    /// <summary>
+    /// A world's weather as a particle system: confetti, sugar, fireflies,
+    /// sparkle, snow, blowing sand or embers, filling a box of the given extents.
+    /// </summary>
+    public static GpuParticles3D MakeWeather(string kind, Vector3 box, float density)
+    {
+        (Color a, Color b, Vector2 size, Vector3 gravity, int amount, bool glow) = kind switch
         {
             "sugar" => (new Color(1f, 0.85f, 0.95f), new Color(1f, 1f, 1f), new Vector2(0.06f, 0.06f), new Vector3(0f, -0.15f, 0f), 120, false),
             "fireflies" => (new Color(0.8f, 1f, 0.4f), new Color(0.5f, 1f, 0.6f), new Vector2(0.05f, 0.05f), new Vector3(0f, 0.02f, 0f), 90, true),
@@ -247,7 +262,7 @@ public partial class StageScenery : Node3D
         var process = new ParticleProcessMaterial
         {
             EmissionShape = ParticleProcessMaterial.EmissionShapeEnum.Box,
-            EmissionBoxExtents = new Vector3(10f, 3f, 5f),
+            EmissionBoxExtents = box,
             Gravity = gravity,
             InitialVelocityMin = 0.05f, InitialVelocityMax = 0.3f,
             Direction = new Vector3(0f, -1f, 0f), Spread = 180f,
@@ -264,16 +279,14 @@ public partial class StageScenery : Node3D
             CullMode = BaseMaterial3D.CullModeEnum.Disabled,
         };
         if (glow) { mat.EmissionEnabled = true; mat.Emission = a; mat.EmissionEnergyMultiplier = 3f; }
-        _weather = new GpuParticles3D
+        return new GpuParticles3D
         {
-            Amount = amount, Lifetime = 9f, Preprocess = 9f,
+            Amount = Mathf.Max(8, (int)(amount * density)), Lifetime = 9f, Preprocess = 9f,
             ProcessMaterial = process,
             DrawPass1 = new QuadMesh { Size = size, Material = mat },
-            Position = new Vector3(0f, 3f, -1f),
-            VisibilityAabb = new Aabb(new Vector3(-16f, -6f, -10f), new Vector3(32f, 14f, 20f)),
+            VisibilityAabb = new Aabb(-box - new Vector3(4f, 6f, 4f), box * 2f + new Vector3(8f, 12f, 8f)),
             LocalCoords = false,
         };
-        AddChild(_weather);
     }
 
     /// <summary>Keep the weather around the camera as it travels.</summary>

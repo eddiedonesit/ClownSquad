@@ -208,6 +208,28 @@ def world_map(w):
             if d < 4.5:
                 px[y][x] = dirt[0] if d > 3.4 else dirt[dither(0.65 - d * 0.05, x, y)]
 
+    # For the 3D map: the ground with no scenery stamped on it, and a
+    # heightmap (land rises with the noise, flattened along the road so the
+    # path lies level, sinking under the sea at the shore).
+    write_rgba(f"ground_{w}.png", px)
+    HS = 3                                         # heightmap is a third the map's resolution
+    hw, hh = MW // HS, MH // HS
+    hrows = []
+    for hy in range(hh):
+        r = bytearray()
+        for hx in range(hw):
+            x, y = hx * HS + 1, hy * HS + 1
+            fx, fy = (x - MW / 2) / (MW / 2), (y - MH / 2) / (MH / 2)
+            v = n(x, y) - 0.55 * (fx * fx * 0.8 + fy * fy) + 0.18
+            near = min(seg_dist(x, y, a, b) for a, b in es)
+            if near < 34: v = max(v, 0.5 - near / 120)
+            h = max(0.0, min(1.0, (v - 0.15) / 0.55))
+            if near < 10: h = min(h, 0.32 + near * 0.004)          # the road runs level
+            g = int(h * 255)
+            r.extend((g, g, g, 255))
+        hrows.append(r)
+    write_png(os.path.join(OUT, f"height_{w}.png"), hw, hh, hrows)
+
     # Scenery on the land, kept clear of the road and the nodes.
     rnd = random.Random(500 + w)
     placed = []
@@ -226,6 +248,10 @@ def world_map(w):
                     px[y + yy][x + xx] = p[:3]
         if len(placed) > 46: break
 
+    import json
+    with open(os.path.join(OUT, f"decos_{w}.json"), "w") as fh:
+        json.dump([[x + 14, y + 28] for x, y in placed], fh)
+
     rows = []
     for y in range(MH):
         r = bytearray()
@@ -234,6 +260,17 @@ def world_map(w):
         rows.append(r)
     os.makedirs(OUT, exist_ok=True)
     write_png(os.path.join(OUT, f"world_{w}.png"), MW, MH, rows)
+
+
+def write_rgba(name, px):
+    rows = []
+    for y in range(MH):
+        r = bytearray()
+        for p in px[y]:
+            r.extend(tuple(p[:3]) + (255,))
+        rows.append(r)
+    os.makedirs(OUT, exist_ok=True)
+    write_png(os.path.join(OUT, name), MW, MH, rows)
 
 
 # ----------------------------------------------------------------- icons
