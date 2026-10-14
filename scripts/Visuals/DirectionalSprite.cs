@@ -53,6 +53,14 @@ public partial class DirectionalSprite : Node3D
             Modulate = _tint,
         };
         AddChild(_sprite);
+
+        // Sit the sprite so its feet land on the node origin. Hardcoding this
+        // only works for one scale: at a larger pixel size the lower part of the
+        // sprite drops below y=0 and the ground plane culls it.
+        Texture2D? first = _sprite.SpriteFrames.GetFrameTexture("idle", 0);
+        float frameHeight = first?.GetHeight() ?? 64;
+        _sprite.Position = new Vector3(0f, frameHeight * _pixelSize * 0.5f, 0f);
+
         Play("idle");
     }
 

@@ -68,10 +68,9 @@ public partial class Fighter : CharacterBody3D
         Health = MaxHealth;
         AddToGroup(Group);
 
-        Visual = new DirectionalSprite(SheetPath, FramesPath, SpritePixelSize)
-        {
-            Position = new Vector3(0, 0.72f, 0),
-        };
+        // The visual aligns its own feet to this node's origin, so fighters of
+        // different sprite scales all stand on the ground correctly.
+        Visual = new DirectionalSprite(SheetPath, FramesPath, SpritePixelSize);
         Visual.Tint = _pendingTint;
         AddChild(Visual);
 

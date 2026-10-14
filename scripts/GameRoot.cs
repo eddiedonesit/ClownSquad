@@ -158,6 +158,12 @@ public partial class GameRoot : Node3D
         float d = b.GlobalPosition.DistanceTo(p.GlobalPosition);
         GD.Print($"  t={_aiProbeTime:F1}  dist={d:F2}  boss={b.DebugState} clip={b.CurrentClip}  playerHp={p.Health:F0}");
 
+        if (!DisplayServer.GetName().Contains("headless") && _aiProbeTick % 3 == 0)
+        {
+            Image img = GetViewport().GetTexture().GetImage();
+            img.SavePng($"C:/Claude/ClownSquad/debug/ai_{_aiProbeTick}.png");
+        }
+
         if (++_aiProbeTick > 10)
         {
             GD.Print("=== AI PROBE DONE ===");
