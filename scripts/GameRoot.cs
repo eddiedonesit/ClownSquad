@@ -100,6 +100,7 @@ public partial class GameRoot : Node3D
         }
 
         Fighter.HitLanded += OnHitLanded;
+        if (!ClownSquad.Visuals.ArtStyle.Classic) SetUpLighting();
 
         if (Has("animtest")) { AddChild(new ClownSquad.Debug.AnimationProbe()); return; }
         if (Has("movetest")) { AddChild(new ClownSquad.Debug.MovesProbe()); return; }
@@ -145,6 +146,39 @@ public partial class GameRoot : Node3D
                 GetTree().Quit();
             };
         };
+    }
+
+    /// <summary>
+    /// Lighting for the normal-mapped art: the key light turned to come from the
+    /// upper left, where the sprites' own shading says it does, and a warm and a
+    /// cool circus lamp either side so every outline catches a coloured rim.
+    /// </summary>
+    private void SetUpLighting()
+    {
+        if (GetNodeOrNull<DirectionalLight3D>("DirectionalLight3D") is DirectionalLight3D sun)
+        {
+            sun.LookAtFromPosition(sun.GlobalPosition, sun.GlobalPosition + new Vector3(0.55f, -0.7f, -0.45f), Vector3.Up);
+            sun.LightEnergy = 1.25f;
+        }
+        if (GetNodeOrNull<WorldEnvironment>("WorldEnvironment")?.Environment is Godot.Environment env)
+        {
+            env.AmbientLightEnergy = 0.45f;
+            // Both reference games are saturated and clean, not hazy: less fog,
+            // and a grade that keeps the sprites' colours vivid through the tonemap.
+            env.VolumetricFogDensity = 0.003f;
+            env.AdjustmentEnabled = true;
+            env.AdjustmentContrast = 1.1f;
+            env.AdjustmentSaturation = 1.22f;
+        }
+
+        void Lamp(Vector3 at, Color color, float energy)
+        {
+            var lamp = new OmniLight3D { LightColor = color, LightEnergy = energy, OmniRange = 11f, OmniAttenuation = 1.2f };
+            AddChild(lamp);
+            lamp.GlobalPosition = at;
+        }
+        Lamp(new Vector3(-6.5f, 3.2f, 0.5f), new Color(1f, 0.55f, 0.45f), 3.4f);   // warm, stage left
+        Lamp(new Vector3(6.5f, 3.2f, 0.5f), new Color(0.45f, 0.7f, 1f), 3.0f);     // cool, stage right
     }
 
     public override void _ExitTree()

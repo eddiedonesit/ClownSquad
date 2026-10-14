@@ -21,6 +21,7 @@ public partial class DirectionalSprite : Node3D
     private float _squash;
     private float _flash;
     private Color _tint = Colors.White;
+    private ShaderMaterial? _lit;
 
     public DirectionalSprite(string sheetPath, string framesPath, float pixelSize = 0.0225f)
     {
@@ -65,6 +66,12 @@ public partial class DirectionalSprite : Node3D
             Modulate = _tint,
         };
         AddChild(_sprite);
+
+        // Sheets with a normal map are drawn lit by the scene's lights. The
+        // material replaces the sprite's own, so tint, flash and mirroring are
+        // pushed to it in Tick rather than through Modulate.
+        _lit = LitSprite.For(_sheetPath);
+        if (_lit is not null) _sprite.MaterialOverride = _lit;
 
         // Stand the sprite so its feet row lands on the node origin. Derived
         // from the sheet rather than hardcoded: the offset differs with sprite
@@ -126,15 +133,10 @@ public partial class DirectionalSprite : Node3D
     {
         if (_sprite is null) return;
 
-        if (_flash > 0f)
-        {
-            _flash -= dt;
-            _sprite.Modulate = _flash > 0f ? new Color(3f, 2f, 2f) : _tint;
-        }
-        else
-        {
-            _sprite.Modulate = _tint;
-        }
+        if (_flash > 0f) _flash -= dt;
+        bool flashing = _flash > 0f;
+        _sprite.Modulate = flashing ? new Color(3f, 2f, 2f) : _tint;
+        if (_lit is not null) LitSprite.Apply(_lit, _tint, flashing ? 1.1f : 0f, _sprite.FlipH);
 
         _squash = Mathf.MoveToward(_squash, 0f, 4f * dt);
         _sprite.Scale = new Vector3(1f + _squash * 0.5f, 1f - _squash * 0.5f, 1f);

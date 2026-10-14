@@ -48,7 +48,11 @@ public static class FrameLibrary
             // Match on suffix so prefixed sets (empty_walk) share looping and rate.
             bool loops = name.EndsWith("idle") || name.EndsWith("walk") || name.EndsWith("spin");
             frames.SetAnimationLoop(name, loops);
-            frames.SetAnimationSpeed(name,
+            // A sheet may set its own rates (more in-betweens play faster);
+            // otherwise these defaults, tuned for the classic frame counts.
+            var fps = meta.ContainsKey("fps") ? meta["fps"].AsGodotDictionary() : null;
+            if (fps is not null && fps.ContainsKey(name)) frames.SetAnimationSpeed(name, (double)fps[name]);
+            else frames.SetAnimationSpeed(name,
                   name.EndsWith("idle") ? 3.0
                 : name.EndsWith("walk") ? 11.0
                 : name.EndsWith("attack") ? 14.0

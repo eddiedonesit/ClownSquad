@@ -13,11 +13,13 @@ public partial class ImpactEffect : Node3D
     private const string Frames = "res://assets/effects/impact.frames.json";
 
     private float _scale = 1f;
+    private bool _glow = true;
 
-    public static void Spawn(Node parent, Vector3 globalPosition, float scale = 1f)
+    /// <summary>A burst; with glow, it also throws a brief flash of real light on whatever is near.</summary>
+    public static void Spawn(Node parent, Vector3 globalPosition, float scale = 1f, bool glow = true)
     {
         if (parent is null || !GodotObject.IsInstanceValid(parent)) return;
-        var fx = new ImpactEffect { _scale = scale };
+        var fx = new ImpactEffect { _scale = scale, _glow = glow };
         parent.AddChild(fx);
         fx.GlobalPosition = globalPosition;
     }
@@ -46,5 +48,20 @@ public partial class ImpactEffect : Node3D
         AddChild(sprite);
         sprite.AnimationFinished += QueueFree;
         sprite.Play("burst");
+
+        if (!_glow) return;
+        // The lighting half of the hit: lit sprites around the impact catch it
+        // on the side that faces it, then it is gone. Sized by the hit.
+        var light = new OmniLight3D
+        {
+            LightColor = new Color(1f, 0.82f, 0.55f),
+            LightEnergy = 3.2f * Mathf.Min(_scale, 2.5f),
+            OmniRange = 1.6f + 1.6f * _scale,
+            ShadowEnabled = false,
+            Position = new Vector3(0f, 0.35f, 0.35f),
+        };
+        AddChild(light);
+        CreateTween().TweenProperty(light, "light_energy", 0f, 0.2f)
+            .SetTrans(Tween.TransitionType.Quad).SetEase(Tween.EaseType.Out);
     }
 }

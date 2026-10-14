@@ -255,13 +255,33 @@ def draw(p):
 # ------------------------------------------------------------------ clips
 # Mirrors tools/gen_sprite.py clip for clip, so either sheet drives the same code.
 
-BASE = [
-    ("idle", dict()),
-    ("idle", dict(body_dy=1, head_dy=1, arm_lift=-1)),
-    ("walk", dict(near_leg=6, far_leg=-5, near_arm=-2, far_arm=3, body_dy=-1, lean=1)),
-    ("walk", dict(near_leg=2, far_leg=-1, near_arm=-1, far_arm=1, ffoot=4)),
-    ("walk", dict(near_leg=-5, far_leg=6, near_arm=3, far_arm=-3, body_dy=-1, lean=1)),
-    ("walk", dict(near_leg=-1, far_leg=2, near_arm=1, far_arm=-1, nfoot=4)),
+def idle_cycle(n=4):
+    """A slow breath: settle down and back up, in n in-betweens."""
+    out = []
+    for i in range(n):
+        b = 0.5 - 0.5 * math.cos(2 * math.pi * i / n)
+        out.append(("idle", dict(body_dy=b, head_dy=b, arm_lift=-b)))
+    return out
+
+
+def walk_cycle(n=8):
+    """A full stride as a continuous cycle, so it can be cut into as many
+    in-betweens as smoothness wants. Both feet lift on their forward swing."""
+    out = []
+    for i in range(n):
+        t = 2 * math.pi * i / n
+        stride = math.cos(t)
+        out.append(("walk", dict(near_leg=6 * stride, far_leg=-6 * stride,
+                                 near_arm=-2 * stride, far_arm=3 * stride,
+                                 body_dy=-abs(stride), lean=abs(stride),
+                                 nfoot=5 * max(0.0, -math.sin(t)), ffoot=5 * max(0.0, math.sin(t)))))
+    return out
+
+
+# Hand-keyed brawlers live on in-betweens; these two loops play all the time.
+FPS = {"idle": 6, "walk": 22, "empty_idle": 6, "empty_walk": 22}
+
+BASE = idle_cycle() + walk_cycle() + [
     ("hit", dict(lean=-4, head_dy=-2, body_dy=2, near_arm=-7, far_arm=-5, arm_lift=-2)),
     ("dodge", dict(body_dy=8, lean=6, head_dy=3, near_leg=12, far_leg=-6,
                    near_arm=-10, far_arm=-7, arm_lift=-6)),
@@ -354,7 +374,7 @@ def mallet_frames():
         cv = crop(rotated(loose, step * 45, cx, cy), cx - MS // 2, cy - MS // 2, MS, MS)
         if touches_border(cv):
             print("WARNING: mallet projectile frame {} is clipped".format(step))
-        out.append(shade(cv, MATS))
+        out.append(shade(cv, MATS, normals=True))
     return out, MS
 
 
@@ -362,16 +382,18 @@ def write_sheet(name, frames, mats):
     clipped = sorted({n for n, cv in frames if touches_border(cv)})
     if clipped:
         print("WARNING: {} art touches the canvas edge in: {}".format(name, ", ".join(clipped)))
-    shaded = [shade(cv, mats) for _, cv in frames]
+    both = [shade(cv, mats, normals=True) for _, cv in frames]
+    shaded = [p for p, _ in both]
     out = os.path.join("assets", "sprites", name + ".png")
     write_png(out, W * len(shaded), H, to_rows(shaded, W, H))
+    write_png(os.path.join("assets", "sprites", name + "_n.png"), W * len(both), H, to_rows([n for _, n in both], W, H))
     clips = {}
     for i, (n, _) in enumerate(frames):
         clips.setdefault(n, []).append(i)
     with open(os.path.join("assets", "sprites", name + ".frames.json"), "w") as f:
         json.dump({"frame_width": W, "frame_height": H, "baseline": BASELINE,
-                   "count": len(shaded), "clips": clips}, f, indent=2)
-    print("wrote {}  {}x{}  {} frames".format(out, W * len(shaded), H, len(shaded)))
+                   "count": len(shaded), "clips": clips, "fps": FPS}, f, indent=2)
+    print("wrote {} (+ normal map)  {}x{}  {} frames".format(out, W * len(shaded), H, len(shaded)))
 
 
 def main():
@@ -379,7 +401,8 @@ def main():
     write_sheet("grunt_hd", grunt_frames(), GRUNT_MATS)
     spin, ms = mallet_frames()
     out = os.path.join("assets", "sprites", "mallet_spin_hd.png")
-    write_png(out, ms * len(spin), ms, to_rows(spin, ms, ms))
+    write_png(out, ms * len(spin), ms, to_rows([p for p, _ in spin], ms, ms))
+    write_png(out.replace(".png", "_n.png"), ms * len(spin), ms, to_rows([n for _, n in spin], ms, ms))
     with open(os.path.join("assets", "sprites", "mallet_spin_hd.frames.json"), "w") as f:
         json.dump({"frame_width": ms, "frame_height": ms, "count": len(spin),
                    "clips": {"mallet_spin": list(range(len(spin)))}}, f, indent=2)

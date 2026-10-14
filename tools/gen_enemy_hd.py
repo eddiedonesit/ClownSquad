@@ -153,13 +153,30 @@ def draw(p):
     return c
 
 
-FRAMES = [
-    ("idle", pose()),
-    ("idle", pose(belly=1, body_dy=1, head_dy=1)),
-    ("walk", pose(near_leg=5, far_leg=-4, body_dy=-1, lean=1)),
-    ("walk", pose(near_leg=2, far_leg=-1, body_dy=1, belly=1)),
-    ("walk", pose(near_leg=-4, far_leg=5, body_dy=-1, lean=-1)),
-    ("walk", pose(near_leg=-1, far_leg=2, body_dy=1, belly=1)),
+def idle_cycle(n=4):
+    """The belly breathes."""
+    out = []
+    for i in range(n):
+        b = 0.5 - 0.5 * math.cos(2 * math.pi * i / n)
+        out.append(("idle", pose(belly=b, body_dy=b, head_dy=b)))
+    return out
+
+
+def walk_cycle(n=8):
+    """A heavy waddle: weight rolls side to side, the belly bounces between steps."""
+    out = []
+    for i in range(n):
+        t = 2 * math.pi * i / n
+        stride = math.cos(t)
+        out.append(("walk", pose(near_leg=4.5 * stride, far_leg=-4.5 * stride,
+                                 body_dy=-abs(stride) + (1 - abs(stride)),
+                                 belly=1 - abs(stride), lean=stride)))
+    return out
+
+
+FPS = {"idle": 6, "walk": 18}
+
+FRAMES = idle_cycle() + walk_cycle() + [
     ("attack", pose(lean=-4, body_dy=1, head_dy=1, grin=1)),
     ("attack", pose(lean=3, body_dy=-1, belly=2, grin=2, near_leg=4)),
     ("attack", pose(lean=6, body_dy=1, belly=1, grin=1, near_leg=7)),
@@ -189,19 +206,23 @@ def fist():
 
 
 def main():
-    shaded = [shade(draw(p), MATS) for _, p in FRAMES]
+    both = [shade(draw(p), MATS, normals=True) for _, p in FRAMES]
+    shaded = [p for p, _ in both]
     out = os.path.join("assets", "sprites", "boss_hd.png")
     write_png(out, W * len(shaded), H, to_rows(shaded, W, H))
+    write_png(out.replace(".png", "_n.png"), W * len(both), H, to_rows([n for _, n in both], W, H))
     clips = {}
     for i, (name, _) in enumerate(FRAMES):
         clips.setdefault(name, []).append(i)
     with open(os.path.join("assets", "sprites", "boss_hd.frames.json"), "w") as f:
         json.dump({"frame_width": W, "frame_height": H, "baseline": H,
-                   "count": len(shaded), "clips": clips}, f, indent=2)
+                   "count": len(shaded), "clips": clips, "fps": FPS}, f, indent=2)
     print("wrote {}  {}x{}  {} frames".format(out, W * len(shaded), H, len(shaded)))
 
     fout = os.path.join("assets", "sprites", "boss_fist_hd.png")
-    write_png(fout, FW, FW, to_rows([shade(fist(), MATS)], FW, FW))
+    fp, fn = shade(fist(), MATS, normals=True)
+    write_png(fout, FW, FW, to_rows([fp], FW, FW))
+    write_png(fout.replace(".png", "_n.png"), FW, FW, to_rows([fn], FW, FW))
     print("wrote {}  {}x{}  1 frame".format(fout, FW, FW))
 
 

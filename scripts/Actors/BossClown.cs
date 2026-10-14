@@ -289,6 +289,7 @@ public partial class BossClown : PlayerFighter
             Shaded = true,
             CastShadow = GeometryInstance3D.ShadowCastingSetting.Off,
         };
+        if (LitSprite.For(FistSheet) is ShaderMaterial lit) s.MaterialOverride = lit;
         AddChild(s);
         return s;
     }
@@ -377,8 +378,12 @@ public partial class BossClown : PlayerFighter
 
         // Flash and blink with the body, the back glove a shade darker.
         Color c = Visual.CurrentModulate;
+        Color back = new(c.R * 0.78f, c.G * 0.78f, c.B * 0.82f, c.A);
         _nearFist.Modulate = c;
-        _farFist.Modulate = new Color(c.R * 0.78f, c.G * 0.78f, c.B * 0.82f, c.A);
+        _farFist.Modulate = back;
+        bool flash = c.R > 1.5f;
+        if (_nearFist.MaterialOverride is ShaderMaterial nm) LitSprite.Apply(nm, flash ? Colors.White : c, flash ? 1.1f : 0f, f < 0f);
+        if (_farFist.MaterialOverride is ShaderMaterial fm) LitSprite.Apply(fm, flash ? Colors.White : back, flash ? 1.1f : 0f, f < 0f);
         _nearFist.Visible = _farFist.Visible = SpriteVisible;
     }
 

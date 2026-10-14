@@ -141,6 +141,8 @@ public partial class Fighter : CharacterBody3D
         Visual.Tint = _pendingTint;
         AddChild(Visual);
 
+        BuildShadow();
+
         AddChild(new CollisionShape3D
         {
             Shape = new CapsuleShape3D { Radius = 0.35f, Height = 1.4f },
@@ -219,6 +221,7 @@ public partial class Fighter : CharacterBody3D
         }
 
         KeepInArena();
+        UpdateShadow();
     }
 
     /// <summary>Per-frame logic for a fighter able to act.</summary>
@@ -325,7 +328,56 @@ public partial class Fighter : CharacterBody3D
     }
 
     protected void Dust(float scale) =>
-        ImpactEffect.Spawn(GetParent(), GlobalPosition + new Vector3(0f, 0.1f, 0f), scale);
+        ImpactEffect.Spawn(GetParent(), GlobalPosition + new Vector3(0f, 0.1f, 0f), scale, glow: false);
+
+    // ---- contact shadow ----
+    // A soft dark ellipse on the floor under every fighter. It is what plants a
+    // sprite on the ground, and in the air it shrinks and fades with height, so
+    // a jump or a launch reads at a glance how high the body is.
+    private static Texture2D? _shadowTex;
+    private MeshInstance3D? _shadow;
+    private StandardMaterial3D? _shadowMat;
+
+    private void BuildShadow()
+    {
+        _shadowTex ??= new GradientTexture2D
+        {
+            Gradient = new Gradient
+            {
+                Offsets = new[] { 0f, 0.55f, 1f },
+                Colors = new[] { new Color(0.05f, 0.02f, 0.08f, 0.62f), new Color(0.05f, 0.02f, 0.08f, 0.35f), new Color(0.05f, 0.02f, 0.08f, 0f) },
+            },
+            Fill = GradientTexture2D.FillEnum.Radial,
+            FillFrom = new Vector2(0.5f, 0.5f),
+            FillTo = new Vector2(0.5f, 0f),
+            Width = 64,
+            Height = 64,
+        };
+        _shadowMat = new StandardMaterial3D
+        {
+            ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded,
+            Transparency = BaseMaterial3D.TransparencyEnum.Alpha,
+            AlbedoTexture = _shadowTex,
+        };
+        _shadow = new MeshInstance3D
+        {
+            Mesh = new PlaneMesh { Size = new Vector2(BodyHalfWidth * 3.0f, BodyHalfWidth * 1.4f) },
+            MaterialOverride = _shadowMat,
+            CastShadow = GeometryInstance3D.ShadowCastingSetting.Off,
+            TopLevel = true,
+        };
+        AddChild(_shadow);
+    }
+
+    private void UpdateShadow()
+    {
+        if (_shadow is null || _shadowMat is null) return;
+        float h = Mathf.Max(0f, GlobalPosition.Y);
+        float k = 1f / (1f + h * 0.35f);
+        _shadow.GlobalPosition = new Vector3(GlobalPosition.X, 0.012f, GlobalPosition.Z);
+        _shadow.Scale = new Vector3(k, 1f, k);
+        _shadowMat.AlbedoColor = new Color(1f, 1f, 1f, k * (Visual.Visible ? 1f : 0.4f));
+    }
 
     protected void ApplyGroundMovement(Vector3 desired, float dt)
     {

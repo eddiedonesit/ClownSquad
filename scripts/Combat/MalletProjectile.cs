@@ -63,6 +63,11 @@ public partial class MalletProjectile : Node3D
             // Mirrored when thrown left, so it always tumbles forward.
             FlipH = _dir.X < 0f,
         };
+        if (LitSprite.For(Sheet) is ShaderMaterial lit)
+        {
+            LitSprite.Apply(lit, Colors.White, 0f, _sprite.FlipH);
+            _sprite.MaterialOverride = lit;
+        }
         AddChild(_sprite);
         _sprite.Play("mallet_spin");
     }
@@ -104,6 +109,7 @@ public partial class MalletProjectile : Node3D
         {
             _returning = true;
             _sprite.FlipH = !_sprite.FlipH;   // tumble back the other way
+            if (_sprite.MaterialOverride is ShaderMaterial m) LitSprite.Apply(m, Colors.White, 0f, _sprite.FlipH);
         }
     }
 

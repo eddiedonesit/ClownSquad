@@ -201,8 +201,12 @@ def _distance(c):
     return [[v / 3.0 for v in row] for row in d]
 
 
-def shade(c, mats):
-    """Render the canvas to RGBA rows (list of lists of 4-tuples)."""
+def shade(c, mats, normals=False):
+    """Render the canvas to RGBA rows (list of lists of 4-tuples). With
+    normals=True, also return a matching normal map: the same per-pixel surface
+    direction the baked shading used, so real-time lights in the game land on
+    the art the way its own shading says the form turns. The outline rings get
+    an outward-facing normal, which is what gives sprites a rim light."""
     w, h, M, P = c.w, c.h, c.mat, c.part_of
     dist = _distance(c)
 
@@ -246,6 +250,7 @@ def shade(c, mats):
         return None
 
     tone = [[None] * w for _ in range(h)]
+    nrm = [[None] * w for _ in range(h)]
     for y in range(h):
         for x in range(w):
             m = M[y][x]
@@ -255,6 +260,7 @@ def shade(c, mats):
             mat = mats[m]
             if mat.flat:
                 tone[y][x] = 2
+                nrm[y][x] = (0.0, 0.0, 1.0)
                 continue
             hl = hgt(x - 1, y, p); hr = hgt(x + 1, y, p)
             hu = hgt(x, y - 1, p); hd = hgt(x, y + 1, p)
@@ -262,6 +268,7 @@ def shade(c, mats):
             sy = ((hd if hd is not None else 0.0) - (hu if hu is not None else 0.0)) * 0.5
             nx, ny, nz = -sx, -sy, 1.0
             nl = math.sqrt(nx * nx + ny * ny + nz * nz)
+            nrm[y][x] = (nx / nl, ny / nl, nz / nl)
             lam = max(0.0, (nx * LIGHT[0] + ny * LIGHT[1] + nz * LIGHT[2]) / nl)
             v = 0.26 + 0.84 * lam
 
@@ -322,6 +329,7 @@ def shade(c, mats):
             if best is None:
                 continue
             dx, dy, m = best
+            nrm[y][x] = (-dx * 0.8, -dy * 0.8, 0.6)
             lit_side = dx > 0 or dy > 0           # the shape is right of / below this pixel
             base = mats[m].tones[0]
             k = 0.62 if lit_side else 0.42
@@ -333,10 +341,25 @@ def shade(c, mats):
         for x in range(w):
             if M[y][x] or (x, y) in filled:
                 continue
-            if any(0 <= x + dx < w and 0 <= y + dy < h and (M[y + dy][x + dx] or (x + dx, y + dy) in filled)
-                   for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1))):
-                px[y][x] = INK + (255,)
-    return px
+            for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1)):
+                qx, qy = x + dx, y + dy
+                if 0 <= qx < w and 0 <= qy < h and (M[qy][qx] or (qx, qy) in filled):
+                    px[y][x] = INK + (255,)
+                    nrm[y][x] = (-dx * 0.9, -dy * 0.9, 0.45)
+                    break
+    if not normals:
+        return px
+    # Encoded for Godot (OpenGL convention): +X right, +Y up, so image-down flips.
+    nm = [[(128, 128, 255, 0)] * w for _ in range(h)]
+    for y in range(h):
+        for x in range(w):
+            n = nrm[y][x]
+            if n is None or px[y][x][3] == 0:
+                continue
+            l = math.sqrt(n[0] ** 2 + n[1] ** 2 + n[2] ** 2) or 1.0
+            nm[y][x] = (int((n[0] / l * 0.5 + 0.5) * 255), int((-n[1] / l * 0.5 + 0.5) * 255),
+                        int((n[2] / l * 0.5 + 0.5) * 255), 255)
+    return px, nm
 
 
 def to_rows(frames_px, fw, fh):
