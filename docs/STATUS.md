@@ -38,8 +38,9 @@ immediately; pads join by pressing a button.
 | --- | --- |
 | Combat | 3-hit combo, hitstop, input buffering, knockback, hit flash and squash |
 | Hit reactions | Hitstun, launch and juggle with decaying lift, ground bounce, knockdown, get-up invulnerability, wall bounce (ADR 0005) |
-| Mallet moves | Hold attack 3s standing: boomerang throw. Hold attack + left/right: travelling spin. Attack in the air: front flip |
+| Mallet moves | Hold attack 1s standing: boomerang throw. Hold attack + left/right: travelling spin. Attack in the air: front flip |
 | Arena | Screen edges are walls for players and enemies, derived from the camera frustum |
+| Pace | Whole game runs at 0.9 speed via one global time scale (`GameClock.Speed`) |
 | The fight | Three waves (3 grunts, 5 grunts, boss + 2), staggered in from the screen edges; 3 shared lives; win and game-over states; press attack to replay |
 | Grunt | Weak, bare-handed, launchable enemy with its own recoloured sheet |
 | Death | Killing blow lifts the body; it lies in a floored pose, blinks and is removed |

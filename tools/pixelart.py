@@ -85,7 +85,7 @@ class Canvas:
             self.rect(x - half, y - half, x + half, y + half, m)
 
 
-def shade(canvas, mats=MATS, outline=OUTLINE):
+def shade(canvas, mats=MATS, outline=OUTLINE, outer=True):
     """The passes that make flat regions read as 16-bit art: a dark silhouette
     outline, rim light on the upper-left, shadow on the lower-right."""
     buf, w, h = canvas.buf, canvas.w, canvas.h
@@ -110,6 +110,16 @@ def shade(canvas, mats=MATS, outline=OUTLINE):
             else:
                 col = base
             px[y][x] = col + (255,)
+
+    if outer:
+        # Grow the outline one pixel outward. Thickening it inward would eat
+        # the detail at this resolution; growing outward keeps every pixel of
+        # art and just makes the silhouette read harder against the ground.
+        ring = [(x, y) for y in range(h) for x in range(w)
+                if buf[y][x] == 0 and any(op(x + dx, y + dy)
+                                          for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1)))]
+        for x, y in ring:
+            px[y][x] = outline + (255,)
     return px
 
 

@@ -41,6 +41,14 @@ public partial class Fighter : CharacterBody3D
     /// <summary>Zero for fighters too heavy to be thrown into the air.</summary>
     protected virtual float LaunchScale => 1f;
 
+    /// <summary>
+    /// Blink while lying dead and while invulnerable after reviving. The arcade
+    /// signal for "this one is coming back" and "cannot be hurt yet".
+    /// </summary>
+    protected virtual bool BlinkWhileDown => false;
+    private const float BlinkPeriod = 0.09f;
+    private float _deadTime;
+
     [Export] public float MaxHealth { get; set; } = 100f;
     [Export] public float MoveSpeed { get; set; } = 5.0f;
     [Export] public float Acceleration { get; set; } = 60f;
@@ -77,6 +85,7 @@ public partial class Fighter : CharacterBody3D
 
     public string CurrentClip => Visual?.CurrentClip ?? "-";
     public bool SpriteFlipped => Visual?.Flipped ?? false;
+    public bool SpriteVisible => Visual?.Visible ?? true;
 
     protected DirectionalSprite Visual = null!;
     protected float HitstopRemaining;
@@ -155,6 +164,8 @@ public partial class Fighter : CharacterBody3D
         if (_hitAnimRemaining > 0f) _hitAnimRemaining -= dt;
         if (_stunRemaining > 0f) _stunRemaining -= dt;
         if (_invulnerable > 0f) _invulnerable -= dt;
+        if (BlinkWhileDown && !IsDead)
+            Visual.Visible = _invulnerable <= 0f || (int)(_invulnerable / BlinkPeriod) % 2 == 0;
 
         TickAlways(dt);
         if (Incapacitated) TickIncapacitated(dt);
@@ -217,6 +228,11 @@ public partial class Fighter : CharacterBody3D
 
         bool floored = (Down || IsDead) && Grounded;
         bool hasFlooredArt = Visual.HasClip("down");
+        if (IsDead && floored && BlinkWhileDown)
+        {
+            _deadTime += dt;
+            Visual.Visible = (int)(_deadTime / BlinkPeriod) % 2 == 0;
+        }
         PinClipFrame(floored && hasFlooredArt ? "down" : "hit", 0);
 
         if (Down || IsDead)
@@ -411,6 +427,8 @@ public partial class Fighter : CharacterBody3D
         _wallBounced = false;
         HitstopRemaining = 0f;
         _invulnerable = 1.0f;
+        _deadTime = 0f;
+        Visual.Visible = true;
         OnRevived();
         PlayClip("idle", restart: true);
     }

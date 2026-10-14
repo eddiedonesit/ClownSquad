@@ -45,7 +45,9 @@ public partial class PlayerFighter : Fighter
     // Charge moves. Time is measured from the moment attack is pressed.
     private const float ChargeStart = 0.35f;     // held past a tap: the charge pose begins
     private const float SpinMinCharge = 0.6f;    // earliest a held direction turns it into a spin
-    private const float FullCharge = 3.0f;       // standing still this long throws the mallet
+    // Standing still this long throws the mallet: one real second, expressed in
+    // game time, which runs at GameClock.Speed.
+    private const float FullCharge = 1.0f * (float)ClownSquad.World.GameClock.Speed;
     private const float SpinSpeed = 5.2f;
     private const float SpinHitInterval = 0.2f;
     private const float SpinMin = 0.5f;
@@ -65,6 +67,9 @@ public partial class PlayerFighter : Fighter
 
     /// <summary>False while a thrown mallet is in flight. Unarmed fighters cannot attack.</summary>
     public bool Armed { get; private set; } = true;
+
+    // Players blink while floored and while invulnerable after respawning.
+    protected override bool BlinkWhileDown => !Hostile;
 
     /// <summary>Scales all damage this fighter deals. Weak enemies sit below one.</summary>
     public float DamageMultiplier { get; set; } = 1f;

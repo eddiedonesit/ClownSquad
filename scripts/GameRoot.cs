@@ -54,6 +54,7 @@ public partial class GameRoot : Node3D
 
         GameClock.Reset();
         AttackTokens.Reset();
+        Engine.TimeScale = GameClock.Speed;
 
         // The arena is whatever the camera sees, captured before any shake, and
         // rebuilt whenever the window changes shape so the walls stay at the
@@ -387,6 +388,7 @@ public partial class GameRoot : Node3D
     }
 
     private int _shots;
+    private bool _sawDeadBlink;
 
     /// <summary>
     /// Plays the whole fight unattended, fast. For "win" an AI drives the
@@ -406,6 +408,7 @@ public partial class GameRoot : Node3D
     private void TickOutcomeProbe()
     {
         WaveDirector d = _director!;
+        if (_players[0].IsDead && !_players[0].SpriteVisible) _sawDeadBlink = true;
 
         // A few stills along the way, when there is a window to take them from.
         if (!DisplayServer.GetName().Contains("headless") && GameClock.Seconds > 4.0 + _shots * 5.0 && _shots < 6)
@@ -421,10 +424,15 @@ public partial class GameRoot : Node3D
         string got = d.Current == WaveDirector.Phase.Victory ? "win"
                    : d.Current == WaveDirector.Phase.Defeat ? "lose" : "timeout";
         bool ok = got == _outcomeProbe;
+        if (_outcomeProbe == "lose")
+        {
+            GD.Print($"  player blinked while lying dead: {_sawDeadBlink}");
+            ok &= _sawDeadBlink;
+        }
         GD.Print($"=== WAVE PROBE {(ok ? "PASS" : "FAIL")}: got {got}, expected {_outcomeProbe}; " +
                  $"wave {d.WaveNumber}/{d.WaveCount}, lives {d.Lives}, {GameClock.Seconds:F0}s of game time ===");
         _outcomeProbe = "";
-        Engine.TimeScale = 1.0;
+        Engine.TimeScale = GameClock.Speed;
         GetTree().Quit(ok ? 0 : 1);
     }
 }

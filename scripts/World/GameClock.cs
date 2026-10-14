@@ -7,6 +7,9 @@ namespace ClownSquad.World;
 /// </summary>
 public static class GameClock
 {
+    /// <summary>Overall game pace. 0.9 runs everything 10% slower than authored.</summary>
+    public const double Speed = 0.9;
+
     public static double Seconds { get; private set; }
     public static ulong Ms => (ulong)(Seconds * 1000.0);
 
