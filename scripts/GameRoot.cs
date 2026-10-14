@@ -66,6 +66,9 @@ public partial class GameRoot : Node3D
         string[] args = OS.GetCmdlineUserArgs();
         bool Has(string flag) => Array.IndexOf(args, flag) >= 0;
 
+        // The HD art is the default; the original sheets are kept and selectable.
+        ClownSquad.Visuals.ArtStyle.Classic = Has("classic");
+
         // Tests run against a throwaway save, so they never read or touch a real one.
         bool probe = Has("animtest") || Has("movetest") || Has("aitest") || Has("wavetest") || Has("losetest") || Has("tentshot");
         if (probe)
@@ -102,7 +105,6 @@ public partial class GameRoot : Node3D
         if (Has("movetest")) { AddChild(new ClownSquad.Debug.MovesProbe()); return; }
 
         _aiProbe = Has("aitest");
-        PlayerFighter.HdSample = Has("hd");
         if (Has("wavetest")) _outcomeProbe = "win";
         if (Has("losetest")) _outcomeProbe = "lose";
 

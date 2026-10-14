@@ -14,12 +14,12 @@ using ClownSquad.Visuals;
 /// </summary>
 public partial class BossClown : PlayerFighter
 {
-    protected override string SheetPath => "res://assets/sprites/boss_clown.png";
-    protected override string FramesPath => "res://assets/sprites/boss_clown.frames.json";
+    protected override string SheetPath =>
+        ArtStyle.Sheet("res://assets/sprites/boss_clown.png", "res://assets/sprites/boss_hd.png");
 
     // Authored at the same 64px height as the player but rendered larger, so it
     // towers over them without needing a taller canvas.
-    protected override float SpritePixelSize => 0.034f;
+    protected override float SpritePixelSize => ArtStyle.Pixel(0.034f);
 
     public override bool Hostile => true;
 
@@ -260,7 +260,8 @@ public partial class BossClown : PlayerFighter
     // reeled back in. The swing's
     // hitbox is unchanged; the glove is drawn to arrive as the hit lands.
 
-    private const string FistSheet = "res://assets/sprites/boss_fist.png";
+    private static string FistSheet =>
+        ArtStyle.Sheet("res://assets/sprites/boss_fist.png", "res://assets/sprites/boss_fist_hd.png");
     private Sprite3D? _nearFist;
     private Sprite3D? _farFist;
     private float _fistClock;

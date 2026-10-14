@@ -50,6 +50,7 @@ immediately; pads join by pressing a button.
 | Saving | One JSON save in the Godot user folder (`user://clownsquad_save.json`), written atomically; an unreadable save is set aside, never overwritten. Saved on every kill, wave clear, stage end, Stat Tent close and quit. Tests use a separate throwaway save |
 | Levelling | XP from every enemy to every player (grunt 15, boss 150); curve 40 x level^1.35 to a cap of 50; each level gives 3 stat points, 1 banked skill point, and a full heal. Failing a stage keeps XP |
 | Stats | POW +4% damage, GUTS +8 max health, ZIP +2% speed (cap +40%), LUCK +1.5% crit chance (base 3%, cap 50%, crits x1.75). Spent in the Stat Tent: one card per player on their own controller, game paused, undo until closed; opens on Tab / Back and after a stage |
+| Art | HD sprites by default: squad (44 frames, every clip), grunts, thrown mallet, Bertie and his fists at double resolution (player 96x128), with 5-tone hue-shifted ramps, form shading, cast shadows between parts and coloured outlines (tools/pixelart_hd.py, gen_sprite_hd.py, gen_enemy_hd.py). The original sheets and generators are kept; `-- classic` plays with them |
 | Bertie's fists | No arms: two gloves float beside him and fly at the target on each punch (jab, cross, both for the finisher); hands up and waving through the belly-flop hang |
 | Feel helpers | Lane assist, dodge-cancel from recovery, hit sparks, combo counter, attack tokens |
 | Dodge | Ground slide with i-frames 0.05-0.26s of a 0.35s roll |

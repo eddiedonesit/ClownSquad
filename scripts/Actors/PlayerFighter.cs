@@ -70,17 +70,6 @@ public partial class PlayerFighter : Fighter
     /// <summary>False while a thrown mallet is in flight. Unarmed fighters cannot attack.</summary>
     public bool Armed { get; private set; } = true;
 
-    /// <summary>
-    /// Plays the squad on the double-resolution sample sheet ("-- hd"). It has
-    /// only idle and walk so far; every other state falls back to idle.
-    /// </summary>
-    public static bool HdSample { get; set; }
-
-    protected override string SheetPath => HdSample && !Hostile ? "res://assets/sprites/pip_hd.png" : base.SheetPath;
-    protected override string FramesPath => HdSample && !Hostile ? "res://assets/sprites/pip_hd.frames.json" : base.FramesPath;
-    // Half the pixel size for twice the pixels: the same height on screen.
-    protected override float SpritePixelSize => HdSample && !Hostile ? base.SpritePixelSize * 0.5f : base.SpritePixelSize;
-
     // Players blink while floored and while invulnerable after respawning.
     protected override bool BlinkWhileDown => !Hostile;
 

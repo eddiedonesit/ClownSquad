@@ -1,0 +1,29 @@
+{
+  "frame_width": 208,
+  "frame_height": 288,
+  "baseline": 216,
+  "count": 11,
+  "clips": {
+    "idle": [
+      0,
+      1
+    ],
+    "walk": [
+      2,
+      3,
+      4,
+      5
+    ],
+    "hit": [
+      6
+    ],
+    "attack": [
+      7,
+      8,
+      9
+    ],
+    "down": [
+      10
+    ]
+  }
+}

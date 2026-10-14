@@ -3,6 +3,7 @@ namespace ClownSquad.UI;
 using System;
 using System.Collections.Generic;
 using Godot;
+using ClownSquad.Visuals;
 using ClownSquad.Actors;
 using ClownSquad.Progression;
 using ClownSquad.World;
@@ -18,9 +19,9 @@ using ClownSquad.World;
 /// </summary>
 public partial class ClownHud : CanvasLayer
 {
-    private const string PlayerSheet = "res://assets/sprites/clown_16bit.png";
-    private const string GruntSheet = "res://assets/sprites/grunt_clown.png";
-    private const string BossSheet = "res://assets/sprites/boss_clown.png";
+    private static string PlayerSheet => ArtStyle.Sheet("res://assets/sprites/clown_16bit.png", "res://assets/sprites/pip_hd.png");
+    private static string GruntSheet => ArtStyle.Sheet("res://assets/sprites/grunt_clown.png", "res://assets/sprites/grunt_hd.png");
+    private static string BossSheet => ArtStyle.Sheet("res://assets/sprites/boss_clown.png", "res://assets/sprites/boss_hd.png");
 
     private static readonly (int at, string word, Color color)[] Ranks =
     {
@@ -133,8 +134,8 @@ public partial class ClownHud : CanvasLayer
     };
 
     // Head crops from the first idle frame of each sheet.
-    private static readonly Rect2 ClownHead = new(36, 45, 32, 34);
-    private static readonly Rect2 BossHead = new(26, 0, 40, 34);
+    private static Rect2 ClownHead => ArtStyle.Classic ? new(36, 45, 32, 34) : new(72, 90, 64, 68);
+    private static Rect2 BossHead => ArtStyle.Classic ? new(26, 0, 40, 34) : new(52, 4, 80, 76);
 
     private (Control, CandyBar, Label) BuildPlayerPanel(int index)
     {

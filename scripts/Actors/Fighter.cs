@@ -20,9 +20,10 @@ public partial class Fighter : CharacterBody3D
     /// <summary>Raised for every hit that lands: attacker (if any), victim, damage.</summary>
     public static event Action<Fighter?, Fighter, float>? HitLanded;
 
-    protected virtual string SheetPath => "res://assets/sprites/clown_16bit.png";
-    protected virtual string FramesPath => "res://assets/sprites/clown_16bit.frames.json";
-    protected virtual float SpritePixelSize => 0.0225f;
+    protected virtual string SheetPath =>
+        ArtStyle.Sheet("res://assets/sprites/clown_16bit.png", "res://assets/sprites/pip_hd.png");
+    protected virtual string FramesPath => ArtStyle.FramesFor(SheetPath);
+    protected virtual float SpritePixelSize => ArtStyle.Pixel(0.0225f);
 
     /// <summary>Which side this fighter is on. Attacks only cross factions.</summary>
     public virtual bool Hostile => false;

@@ -1,15 +1,14 @@
-"""PIP at double resolution: the sample for the SNES-quality art pass.
+"""The squad, the grunts and the thrown mallet at double resolution.
 
 The character is authored in a 96 x 128 space (the original was 48 x 64) and
 rendered through pixelart_hd.py: five-tone hue-shifted ramps, form shading,
-cast shadows between parts, and coloured outlines. Only idle and walk exist so
-far; the game falls back to idle for everything else while this is a sample.
+cast shadows between parts, and coloured outlines. Every clip of the original
+sheet (tools/gen_sprite.py, kept as the classic art) is here with the same
+poses doubled, so the game code drives either sheet unchanged.
 
-Same canvas padding as the original, doubled, so the sheet is a drop-in
-replacement once every clip is drawn: 208 x 288 frames, feet on row 216.
+Same canvas padding as the original, doubled: 208 x 288 frames, feet on row 216.
 
-Run: python tools/gen_sprite_hd.py  (then Godot --import, as refresh_sprites.sh does)
-Play it: add  -- hd  to the game's command line.
+Run: bash tools/refresh_sprites.sh.  The classic art: add  -- classic  to the game.
 """
 import json
 import math
@@ -17,7 +16,7 @@ import os
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from pixelart_hd import HDCanvas, Material, shade, to_rows, bezier
+from pixelart_hd import HDCanvas, Material, shade, to_rows, bezier, rotated, laid_down, crop, touches_border
 from pixelpng import write_png
 
 BODY_W, BODY_H = 96, 128
@@ -85,7 +84,7 @@ def fist(c, x, y, far):
     c.ellipse(x + 3, y - 3.5, 3, 2.5, WHITE)            # thumb over the grip
 
 
-def mallet_head(c, hx, hy, angle, length, head_len=40, head_rad=14):
+def mallet_head(c, hx, hy, angle, length, head_len=44, head_rad=15):
     """The squeaky mallet's barrel: red, with a yellow striking face and steel
     bands, its axis across the handle. Drawn before the body when carried, so
     it rests behind the head instead of over the face."""
@@ -114,15 +113,26 @@ def mallet_handle(c, hx, hy, angle, length):
 
 # -------------------------------------------------------------------- pose
 
-CARRY_ANGLE, CARRY_LENGTH = 150, 54     # resting back over the shoulder
+CARRY = (143, 29)          # resting back over the shoulder (original units)
+DODGE_CARRY = (112, 24)    # steeper and closer, so the deep slide stays on canvas
 
-POSE = dict(by=0, ln=0, hd=0, nl=0, fl=0, nfoot=0, ffoot=0, na=0, fa=0, lift=0)
+POSE = dict(by=0, ln=0, hd=0, nl=0, fl=0, nfoot=0, ffoot=0, na=0, fa=0, lift=0, mallet=None)
 
 
 def pose(**over):
     p = dict(POSE)
     p.update(over)
     return p
+
+
+def old(mallet=None, body_dy=0, lean=0, head_dy=0, near_leg=0, far_leg=0,
+        near_arm=0, far_arm=0, arm_lift=0, nfoot=0, ffoot=0):
+    """A pose written in the original sheet's units, doubled. Every clip keeps
+    the timing and staging that was already tuned against the game code; only
+    the drawing changes."""
+    m = None if mallet is None else (mallet[0], mallet[1] * 2)
+    return pose(by=body_dy * 2, ln=lean * 2, hd=head_dy * 2, nl=near_leg * 2, fl=far_leg * 2,
+                na=near_arm * 2, fa=far_arm * 2, lift=arm_lift * 2, nfoot=nfoot, ffoot=ffoot, mallet=m)
 
 
 def draw(p):
@@ -132,10 +142,15 @@ def draw(p):
     nl, fl = p["nl"], p["fl"]
     hipy = 93 + by
     hy = 46 + by + hd                       # head centre
+    # The grip sits where the original's did (doubled), so the mallet head lands
+    # where the game's impact effects expect it.
+    ex, ey = 52 + p["na"], 102 - p["lift"]
+    gx, gy = ex, ey + 4
+    m = p["mallet"]
+    behind = m is not None and m[0] >= 100   # swung back over the shoulder
 
-    # the carried mallet's head rests behind everything, over the shoulder
-    ex, ey = 52 + p["na"], 95 - p["lift"]
-    mallet_head(c, ex, ey + 4, CARRY_ANGLE, CARRY_LENGTH)
+    if behind:
+        mallet_head(c, gx, gy, m[0], m[1])
 
     # hair, behind everything above the shoulders
     for x, y, r in ((36, hy - 10, 6), (31, hy - 3, 7.5), (27, hy + 5, 7), (30, hy + 13, 6.5)):
@@ -145,23 +160,23 @@ def draw(p):
     # far leg, shoe and arm, a tone darker
     c.part(far=True)
     c.capsule(42 + ln, hipy, 44 + fl, 112 - p["ffoot"], 8.5, 6.5, SUIT)
-    c.recolor(lambda x, y, m: RED if 104 - p["ffoot"] < y < 108 - p["ffoot"] else m)
+    c.recolor(lambda x, y, mm: RED if 104 - p["ffoot"] < y < 108 - p["ffoot"] else mm)
     frill(c, 44 + fl, 113 - p["ffoot"], 7, True)
     shoe(c, 46 + fl, 128 - p["ffoot"], True)
     c.part(far=True)
-    c.capsule(41 + ln, 76 + by, 39 + p["fa"], 95 - p["lift"], 5.6, 4.8, SUIT)
-    fist(c, 39 + p["fa"], 99 - p["lift"], True)
+    c.capsule(41 + ln, 76 + by, 39 + p["fa"], 102 - p["lift"], 5.6, 4.8, SUIT)
+    fist(c, 39 + p["fa"], 106 - p["lift"], True)
 
     # torso: a pear of harlequin diamonds, pompom buttons, a belt and buckle
     c.part()
     c.ellipse(46 + ln, 85 + by, 15, 13.5, SUIT)
     c.ellipse(47 + ln, 76 + by, 12.5, 9, SUIT)
 
-    def harlequin(x, y, m):
+    def harlequin(x, y, mm):
         u, v = (x - ln + y - by) / 7.0, (x - ln - y + by) / 7.0
         if 93 + by <= y <= 97 + by:
             return GOLD if 52 + ln <= x <= 57 + ln else BELT
-        return DIAMOND if (math.floor(u) + math.floor(v)) % 2 == 0 else m
+        return DIAMOND if (math.floor(u) + math.floor(v)) % 2 == 0 else mm
     c.recolor(harlequin)
     for bx, byy in ((58, 78), (59.5, 87)):
         c.part()
@@ -170,7 +185,7 @@ def draw(p):
     # near leg: baggy trousers with a red band, a frill, the big shoe
     c.part()
     c.capsule(50 + ln, hipy - 1, 52 + nl, 112 - p["nfoot"], 9, 6.8, SUIT)
-    c.recolor(lambda x, y, m: RED if 103 - p["nfoot"] < y < 108 - p["nfoot"] else m)
+    c.recolor(lambda x, y, mm: RED if 103 - p["nfoot"] < y < 108 - p["nfoot"] else mm)
     frill(c, 52 + nl, 113 - p["nfoot"], 8, False)
     shoe(c, 56 + nl, 128 - p["nfoot"], False)
 
@@ -182,10 +197,10 @@ def draw(p):
     # head: one rounded shape, white greasepaint round the mouth
     c.part()
     c.ellipse(50 + ln, hy + 1, 18.5, 18.5, SKIN)
-    c.recolor(lambda x, y, m: WHITE if ((x - 60 - ln) / 9.5) ** 2 + ((y - hy - 11) / 6.5) ** 2 <= 1 else m)
+    c.recolor(lambda x, y, mm: WHITE if ((x - 60 - ln) / 9.5) ** 2 + ((y - hy - 11) / 6.5) ** 2 <= 1 else mm)
     c.part()
     c.ellipse(37 + ln, hy + 4, 3.6, 5, SKIN)                     # ear, half under the hair
-    c.recolor(lambda x, y, m: BLUSH if ((x - 37.6 - ln) / 1.6) ** 2 + ((y - hy - 4) / 2.8) ** 2 <= 1 else m)
+    c.recolor(lambda x, y, mm: BLUSH if ((x - 37.6 - ln) / 1.6) ** 2 + ((y - hy - 4) / 2.8) ** 2 <= 1 else mm)
     c.part()
     c.ellipse(33 + ln, hy + 1, 4.5, 7, HAIR)                     # a curl over its back edge
 
@@ -196,7 +211,7 @@ def draw(p):
     c.ellipse(60 + ln, hy - 4, 3.3, 5, EYE)
     c.part(line=False)
     c.ellipse(61.4 + ln, hy - 3, 1.9, 3.2, INK)
-    c.recolor(lambda x, y, m: EYE if abs(x - 61.5 - ln) < 0.6 and abs(y - hy + 5) < 0.6 else m)
+    c.recolor(lambda x, y, mm: EYE if abs(x - 61.5 - ln) < 0.6 and abs(y - hy + 5) < 0.6 else mm)
     c.part(line=False)
     c.ellipse(50.5 + ln, hy + 7, 3.2, 2.2, BLUSH)
     c.part(line=False)
@@ -208,10 +223,10 @@ def draw(p):
     hx = 46 + ln
     c.part()
     c.poly([(hx - 17, hy - 11), (hx + 17, hy - 11), (hx + 8, hy - 28), (hx - 4, hy - 43), (hx - 12, hy - 26)], RED)
-    c.recolor(lambda x, y, m: YELLOW if math.floor((x - ln + (y - by) * 0.75) / 5.0) % 3 == 0 else m)
+    c.recolor(lambda x, y, mm: YELLOW if math.floor((x - ln + (y - by) * 0.75) / 5.0) % 3 == 0 else mm)
     c.part()
     c.ellipse(hx, hy - 11, 19.5, 4.2, YELLOW)
-    c.recolor(lambda x, y, m: WHITE if abs(y - hy + 11) < 0.8 and math.floor(x) % 5 == 0 else m)
+    c.recolor(lambda x, y, mm: WHITE if abs(y - hy + 11) < 0.8 and math.floor(x) % 5 == 0 else mm)
     c.part()
     px_, py_ = hx - 5, hy - 45
     c.ellipse(px_, py_, 4.5, 4.5, WHITE)
@@ -223,38 +238,152 @@ def draw(p):
     c.part()
     c.capsule(sx, sy, ex, ey, 6.2, 5.2, SUIT)
 
-    def sleeve(x, y, m):
+    def sleeve(x, y, mm):
         dx, dy = ex - sx, ey - sy
-        t = ((x - sx) * dx + (y - sy) * dy) / (dx * dx + dy * dy)
-        return RED if 0.42 < t < 0.56 else m
+        t = ((x - sx) * dx + (y - sy) * dy) / max(1e-6, dx * dx + dy * dy)
+        return RED if 0.42 < t < 0.56 else mm
     c.recolor(sleeve)
     frill(c, sx + (ex - sx) * 0.92, sy + (ey - sy) * 0.92, 5.5, False)
-    mallet_handle(c, ex, ey + 4, CARRY_ANGLE, CARRY_LENGTH)
-    fist(c, ex, ey + 4, False)
+    if m is not None:
+        mallet_handle(c, gx, gy, m[0], m[1])
+    fist(c, gx, gy, False)
+    if m is not None and not behind:
+        mallet_head(c, gx, gy, m[0], m[1])
     return c
 
 
-FRAMES = [
-    ("idle", pose()),
-    ("idle", pose(by=1, hd=1, lift=-1)),
-    ("walk", pose(nl=12, fl=-10, na=-4, fa=6, by=-2, ln=1)),
-    ("walk", pose(nl=3, fl=-2, ffoot=4, na=-1, fa=2)),
-    ("walk", pose(nl=-10, fl=12, na=5, fa=-5, by=-2, ln=1)),
-    ("walk", pose(nl=-2, fl=3, nfoot=4, na=1, fa=-2)),
+# ------------------------------------------------------------------ clips
+# Mirrors tools/gen_sprite.py clip for clip, so either sheet drives the same code.
+
+BASE = [
+    ("idle", dict()),
+    ("idle", dict(body_dy=1, head_dy=1, arm_lift=-1)),
+    ("walk", dict(near_leg=6, far_leg=-5, near_arm=-2, far_arm=3, body_dy=-1, lean=1)),
+    ("walk", dict(near_leg=2, far_leg=-1, near_arm=-1, far_arm=1, ffoot=4)),
+    ("walk", dict(near_leg=-5, far_leg=6, near_arm=3, far_arm=-3, body_dy=-1, lean=1)),
+    ("walk", dict(near_leg=-1, far_leg=2, near_arm=1, far_arm=-1, nfoot=4)),
+    ("hit", dict(lean=-4, head_dy=-2, body_dy=2, near_arm=-7, far_arm=-5, arm_lift=-2)),
+    ("dodge", dict(body_dy=8, lean=6, head_dy=3, near_leg=12, far_leg=-6,
+                   near_arm=-10, far_arm=-7, arm_lift=-6)),
+    ("dodge", dict(body_dy=15, lean=10, head_dy=6, near_leg=20, far_leg=-10,
+                   near_arm=-15, far_arm=-11, arm_lift=-11)),
+    ("dodge", dict(body_dy=8, lean=5, head_dy=3, near_leg=11, far_leg=-5,
+                   near_arm=-9, far_arm=-6, arm_lift=-6)),
+    ("jump", dict(body_dy=-2, lean=2, near_leg=5, far_leg=-3, near_arm=-6, far_arm=-4, arm_lift=6)),
+    ("jump", dict(lean=-1, near_leg=-4, far_leg=6, near_arm=4, far_arm=-3, arm_lift=2)),
 ]
 
+HIT_POSE = dict(lean=-4, head_dy=-2, body_dy=2, near_arm=-7, far_arm=-5, arm_lift=-2)
 
-def main():
-    shaded = [shade(draw(p), MATS) for _, p in FRAMES]
-    out = os.path.join("assets", "sprites", "pip_hd.png")
+
+def player_frames():
+    frames = []
+    add = lambda name, cv: frames.append((name, cv))
+    for name, kw in BASE:
+        add(name, draw(old(mallet=DODGE_CARRY if name == "dodge" else CARRY, **kw)))
+
+    # attack: mallet arcs from behind the head, out to 45 degrees, down to ground
+    add("attack", draw(old(lean=-3, body_dy=1, near_arm=-6, far_arm=-4, arm_lift=5, mallet=(165, 26))))
+    add("attack", draw(old(lean=0, body_dy=-1, near_arm=-2, far_arm=-1, arm_lift=9, mallet=(120, 30))))
+    add("attack", draw(old(lean=3, body_dy=-1, near_arm=6, far_arm=3, arm_lift=5, mallet=(45, 30))))
+    add("attack", draw(old(lean=4, body_dy=1, near_arm=9, far_arm=5, arm_lift=-2, mallet=(0, 26))))
+
+    # charge: coiled low with the mallet drawn right back, two frames to shudder
+    add("charge", draw(old(body_dy=5, lean=-4, head_dy=1, near_leg=5, far_leg=-5,
+                           near_arm=-9, far_arm=-6, arm_lift=7, mallet=(168, 28))))
+    add("charge", draw(old(body_dy=6, lean=-5, head_dy=2, near_leg=6, far_leg=-5,
+                           near_arm=-10, far_arm=-7, arm_lift=8, mallet=(160, 28))))
+
+    # spin: mallet straight out; the engine mirrors these rapidly into a whirl
+    add("spin", draw(old(body_dy=2, lean=2, near_leg=4, far_leg=-4,
+                         near_arm=10, far_arm=-8, arm_lift=10, mallet=(6, 28))))
+    add("spin", draw(old(body_dy=3, lean=3, near_leg=-3, far_leg=4,
+                         near_arm=10, far_arm=-8, arm_lift=9, mallet=(-6, 28))))
+
+    # throw: wind up, then released with the arm thrown forward and the hand empty
+    add("throw", draw(old(lean=-5, body_dy=2, near_leg=-4, far_leg=5,
+                          near_arm=-10, far_arm=-6, arm_lift=11, mallet=(150, 26))))
+    add("throw", draw(old(lean=6, body_dy=1, near_leg=8, far_leg=-6,
+                          near_arm=13, far_arm=7, arm_lift=9)))
+
+    # flip: one tucked pose, rotated through a full turn, re-lit at every step
+    tuck = draw(old(body_dy=3, lean=2, head_dy=2, near_leg=6, far_leg=4,
+                    near_arm=6, far_arm=4, arm_lift=12, mallet=(70, 24)))
+    for step in range(8):
+        add("flip", rotated(tuck, step * 45, 48 + DRAW_X, 76 + DRAW_Y))
+
+    # the same body with empty hands, for while the mallet is in flight
+    for name, kw in BASE:
+        add("empty_" + name, draw(old(**kw)))
+
+    floored = laid_down(draw(old(**HIT_POSE)), 48 + DRAW_X, 80 + DRAW_Y, BASELINE)
+    add("down", floored)
+    add("empty_down", floored)
+    return frames
+
+
+def grunt_frames():
+    """The grunt: the same body bare-handed, recoloured at shading time."""
+    frames = []
+    for name, kw in BASE:
+        if name in ("idle", "walk", "hit"):
+            frames.append((name, draw(old(**kw))))
+    frames.append(("attack", draw(old(lean=-4, body_dy=1, near_arm=-9, far_arm=5, arm_lift=9, near_leg=-3, far_leg=3))))
+    frames.append(("attack", draw(old(lean=5, body_dy=0, near_arm=15, far_arm=-6, arm_lift=11, near_leg=7, far_leg=-5))))
+    frames.append(("attack", draw(old(lean=3, body_dy=1, near_arm=9, far_arm=-3, arm_lift=6, near_leg=4, far_leg=-2))))
+    frames.append(("down", laid_down(draw(old(**HIT_POSE)), 48 + DRAW_X, 80 + DRAW_Y, BASELINE)))
+    return frames
+
+
+GRUNT_MATS = dict(MATS)
+GRUNT_MATS[SUIT] = Material((84, 162, 92))
+GRUNT_MATS[RED] = Material((146, 70, 166))
+GRUNT_MATS[HAIR] = Material((110, 200, 214))
+GRUNT_MATS[DIAMOND] = Material((246, 200, 84))
+
+
+def mallet_frames():
+    """The thrown mallet alone at eight rotations, in a 120px square."""
+    MS = 120
+    loose = HDCanvas(W, H, DRAW_X, DRAW_Y)
+    mallet_handle(loose, 24, 64, 0, 44)
+    mallet_head(loose, 24, 64, 0, 44)
+    cx, cy = 52 + DRAW_X, 64 + DRAW_Y
+    out = []
+    for step in range(8):
+        cv = crop(rotated(loose, step * 45, cx, cy), cx - MS // 2, cy - MS // 2, MS, MS)
+        if touches_border(cv):
+            print("WARNING: mallet projectile frame {} is clipped".format(step))
+        out.append(shade(cv, MATS))
+    return out, MS
+
+
+def write_sheet(name, frames, mats):
+    clipped = sorted({n for n, cv in frames if touches_border(cv)})
+    if clipped:
+        print("WARNING: {} art touches the canvas edge in: {}".format(name, ", ".join(clipped)))
+    shaded = [shade(cv, mats) for _, cv in frames]
+    out = os.path.join("assets", "sprites", name + ".png")
     write_png(out, W * len(shaded), H, to_rows(shaded, W, H))
     clips = {}
-    for i, (name, _) in enumerate(FRAMES):
-        clips.setdefault(name, []).append(i)
-    with open(os.path.join("assets", "sprites", "pip_hd.frames.json"), "w") as f:
+    for i, (n, _) in enumerate(frames):
+        clips.setdefault(n, []).append(i)
+    with open(os.path.join("assets", "sprites", name + ".frames.json"), "w") as f:
         json.dump({"frame_width": W, "frame_height": H, "baseline": BASELINE,
                    "count": len(shaded), "clips": clips}, f, indent=2)
     print("wrote {}  {}x{}  {} frames".format(out, W * len(shaded), H, len(shaded)))
+
+
+def main():
+    write_sheet("pip_hd", player_frames(), MATS)
+    write_sheet("grunt_hd", grunt_frames(), GRUNT_MATS)
+    spin, ms = mallet_frames()
+    out = os.path.join("assets", "sprites", "mallet_spin_hd.png")
+    write_png(out, ms * len(spin), ms, to_rows(spin, ms, ms))
+    with open(os.path.join("assets", "sprites", "mallet_spin_hd.frames.json"), "w") as f:
+        json.dump({"frame_width": ms, "frame_height": ms, "count": len(spin),
+                   "clips": {"mallet_spin": list(range(len(spin)))}}, f, indent=2)
+    print("wrote {}  {} frames".format(out, len(spin)))
 
 
 if __name__ == "__main__":

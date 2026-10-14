@@ -17,8 +17,8 @@ using ClownSquad.World;
 /// </summary>
 public partial class MalletProjectile : Node3D
 {
-    private const string Sheet = "res://assets/sprites/mallet_spin.png";
-    private const string Frames = "res://assets/sprites/mallet_spin.frames.json";
+    private static string Sheet =>
+        ArtStyle.Sheet("res://assets/sprites/mallet_spin.png", "res://assets/sprites/mallet_spin_hd.png");
 
     private const float OutSpeed = 15f;
     private const float ReturnSpeed = 18f;
@@ -52,8 +52,8 @@ public partial class MalletProjectile : Node3D
     {
         _sprite = new AnimatedSprite3D
         {
-            SpriteFrames = FrameLibrary.Load(Sheet, Frames),
-            PixelSize = 0.0225f,
+            SpriteFrames = FrameLibrary.Load(Sheet, ArtStyle.FramesFor(Sheet)),
+            PixelSize = ArtStyle.Pixel(0.0225f),
             Billboard = BaseMaterial3D.BillboardModeEnum.FixedY,
             TextureFilter = BaseMaterial3D.TextureFilterEnum.Nearest,
             AlphaCut = SpriteBase3D.AlphaCutMode.Discard,

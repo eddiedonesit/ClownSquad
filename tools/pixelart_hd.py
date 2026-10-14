@@ -349,3 +349,68 @@ def to_rows(frames_px, fw, fh):
                 r.extend(p)
         rows.append(r)
     return rows
+
+
+# ---------------------------------------------------------- whole-figure ops
+# These work on the material and part buffers before shading, so a rotated
+# figure is re-lit from the upper left rather than carrying rotated shadows.
+
+def _empty_like(c):
+    out = HDCanvas(c.w, c.h, c.ox, c.oy)
+    out.parts = c.parts
+    out.cur = c.cur
+    return out
+
+
+def rotated(c, degrees, cx, cy):
+    """Rotate clockwise about a canvas-space point (nearest neighbour)."""
+    out = _empty_like(c)
+    r = math.radians(degrees)
+    co, si = math.cos(r), math.sin(r)
+    for y in range(c.h):
+        for x in range(c.w):
+            dx, dy = x - cx, y - cy
+            sx = int(round(cx + dx * co + dy * si))
+            sy = int(round(cy - dx * si + dy * co))
+            if 0 <= sx < c.w and 0 <= sy < c.h:
+                out.mat[y][x] = c.mat[sy][sx]
+                out.part_of[y][x] = c.part_of[sy][sx]
+    return out
+
+
+def laid_down(c, cx, cy, baseline):
+    """Tip a standing figure onto its back, resting on the baseline row."""
+    out = rotated(c, -90, cx, cy)
+    rows = [y for y in range(out.h) if any(out.mat[y])]
+    if not rows:
+        return out
+    shift = (baseline - 1) - rows[-1]
+    moved = _empty_like(out)
+    for y in range(out.h):
+        sy = y - shift
+        if 0 <= sy < out.h:
+            moved.mat[y] = list(out.mat[sy])
+            moved.part_of[y] = list(out.part_of[sy])
+    return moved
+
+
+def crop(c, x0, y0, w, h):
+    out = HDCanvas(w, h)
+    out.parts = c.parts
+    out.cur = c.cur
+    for y in range(h):
+        for x in range(w):
+            sx, sy = x0 + x, y0 + y
+            if 0 <= sx < c.w and 0 <= sy < c.h:
+                out.mat[y][x] = c.mat[sy][sx]
+                out.part_of[y][x] = c.part_of[sy][sx]
+    return out
+
+
+def touches_border(c):
+    """True when art reaches the canvas edge (with room for the 2px outline)."""
+    for y in range(c.h):
+        for x in range(c.w):
+            if c.mat[y][x] and (x < 2 or y < 2 or x >= c.w - 2 or y >= c.h - 2):
+                return True
+    return False
