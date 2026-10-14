@@ -30,16 +30,25 @@ class Canvas:
     """Index buffer the generators draw into. Art is authored in a logical
     space and offset into a wider canvas, so props can overhang the body."""
 
-    def __init__(self, w, h, offset_x=0):
+    def __init__(self, w, h, offset_x=0, offset_y=0):
         self.w = w
         self.h = h
         self.ox = offset_x
+        self.oy = offset_y
         self.buf = [[0] * w for _ in range(h)]
 
     def put(self, x, y, m):
         x += self.ox
+        y += self.oy
         if 0 <= x < self.w and 0 <= y < self.h:
             self.buf[y][x] = m
+
+    def get(self, x, y):
+        x += self.ox
+        y += self.oy
+        if 0 <= x < self.w and 0 <= y < self.h:
+            return self.buf[y][x]
+        return 0
 
     def ellipse(self, cx, cy, rx, ry, m):
         for y in range(int(cy - ry), int(cy + ry) + 1):
@@ -114,3 +123,32 @@ def pack_rows(frames, w, h):
                 row.extend(f[y][x])
         rows.append(row)
     return rows
+
+
+def rotated(canvas, degrees, cx, cy):
+    """Return a copy of the canvas rotated clockwise about a canvas-space point.
+
+    Nearest-neighbour inverse mapping on the material buffer, before shading,
+    so the outline and light passes are recomputed for the new orientation
+    instead of being smeared by the rotation.
+    """
+    import math
+    out = Canvas(canvas.w, canvas.h, canvas.ox, canvas.oy)
+    r = math.radians(degrees)
+    c, s = math.cos(r), math.sin(r)
+    src = canvas.buf
+    for y in range(canvas.h):
+        for x in range(canvas.w):
+            dx, dy = x - cx, y - cy
+            sx = int(round(cx + dx * c + dy * s))
+            sy = int(round(cy - dx * s + dy * c))
+            if 0 <= sx < canvas.w and 0 <= sy < canvas.h:
+                out.buf[y][x] = src[sy][sx]
+    return out
+
+
+def touches_border(canvas):
+    """True when art reaches the canvas edge, which means it is being clipped."""
+    b, w, h = canvas.buf, canvas.w, canvas.h
+    return (any(b[0]) or any(b[h - 1])
+            or any(b[y][0] for y in range(h)) or any(b[y][w - 1] for y in range(h)))

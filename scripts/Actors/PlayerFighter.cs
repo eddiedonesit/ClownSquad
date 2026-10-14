@@ -8,25 +8,26 @@ using ClownSquad.Visuals;
 
 /// <summary>
 /// A fighter driven by an <see cref="IInputSource"/>. Knows nothing about where
-/// the input came from, so the same class serves single-player, local co-op and
-/// (later) remote peers. See ADR 0003.
+/// the input came from, so the same class serves single-player, local co-op,
+/// AI enemies and (later) remote peers. See ADR 0003.
 /// </summary>
 public partial class PlayerFighter : Fighter
 {
-    private enum State { Free, Attacking, Dodging, Special }
+    private enum State { Free, Attacking, Dodging, Special, Charging, Spinning, Throwing, Flipping }
 
     /// <summary>One swing in the combo. Timings are in seconds.</summary>
     private readonly record struct AttackStep(
         float Startup, float Active, float Recovery,
         float Damage, float Knockback, float Hitstop,
-        float Range, float HalfArcDegrees);
+        float Range, float Launch);
 
-    // Escalating chain: fast opener, faster mid, slow committal finisher.
+    // Escalating chain: fast opener, faster mid, slow committal finisher. Only
+    // the finisher launches, so a full string is what opens a juggle.
     private static readonly AttackStep[] Combo =
     {
-        new(0.08f, 0.06f, 0.16f, 10f, 2.0f, 0.050f, 1.9f, 60f),
-        new(0.08f, 0.06f, 0.18f, 12f, 2.5f, 0.060f, 1.9f, 60f),
-        new(0.13f, 0.08f, 0.32f, 22f, 6.5f, 0.110f, 2.3f, 75f),
+        new(0.08f, 0.06f, 0.16f, 10f, 2.0f, 0.050f, 1.9f, 0f),
+        new(0.08f, 0.06f, 0.18f, 12f, 2.5f, 0.060f, 1.9f, 0f),
+        new(0.13f, 0.08f, 0.32f, 22f, 8.5f, 0.110f, 2.3f, 6.5f),
     };
 
     private const float ComboWindow = 0.45f;
@@ -36,20 +37,37 @@ public partial class PlayerFighter : Fighter
     private const float IFrameEnd = 0.26f;
     private const float JumpSpeed = 8.5f;
 
-    // Where the mallet head sits on the GROUND-CONTACT frame, measured from the
-    // sprite geometry. The strike frame (45 deg) puts the head at 0.657/0.837,
-    // which is head height - centring the burst there made it bloom around the
-    // clown rather than at the floor. The follow-through frame is the one that
-    // actually meets the ground.
-    // 0.833 is the head centre, 1.035 its leading edge; sit just inside the
-    // front face so the blast reads as thrown off the striking surface.
+    // Lane assist: how far off-lane a target may be for a swing to pull the
+    // attacker onto it, and how far the attacker slides when it does.
+    private const float LaneAssistReach = 1.6f;
+    private const float LaneAssistStep = 0.55f;
+
+    // Charge moves. Time is measured from the moment attack is pressed.
+    private const float ChargeStart = 0.35f;     // held past a tap: the charge pose begins
+    private const float SpinMinCharge = 0.6f;    // earliest a held direction turns it into a spin
+    private const float FullCharge = 3.0f;       // standing still this long throws the mallet
+    private const float SpinSpeed = 5.2f;
+    private const float SpinHitInterval = 0.2f;
+    private const float SpinMin = 0.5f;
+    private const float SpinMax = 1.8f;
+    private const float SpinRadius = 1.8f;
+    private const float FlipForward = 6.5f;
+    private const float FlipRadius = 1.9f;
+
+    // Where the mallet head meets the ground on the follow-through frame,
+    // measured from the sprite geometry: 0.833 forward is the head centre and
+    // 1.035 its leading edge, so 0.975 sits just inside the striking face.
     private const float MalletForward = 0.975f;
     private const float MalletHeight = 0.203f;
 
     public IInputSource Source { get; set; } = null!;
     public int PlayerIndex { get; set; }
 
+    /// <summary>False while a thrown mallet is in flight. Unarmed fighters cannot attack.</summary>
+    public bool Armed { get; private set; } = true;
+
     private State _state = State.Free;
+    private InputCommand _cmd;
     private int _comboIndex;
     private float _phaseTime;
     private float _sinceCombo = 99f;
@@ -60,12 +78,25 @@ public partial class PlayerFighter : Fighter
     private readonly HashSet<Fighter> _hitThisSwing = new();
     private bool _impactSpawned;
 
+    private float _heldTime;       // how long attack has been down
+    private bool _chargeLock;      // a mallet move just ended; release before charging again
+    private float _spinTime;
+    private float _spinHitTimer;
+    private Vector3 _spinDir;
+    private float _throwTime;
+    private bool _thrown;
+    private float _flipTime;
+
     public string DebugState => _state switch
     {
         State.Attacking => $"ATK{_comboIndex + 1}",
         State.Dodging => "DODGE",
         State.Special => "SPECIAL",
-        _ => "free",
+        State.Charging => $"CHARGE {Mathf.Min(_heldTime / FullCharge, 1f) * 100f:F0}%",
+        State.Spinning => "SPIN",
+        State.Throwing => "THROW",
+        State.Flipping => "FLIP",
+        _ => Armed ? "free" : "free (unarmed)",
     };
 
     /// <summary>Subclasses with a signature move override these three.</summary>
@@ -75,6 +106,10 @@ public partial class PlayerFighter : Fighter
     protected virtual bool TickSpecialMove(float dt) => true;
 
     protected float SpecialTime { get; private set; }
+    protected bool InSpecial => _state == State.Special;
+
+    /// <summary>Charge throw, charge spin and air flip. Off for fighters with no mallet.</summary>
+    protected virtual bool HasMalletMoves => true;
 
     /// <summary>
     /// Multiplies melee reach. A fighter twice the size swings twice as far;
@@ -90,6 +125,7 @@ public partial class PlayerFighter : Fighter
     protected override void Tick(float dt)
     {
         InputCommand cmd = Source?.Poll() ?? InputCommand.None;
+        _cmd = cmd;
         _sinceCombo += dt;
         if (_sinceCombo > ComboWindow) _comboIndex = 0;
 
@@ -98,12 +134,26 @@ public partial class PlayerFighter : Fighter
         // dropped, while the requester has already spent its cooldown on it.
         if (cmd.SpecialPressed) _bufferedSpecial = true;
 
+        if (cmd.AttackHeld)
+        {
+            _heldTime += dt;
+        }
+        else
+        {
+            _heldTime = 0f;
+            _chargeLock = false;
+        }
+
         switch (_state)
         {
             case State.Free: TickFree(cmd, dt); break;
             case State.Attacking: TickAttack(dt); break;
             case State.Dodging: TickDodge(dt); break;
             case State.Special: TickSpecial(dt); break;
+            case State.Charging: TickCharging(cmd, dt); break;
+            case State.Spinning: TickSpinning(cmd, dt); break;
+            case State.Throwing: TickThrowing(dt); break;
+            case State.Flipping: TickFlipping(dt); break;
         }
     }
 
@@ -117,8 +167,7 @@ public partial class PlayerFighter : Fighter
             Facing = new Vector3(Mathf.Sign(move.X), 0f, 0f);
 
         // Specials outrank a buffered attack. Checked the other way round, a
-        // fast attack cadence starves the special: there is nearly always an
-        // attack queued, so the signature move never fires.
+        // fast attack cadence starves the special.
         if (_bufferedSpecial && HasSpecial && Grounded)
         {
             _bufferedSpecial = false;
@@ -129,33 +178,50 @@ public partial class PlayerFighter : Fighter
             return;
         }
 
-        if (_bufferedAttack)
+        if (!Grounded)
         {
+            // Attack in the air is the front flip, whether tapped or still held
+            // from before the jump.
+            bool wantsFlip = _bufferedAttack || (_heldTime > 0.08f && !_chargeLock);
+            if (HasMalletMoves && Armed && wantsFlip)
+            {
+                StartFlip();
+                return;
+            }
             _bufferedAttack = false;
-            StartAttack();
-            return;
         }
-
-        if (cmd.JumpPressed && Grounded)
+        else
         {
-            Jump(JumpSpeed);
-            ImpactEffect.Spawn(GetParent(), GlobalPosition + new Vector3(0f, 0.1f, 0f), 0.25f);
-            return;
-        }
+            if (_bufferedAttack)
+            {
+                _bufferedAttack = false;
+                if (Armed)
+                {
+                    StartAttack();
+                    return;
+                }
+            }
 
-        // Dodging is a ground slide, so it needs the floor.
-        if (cmd.DodgePressed && Grounded)
-        {
-            _dodgeDir = move.LengthSquared() > 0.001f ? move.Normalized() : Facing;
-            // Turn into the slide, so the pose never reads as moonwalking when
-            // dodging away from the current facing.
-            if (Mathf.Abs(_dodgeDir.X) > 0.1f)
-                Facing = new Vector3(Mathf.Sign(_dodgeDir.X), 0f, 0f);
-            _state = State.Dodging;
-            _dodgeTime = 0f;
-            // scuff of dust kicked up as the slide launches
-            ImpactEffect.Spawn(GetParent(), GlobalPosition + new Vector3(0f, 0.1f, 0f), 0.3f);
-            return;
+            // Still holding attack after the swing: wind up a charge move.
+            if (HasMalletMoves && Armed && !_chargeLock && _heldTime >= ChargeStart)
+            {
+                _state = State.Charging;
+                return;
+            }
+
+            if (cmd.JumpPressed)
+            {
+                Jump(JumpSpeed);
+                Dust(0.25f);
+                return;
+            }
+
+            // Dodging is a ground slide, so it needs the floor.
+            if (cmd.DodgePressed)
+            {
+                StartDodge(move);
+                return;
+            }
         }
 
         ApplyGroundMovement(move * MoveSpeed, dt);
@@ -164,8 +230,7 @@ public partial class PlayerFighter : Fighter
         {
             if (!Grounded)
             {
-                // Airborne pose overrides the ground clips: tuck while rising,
-                // reach while falling.
+                // Tuck while rising, reach while falling.
                 PinClipFrame("jump", Velocity.Y > 0f ? 0 : 1);
             }
             else
@@ -176,6 +241,8 @@ public partial class PlayerFighter : Fighter
         }
     }
 
+    // ---------------------------------------------------------------- combo
+
     private void StartAttack()
     {
         _state = State.Attacking;
@@ -183,6 +250,32 @@ public partial class PlayerFighter : Fighter
         _hitThisSwing.Clear();
         _impactSpawned = false;
         _sinceCombo = 0f;
+        AssistLane();
+    }
+
+    /// <summary>
+    /// Slide a short way onto the depth lane of whoever the swing is aimed at.
+    /// Lining up by hand on a tilted camera is the least fun part of the genre;
+    /// every modern brawler quietly helps, and nobody notices that it does.
+    /// </summary>
+    private void AssistLane()
+    {
+        Fighter? best = null;
+        float bestOffset = LaneAssistReach;
+        float reach = Combo[_comboIndex].Range * ReachScale * 1.15f;
+
+        foreach (Fighter other in Opponents())
+        {
+            Vector3 to = other.GlobalPosition - GlobalPosition;
+            float forward = to.X * Facing.X;
+            if (forward < -0.3f || forward > reach) continue;
+            float offset = Mathf.Abs(to.Z);
+            if (offset < bestOffset) { best = other; bestOffset = offset; }
+        }
+
+        if (best is null || bestOffset < 0.05f) return;
+        float z = Mathf.MoveToward(GlobalPosition.Z, best.GlobalPosition.Z, LaneAssistStep);
+        GlobalPosition = new Vector3(GlobalPosition.X, GlobalPosition.Y, z);
     }
 
     private void TickAttack(float dt)
@@ -200,8 +293,7 @@ public partial class PlayerFighter : Fighter
 
         // Impact fires once per swing, whether or not it connected: the swing
         // should feel like it hit the world. Timed to the second half of the
-        // active window, which is now the frame where the mallet meets the
-        // ground, so the burst and the visible contact coincide.
+        // active window, the frame where the mallet meets the ground.
         if (!_impactSpawned && _phaseTime >= activeStart + step.Active * 0.5f)
         {
             _impactSpawned = true;
@@ -213,17 +305,24 @@ public partial class PlayerFighter : Fighter
         // Pin the swing frame to the phase, so the visible swing is the hitbox.
         if (!InHitAnim)
         {
-            // Startup covers the windup and raise; the active window carries the
-            // strike through to ground contact, so the frame the player reads as
-            // the hit is the frame the hitbox is live on.
             int frame = _phaseTime < step.Startup * 0.5f ? 0
                       : _phaseTime < activeStart ? 1
                       : _phaseTime < activeStart + step.Active * 0.5f ? 2
                       : 3;
             PinClipFrame("attack", frame);
         }
+
         if (_phaseTime > activeStart && prev < activeEnd)
-            ResolveHits(step);
+            ResolveSwing(step);
+
+        // Recovery can be cancelled into a dodge. An attack you cannot get out
+        // of is an attack you stop using once enemies crowd in.
+        if (_phaseTime >= activeEnd && _cmd.DodgePressed && Grounded)
+        {
+            _sinceCombo = 0f;
+            StartDodge(ToWorld(_cmd.Move));
+            return;
+        }
 
         if (_phaseTime >= activeEnd + step.Recovery)
         {
@@ -244,35 +343,41 @@ public partial class PlayerFighter : Fighter
     }
 
     /// <summary>
-    /// Arc query rather than physics hitboxes: deterministic, trivially
-    /// inspectable, and host-authoritative by construction. Swap for real
-    /// hitboxes when attacks need non-conical shapes.
+    /// A forward box, not a cone. Facing is locked to the X axis, so a cone
+    /// around it misses anyone offset in depth even when they look adjacent on
+    /// screen. Brawlers want depth lanes: line up, then hit.
     /// </summary>
-    private void ResolveHits(in AttackStep step)
+    private void ResolveSwing(in AttackStep step)
     {
-        foreach (Node node in GetTree().GetNodesInGroup(Group))
+        foreach (Fighter other in Opponents())
         {
-            if (node is not Fighter other || other == this || !other.CanBeHit()) continue;
-            if (other.Hostile == Hostile) continue;   // no friendly fire
             if (_hitThisSwing.Contains(other)) continue;
 
             Vector3 to = other.GlobalPosition - GlobalPosition;
-            to.Y = 0f;
-
-            // A forward box, not a cone. Facing is locked to the X axis, so a
-            // cone around it misses anyone offset in depth even when they look
-            // adjacent on screen. Brawlers want depth lanes: line up, then hit.
-            float forward = to.Dot(Facing);
-            float lateral = (to - Facing * forward).Length();
+            float forward = to.X * Facing.X;
             if (forward <= 0f || forward > step.Range * ReachScale) continue;
-            if (lateral > DepthBand * ReachScale) continue;
+            if (Mathf.Abs(to.Z) > DepthBand * ReachScale) continue;
+            if (Mathf.Abs(to.Y) > 1.9f * ReachScale) continue;   // juggled targets stay reachable
 
             _hitThisSwing.Add(other);
-            // Knock straight along the attacker's facing rather than toward the
-            // target, so hits shove down the lane instead of scattering sideways.
-            other.TakeDamage(new DamageInfo(step.Damage, Facing, step.Knockback, step.Hitstop, this));
-            ApplyHitstop(step.Hitstop);
+            // Knock straight along the facing, so hits shove down the lane
+            // instead of scattering sideways.
+            Strike(other, step.Damage, Facing, step.Knockback, step.Hitstop, step.Launch);
         }
+    }
+
+    // ---------------------------------------------------------------- dodge
+
+    private void StartDodge(Vector3 move)
+    {
+        _dodgeDir = move.LengthSquared() > 0.001f ? move.Normalized() : Facing;
+        // Turn into the slide, so the pose never reads as moonwalking.
+        if (Mathf.Abs(_dodgeDir.X) > 0.1f)
+            Facing = new Vector3(Mathf.Sign(_dodgeDir.X), 0f, 0f);
+        _state = State.Dodging;
+        _dodgeTime = 0f;
+        _bufferedAttack = false;
+        Dust(0.3f);
     }
 
     private void TickDodge(float dt)
@@ -280,8 +385,8 @@ public partial class PlayerFighter : Fighter
         _dodgeTime += dt;
         float t = _dodgeTime / DodgeDuration;
 
-        // Pinned rather than played, so the slide pose tracks the actual
-        // movement curve: drop, hold the extended slide, gather to recover.
+        // Pinned rather than played, so the slide pose tracks the movement
+        // curve: drop, hold the extended slide, gather to recover.
         if (!InHitAnim)
             PinClipFrame("dodge", t < 0.22f ? 0 : t < 0.72f ? 1 : 2);
 
@@ -302,6 +407,223 @@ public partial class PlayerFighter : Fighter
             _state = State.Free;
             SpecialTime = 0f;
         }
+    }
+
+    // --------------------------------------------------------- charge moves
+
+    /// <summary>
+    /// Winding up. Standing still for the full charge throws the mallet; a held
+    /// direction converts the wind-up into a travelling spin instead. Letting
+    /// go early simply abandons it.
+    /// </summary>
+    private void TickCharging(in InputCommand cmd, float dt)
+    {
+        ApplyGroundMovement(Vector3.Zero, dt);
+
+        if (!cmd.AttackHeld) { EndMalletMove(lockCharge: false); return; }
+        if (cmd.DodgePressed) { EndMalletMove(); StartDodge(ToWorld(cmd.Move)); return; }
+        if (cmd.JumpPressed)
+        {
+            // Still holding attack, so this carries straight into the flip.
+            EndMalletMove(lockCharge: false);
+            Jump(JumpSpeed);
+            Dust(0.25f);
+            return;
+        }
+
+        if (Mathf.Abs(cmd.Move.X) > 0.35f)
+        {
+            Facing = new Vector3(Mathf.Sign(cmd.Move.X), 0f, 0f);
+            if (_heldTime >= SpinMinCharge) { StartSpin(); return; }
+        }
+
+        if (_heldTime >= FullCharge) { StartThrow(); return; }
+
+        // The shudder and the glow both quicken as the charge builds, so the
+        // player can read how close the throw is without a meter.
+        float charge = Mathf.Clamp(_heldTime / FullCharge, 0f, 1f);
+        PinClipFrame("charge", (int)(_heldTime * Mathf.Lerp(7f, 24f, charge)) % 2);
+        float pulse = 0.5f + 0.5f * Mathf.Sin(_heldTime * Mathf.Lerp(9f, 34f, charge));
+        Visual.Tint = BaseTint.Lerp(new Color(2.0f, 1.7f, 0.8f), charge * (0.3f + 0.7f * pulse));
+    }
+
+    private void EndMalletMove(bool lockCharge = true)
+    {
+        Visual.Tint = BaseTint;
+        Visual.FlipOverride = null;
+        _state = State.Free;
+        if (lockCharge) _chargeLock = true;
+    }
+
+    private void StartSpin()
+    {
+        Visual.Tint = BaseTint;
+        _spinDir = Facing;
+        _spinTime = 0f;
+        _spinHitTimer = 0f;
+        _state = State.Spinning;
+    }
+
+    /// <summary>
+    /// Whirl along the lane, hitting everything in reach several times. With
+    /// only a profile view to draw from, the whirl is the mallet-out pose
+    /// mirrored rapidly back and forth.
+    /// </summary>
+    private void TickSpinning(in InputCommand cmd, float dt)
+    {
+        _spinTime += dt;
+        ApplyGroundMovement(_spinDir * SpinSpeed + new Vector3(0f, 0f, cmd.Move.Y * 2f), dt);
+
+        PlayClip("spin");
+        bool mirrored = (int)(_spinTime / 0.07f) % 2 == 1;
+        Visual.FlipOverride = (_spinDir.X < 0f) != mirrored;
+
+        _spinHitTimer -= dt;
+        if (_spinHitTimer <= 0f)
+        {
+            _spinHitTimer = SpinHitInterval;
+            foreach (Fighter other in Opponents())
+            {
+                Vector3 to = other.GlobalPosition - GlobalPosition;
+                if (new Vector2(to.X, to.Z).Length() > SpinRadius || Mathf.Abs(to.Y) > 1.9f) continue;
+                Strike(other, 6f, _spinDir, 1.4f, 0.025f, 0f, 0.3f);
+            }
+        }
+
+        bool stillHeld = cmd.AttackHeld && Mathf.Abs(cmd.Move.X) > 0.2f;
+        if (_spinTime >= SpinMax || (_spinTime >= SpinMin && !stillHeld))
+            EndMalletMove();
+    }
+
+    private void StartThrow()
+    {
+        Visual.Tint = BaseTint;
+        _throwTime = 0f;
+        _thrown = false;
+        _state = State.Throwing;
+    }
+
+    private void TickThrowing(float dt)
+    {
+        _throwTime += dt;
+        ApplyGroundMovement(Vector3.Zero, dt);
+
+        if (!_thrown)
+        {
+            PinClipFrame("throw", 0);
+            if (_throwTime >= 0.14f)
+            {
+                _thrown = true;
+                Armed = false;
+                Visual.ClipPrefix = "empty_";
+                MalletProjectile.Spawn(this, Facing);
+                CameraShake.Request(this, 0.04f, 0.12f);
+            }
+        }
+        else
+        {
+            PinClipFrame("throw", 1);
+        }
+
+        if (_throwTime >= 0.38f) EndMalletMove();
+    }
+
+    /// <summary>The boomerang came home.</summary>
+    public void CatchMallet()
+    {
+        if (Armed) return;
+        Armed = true;
+        Visual.ClipPrefix = "";
+        Visual.Squash(0.25f);
+        _chargeLock = true;
+    }
+
+    private void StartFlip()
+    {
+        _bufferedAttack = false;
+        _flipTime = 0f;
+        _hitThisSwing.Clear();
+        _state = State.Flipping;
+        // A little lift, so a flip started at the top of a jump still completes.
+        Velocity = new Vector3(Facing.X * FlipForward, Mathf.Max(Velocity.Y, 3.5f), Velocity.Z * 0.5f);
+    }
+
+    /// <summary>Front flip: carries forward, hits each enemy once, slams on landing.</summary>
+    private void TickFlipping(float dt)
+    {
+        _flipTime += dt;
+        Velocity = new Vector3(Facing.X * FlipForward, Velocity.Y, Velocity.Z);
+        PinClipFrame("flip", (int)(_flipTime / 0.05f) % 8);
+
+        foreach (Fighter other in Opponents())
+        {
+            if (_hitThisSwing.Contains(other)) continue;
+            Vector3 to = other.GlobalPosition - GlobalPosition;
+            if (new Vector2(to.X, to.Z).Length() > FlipRadius || Mathf.Abs(to.Y) > 2.0f) continue;
+            _hitThisSwing.Add(other);
+            Strike(other, 16f, Facing, 5f, 0.07f, 5.5f, 0.35f);
+        }
+
+        if (Grounded && _flipTime > 0.08f)
+        {
+            ImpactEffect.Spawn(GetParent(), GlobalPosition + Facing * 0.7f + new Vector3(0f, 0.15f, 0f), 0.9f);
+            CameraShake.Request(this, 0.06f, 0.2f);
+            Visual.Squash(0.3f);
+            EndMalletMove();
+        }
+    }
+
+    // ------------------------------------------------------------- striking
+
+    private IEnumerable<Fighter> Opponents()
+    {
+        foreach (Node node in GetTree().GetNodesInGroup(Group))
+        {
+            if (node is Fighter other && other != this && other.Hostile != Hostile && other.CanBeHit())
+                yield return other;
+        }
+    }
+
+    private void Strike(Fighter other, float damage, Vector3 dir, float knockback,
+                        float hitstop, float launch = 0f, float stun = 0.26f)
+    {
+        other.TakeDamage(new DamageInfo(damage, dir, knockback, hitstop, this, launch, stun));
+        ApplyHitstop(hitstop);
+        Spark(other);
+    }
+
+    /// <summary>A hit delivered by this fighter's thrown weapon rather than its body.</summary>
+    public void StrikeFromProjectile(Fighter other, float damage, Vector3 dir, float knockback, float launch)
+    {
+        other.TakeDamage(new DamageInfo(damage, dir, knockback, 0.06f, this, launch, 0.35f));
+        Spark(other);
+    }
+
+    private void Spark(Fighter other) =>
+        ImpactEffect.Spawn(GetParent(), other.GlobalPosition + new Vector3(0f, other.BodyHeight * 0.55f, 0f), 0.34f);
+
+    // -------------------------------------------------------------- hooks
+
+    protected override void OnInterrupted()
+    {
+        // Being hit drops whatever was in progress. A thrown mallet stays out.
+        Visual.Tint = BaseTint;
+        Visual.FlipOverride = null;
+        _state = State.Free;
+        _bufferedAttack = false;
+        _chargeLock = true;
+    }
+
+    protected override void OnRevived()
+    {
+        Armed = true;
+        Visual.ClipPrefix = "";
+        Visual.Tint = BaseTint;
+        Visual.FlipOverride = null;
+        _state = State.Free;
+        _bufferedAttack = false;
+        _bufferedSpecial = false;
+        _comboIndex = 0;
     }
 
     /// <summary>Invulnerable through the middle of the roll, not its edges.</summary>

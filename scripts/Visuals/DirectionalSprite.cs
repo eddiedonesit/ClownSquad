@@ -33,8 +33,17 @@ public partial class DirectionalSprite : Node3D
     public Color Tint
     {
         get => _tint;
-        set { _tint = value; if (_sprite is not null) _sprite.Modulate = value; }
+        set { _tint = value; if (_sprite is not null && _flash <= 0f) _sprite.Modulate = value; }
     }
+
+    /// <summary>
+    /// Selects an alternate clip set, such as "empty_" while a thrown weapon is
+    /// away. A state falls back to its unprefixed clip when the set lacks it.
+    /// </summary>
+    public string ClipPrefix { get; set; } = "";
+
+    /// <summary>Forces mirroring regardless of heading. Used to fake a whirl.</summary>
+    public bool? FlipOverride { get; set; }
 
     public string CurrentClip => _sprite is null ? "-" : _sprite.Animation.ToString();
     public bool Flipped => _sprite is not null && _sprite.FlipH;
@@ -54,12 +63,12 @@ public partial class DirectionalSprite : Node3D
         };
         AddChild(_sprite);
 
-        // Sit the sprite so its feet land on the node origin. Hardcoding this
-        // only works for one scale: at a larger pixel size the lower part of the
-        // sprite drops below y=0 and the ground plane culls it.
-        Texture2D? first = _sprite.SpriteFrames.GetFrameTexture("idle", 0);
-        float frameHeight = first?.GetHeight() ?? 64;
-        _sprite.Position = new Vector3(0f, frameHeight * _pixelSize * 0.5f, 0f);
+        // Stand the sprite so its feet row lands on the node origin. Derived
+        // from the sheet rather than hardcoded: the offset differs with sprite
+        // scale and with any padding the sheet keeps below the feet.
+        FrameLibrary.SheetInfo info = FrameLibrary.Info(_sheetPath);
+        float rowsAboveCentre = info.Baseline - info.FrameHeight * 0.5f;
+        _sprite.Position = new Vector3(0f, rowsAboveCentre * _pixelSize, 0f);
 
         Play("idle");
     }
@@ -71,29 +80,36 @@ public partial class DirectionalSprite : Node3D
     public void SetFacing(Vector3 facing)
     {
         if (Mathf.Abs(facing.X) > 0.01f) _facing = new Vector3(Mathf.Sign(facing.X), 0f, 0f);
-        if (_sprite is not null) _sprite.FlipH = _facing.X < 0f;
+        if (_sprite is not null) _sprite.FlipH = FlipOverride ?? (_facing.X < 0f);
     }
 
-    /// <summary>Play a state, resolving the direction prefix automatically.</summary>
+    private string Resolve(string state)
+    {
+        SpriteFrames frames = _sprite.SpriteFrames;
+        if (ClipPrefix.Length > 0 && frames.HasAnimation(ClipPrefix + state)) return ClipPrefix + state;
+        // Not every sheet authors every clip; degrade rather than throw.
+        return frames.HasAnimation(state) ? state : "idle";
+    }
+
+    /// <summary>Play a state by name.</summary>
     public void Play(string state, bool restart = false)
     {
         if (_sprite is null) return;
-        if (!_sprite.SpriteFrames.HasAnimation(state)) state = "idle";
-        if (!restart && _sprite.Animation == state && _sprite.IsPlaying()) return;
+        string clip = Resolve(state);
+        if (!restart && _sprite.Animation == clip && _sprite.IsPlaying()) return;
         _sprite.SpeedScale = 1f;
-        _sprite.Play(state);
+        _sprite.Play(clip);
     }
 
     /// <summary>Hold an exact frame, so a swing matches its attack phase.</summary>
     public void Pin(string state, int frame)
     {
         if (_sprite is null) return;
-        // Not every sheet authors every clip; fall back rather than throw.
-        if (!_sprite.SpriteFrames.HasAnimation(state)) state = "idle";
-        if (_sprite.Animation != state) _sprite.Animation = state;
+        string clip = Resolve(state);
+        if (_sprite.Animation != clip) _sprite.Animation = clip;
         _sprite.Pause();
         _sprite.SpeedScale = 0f;
-        _sprite.Frame = Mathf.Clamp(frame, 0, _sprite.SpriteFrames.GetFrameCount(state) - 1);
+        _sprite.Frame = Mathf.Clamp(frame, 0, _sprite.SpriteFrames.GetFrameCount(clip) - 1);
     }
 
     public void Flash(float seconds = 0.12f) => _flash = seconds;
@@ -109,6 +125,10 @@ public partial class DirectionalSprite : Node3D
         {
             _flash -= dt;
             _sprite.Modulate = _flash > 0f ? new Color(3f, 2f, 2f) : _tint;
+        }
+        else
+        {
+            _sprite.Modulate = _tint;
         }
 
         _squash = Mathf.MoveToward(_squash, 0f, 4f * dt);

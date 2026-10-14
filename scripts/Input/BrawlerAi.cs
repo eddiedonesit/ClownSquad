@@ -2,6 +2,7 @@ namespace ClownSquad.Input;
 
 using Godot;
 using ClownSquad.Actors;
+using ClownSquad.Combat;
 
 /// <summary>
 /// Drives a fighter toward the nearest opposing fighter and swings when close.
@@ -80,7 +81,8 @@ public sealed class BrawlerAi : IInputSource
         }
         else
         {
-            if (nowMs >= _nextAttackMs)
+            // Only so many enemies may swing at once; the rest hold position.
+            if (nowMs >= _nextAttackMs && AttackTokens.TryAcquire(_self, 900))
             {
                 attack = true;
                 _nextAttackMs = nowMs + _attackCooldownMs;

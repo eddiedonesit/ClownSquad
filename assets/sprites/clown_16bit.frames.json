@@ -1,7 +1,8 @@
 {
   "frame_width": 104,
-  "frame_height": 64,
-  "count": 16,
+  "frame_height": 144,
+  "baseline": 108,
+  "count": 42,
   "clips": {
     "idle": [
       0,
@@ -13,23 +14,67 @@
       4,
       5
     ],
-    "attack": [
-      6,
+    "hit": [
+      6
+    ],
+    "dodge": [
       7,
       8,
       9
     ],
-    "hit": [
-      10
-    ],
-    "dodge": [
-      11,
-      12,
-      13
-    ],
     "jump": [
+      10,
+      11
+    ],
+    "attack": [
+      12,
+      13,
       14,
       15
+    ],
+    "charge": [
+      16,
+      17
+    ],
+    "spin": [
+      18,
+      19
+    ],
+    "throw": [
+      20,
+      21
+    ],
+    "flip": [
+      22,
+      23,
+      24,
+      25,
+      26,
+      27,
+      28,
+      29
+    ],
+    "empty_idle": [
+      30,
+      31
+    ],
+    "empty_walk": [
+      32,
+      33,
+      34,
+      35
+    ],
+    "empty_hit": [
+      36
+    ],
+    "empty_dodge": [
+      37,
+      38,
+      39
+    ],
+    "empty_jump": [
+      40,
+      41
     ]
   }
 }

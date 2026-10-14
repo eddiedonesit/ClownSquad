@@ -5,6 +5,7 @@ using System.Text;
 using Godot;
 using ClownSquad.Actors;
 using ClownSquad.Input;
+using ClownSquad.World;
 
 /// <summary>
 /// Combat test bootstrap. Binds every detected device to its own fighter, which
@@ -28,18 +29,73 @@ public partial class GameRoot : Node3D
     {
         _aiProbe = System.Array.IndexOf(OS.GetCmdlineUserArgs(), "aitest") >= 0;
 
+        // The arena is whatever the camera sees, captured before any shake, and
+        // rebuilt whenever the window changes shape so the walls stay at the
+        // screen edge.
+        if (GetNodeOrNull<Camera3D>("Camera3D") is Camera3D cam)
+        {
+            _arenaCamera = cam;
+            _arenaCameraRest = cam.GlobalTransform;
+            RebuildArena();
+            GetViewport().SizeChanged += RebuildArena;
+            cam.AddChild(new ClownSquad.Visuals.CameraShake());
+        }
+
+        Fighter.HitLanded += OnHitLanded;
+
         if (System.Array.IndexOf(OS.GetCmdlineUserArgs(), "animtest") >= 0)
         {
             AddChild(new ClownSquad.Debug.AnimationProbe());
             return;
         }
-
-        if (GetNodeOrNull<Camera3D>("Camera3D") is Camera3D cam)
-            cam.AddChild(new ClownSquad.Visuals.CameraShake());
+        if (System.Array.IndexOf(OS.GetCmdlineUserArgs(), "movetest") >= 0)
+        {
+            AddChild(new ClownSquad.Debug.MovesProbe());
+            return;
+        }
 
         SpawnPlayers();
         SpawnDummies();
         BuildHud();
+    }
+
+    public override void _ExitTree()
+    {
+        Fighter.HitLanded -= OnHitLanded;
+        Arena.Current = null;
+    }
+
+    private Camera3D? _arenaCamera;
+    private Transform3D _arenaCameraRest;
+
+    private void RebuildArena()
+    {
+        if (_arenaCamera is null) return;
+
+        Vector2 view = GetViewport().GetVisibleRect().Size;
+        // Headless runs report a token square viewport; fall back to the
+        // project's design resolution so tests see the real arena.
+        if (DisplayServer.GetName().Contains("headless") || view.Y < 100f)
+        {
+            view = new Vector2(
+                (float)ProjectSettings.GetSetting("display/window/size/viewport_width", 1152),
+                (float)ProjectSettings.GetSetting("display/window/size/viewport_height", 648));
+        }
+        Arena.Current = new Arena(_arenaCameraRest, _arenaCamera.Fov, view.X / Mathf.Max(view.Y, 1f));
+    }
+
+    // Combo counter: consecutive hits by players, reset after a short lull.
+    private const double ComboLull = 1.6;
+    private int _comboHits;
+    private double _comboExpires;
+
+    private void OnHitLanded(Fighter? attacker, Fighter victim, float amount)
+    {
+        // Wall bounces arrive with no attacker and extend whatever is running.
+        bool byPlayer = attacker is null ? victim.Hostile && _comboHits > 0 : !attacker.Hostile;
+        if (!byPlayer) return;
+        _comboHits++;
+        _comboExpires = _clock + ComboLull;
     }
 
     private void SpawnPlayers()
@@ -218,6 +274,8 @@ public partial class GameRoot : Node3D
         sb.AppendLine("CLOWN SQUAD - combat test");
         sb.AppendLine("Keyboard: WASD move | J attack | Space jump | K or Shift dodge");
         sb.AppendLine("Gamepad:  stick move | X attack | A jump | B or RB dodge");
+        sb.AppendLine("Hold attack 3s standing: throw mallet | hold attack + left/right: spin");
+        sb.AppendLine("Attack in the air: front flip | dodge cancels a swing");
         sb.AppendLine("Unjoined pad? Press A / X to join.");
         sb.AppendLine();
         foreach (PlayerFighter p in _players)
@@ -227,6 +285,12 @@ public partial class GameRoot : Node3D
             sb.AppendLine($"Dummy {i + 1}  hp {_dummies[i].Health:F0} / {_dummies[i].MaxHealth:F0}");
         foreach (BossClown b in _bosses)
             sb.AppendLine($"BOSS CLOWN  hp {b.Health:F0} / {b.MaxHealth:F0}  {b.DebugState}  clip={b.CurrentClip}");
+        if (_comboHits > 0 && _clock > _comboExpires) _comboHits = 0;
+        if (_comboHits > 1)
+        {
+            sb.AppendLine();
+            sb.AppendLine($">>> {_comboHits} HITS <<<");
+        }
         _hud.Text = sb.ToString();
     }
 }

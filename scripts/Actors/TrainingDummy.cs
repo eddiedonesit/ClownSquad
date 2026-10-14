@@ -2,13 +2,17 @@ namespace ClownSquad.Actors;
 
 using Godot;
 
-/// <summary>Stationary target that recovers, so combat feel can be tested in a loop.</summary>
+/// <summary>
+/// Stationary target that recovers, so combat feel can be tested in a loop. It
+/// is light enough to launch, which makes it the thing to practise juggles and
+/// wall bounces on.
+/// </summary>
 public partial class TrainingDummy : Fighter
 {
     // Hostile so players can still hit it once friendly fire is disabled.
     public override bool Hostile => true;
 
-    private float _recoverDelay;
+    private float _recoverDelay = 1.5f;
 
     public override void _Ready()
     {
@@ -21,19 +25,18 @@ public partial class TrainingDummy : Fighter
     {
         ApplyGroundMovement(Vector3.Zero, dt);
         if (!InHitAnim) PlayClip("idle");
+    }
 
-        if (IsDead)
-        {
-            _recoverDelay -= dt;
-            if (_recoverDelay <= 0f)
-            {
-                Heal(MaxHealth);
-                _recoverDelay = 0f;
-            }
-        }
-        else
+    /// <summary>Runs even while floored or dead, which is when recovery matters.</summary>
+    protected override void TickAlways(float dt)
+    {
+        if (!IsDead)
         {
             _recoverDelay = 1.5f;
+            return;
         }
+
+        _recoverDelay -= dt;
+        if (_recoverDelay <= 0f) Revive(GlobalPosition with { Y = 0f });
     }
 }

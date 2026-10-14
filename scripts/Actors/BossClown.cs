@@ -21,9 +21,20 @@ public partial class BossClown : PlayerFighter
     protected override float SpritePixelSize => 0.034f;
 
     public override bool Hostile => true;
+    public override float BodyHeight => 2.25f;
+    public override float BodyHalfWidth => 0.9f;
 
     // Its arms and belly cover far more ground than the player's mallet.
     protected override float ReachScale => 1.45f;
+
+    protected override bool HasMalletMoves => false;
+
+    // A boss shrugs off most of a hit and cannot be thrown into the air, and
+    // nothing interrupts the slam once it has begun. It is beaten by reading
+    // the wind-up and not being there, not by out-mashing it.
+    protected override float StunScale => 0.45f;
+    protected override float LaunchScale => 0f;
+    protected override bool HasPoise => InSpecial;
 
     // Belly slam phases, in seconds.
     private const float WindUp = 0.55f;
@@ -33,7 +44,8 @@ public partial class BossClown : PlayerFighter
 
     private const float SlamRadius = 3.0f;
     private const float SlamDamage = 26f;
-    private const float SlamKnockback = 11f;
+    private const float SlamKnockback = 7f;
+    private const float SlamLaunch = 7f;
 
     private bool _slammed;
     private Vector3 _lungeDir;
@@ -79,7 +91,8 @@ public partial class BossClown : PlayerFighter
             _slammed = true;
             PinClipFrame("attack", 2);
 
-            int hits = DamageInRadius(SlamRadius, SlamDamage, SlamKnockback, 0.16f);
+            // Anyone caught is thrown into the air and floored on landing.
+            int hits = DamageInRadius(SlamRadius, SlamDamage, SlamKnockback, 0.16f, SlamLaunch, 0.4f);
             ApplyHitstop(0.16f);
 
             // Shockwave reads as the whole body landing, so it is centred under

@@ -69,6 +69,6 @@ public sealed class LocalDeviceInput : IInputSource
         _jumpHeldLast = jumpHeld;
         _specialHeldLast = specialHeld;
 
-        return new InputCommand(move, attackPressed, dodgePressed, jumpPressed, specialPressed);
+        return new InputCommand(move, attackPressed, dodgePressed, jumpPressed, specialPressed, attackHeld);
     }
 }
