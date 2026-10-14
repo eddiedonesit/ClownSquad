@@ -45,8 +45,8 @@ let launched bodies come to rest on top of others; spacing belongs to the AI.
 - Juggle balance now exists as a problem. The decay constant (17% per hit, floor
   40%) and the single wall bounce are first guesses.
 - A floored body has no art of its own yet; it is the hit pose pressed flat.
-- Charge time for the mallet throw is three seconds, as specified. That is long
-  by genre standards and may want shortening once it has been played.
+- Charge time for the mallet throw was specified as three seconds and cut to
+  one after play-testing; it is defined in real seconds and converted to game time.
 
 ## Sources
 
