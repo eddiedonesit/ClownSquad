@@ -69,8 +69,11 @@ public static class Campaign
     public static StageDef? Get(string id) => ById.TryGetValue(id, out StageDef? s) ? s : null;
     public static List<StageDef> InWorld(int world) => All.FindAll(s => s.World == world);
 
-    /// <summary>The recommended level for a stage: rises five levels a world.</summary>
-    public static int StageLevel(int world, int stage) => 1 + (world - 1) * 5 + (stage - 1);
+    /// <summary>
+    /// The recommended level for a stage: about two and a half levels a world,
+    /// matching how fast a squad levels (retuned with the slower XP curve).
+    /// </summary>
+    public static int StageLevel(int world, int stage) => 1 + (int)((world - 1) * 2.5f) + (stage - 1) / 2;
 
     private static void BuildWorld(int w)
     {

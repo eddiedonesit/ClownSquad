@@ -891,7 +891,17 @@ public partial class GameRoot : Node3D
         GetTree().ReloadCurrentScene();
     }
 
-    /// <summary>Esc or Start pauses: resume, the Stat Tent, retry, or the map.</summary>
+    /// <summary>The squad as menu seats: character, controller, and refreshing the fighter after a change.</summary>
+    private List<Seat> Seats()
+    {
+        var seats = new List<Seat>();
+        foreach (PlayerFighter p in _players)
+            if (p.Record is CharacterRecord r && p.Source is LocalDeviceInput d)
+                seats.Add(new Seat(r, d.Device, () => p.ApplyProgression(r)));
+        return seats;
+    }
+
+    /// <summary>Esc or Start pauses: resume, the Stat Tent, the inventory, retry, or the map.</summary>
     private void PollPause()
     {
         if (_pause is not null || _shop is not null || (_tent?.IsOpen ?? false) || _outcomeProbe.Length > 0) return;
@@ -901,7 +911,7 @@ public partial class GameRoot : Node3D
         bool fresh = held && !_pauseHeld;
         _pauseHeld = held;
         if (!fresh) return;
-        var items = new List<(PauseMenu.Choice, string)> { (PauseMenu.Choice.Resume, "RESUME"), (PauseMenu.Choice.Stats, "STAT TENT") };
+        var items = new List<(PauseMenu.Choice, string)> { (PauseMenu.Choice.Resume, "RESUME"), (PauseMenu.Choice.Stats, "STAT TENT"), (PauseMenu.Choice.Inventory, "INVENTORY") };
         if (_stage is not null) items.Add((PauseMenu.Choice.Retry, "RETRY STAGE"));
         items.Add((PauseMenu.Choice.Map, "BACK TO THE MAP"));
         _pause = new PauseMenu(items, devices, choice =>
@@ -911,6 +921,7 @@ public partial class GameRoot : Node3D
             switch (choice)
             {
                 case PauseMenu.Choice.Stats: _tent?.Open(); break;
+                case PauseMenu.Choice.Inventory: AddChild(new InventoryMenu(Seats())); break;
                 case PauseMenu.Choice.Retry: Retry(); break;
                 case PauseMenu.Choice.Map: SaveSystem.Save(); GoToMap(); break;
             }
@@ -956,6 +967,8 @@ public partial class GameRoot : Node3D
         Row("BEST COMBO", $"{_bestCombo} HITS");
         Row(won ? "GOLD BANKED" : "GOLD LOST", $"{_goldEarned} G");
         Row(won ? "LOOT BANKED" : "LOOT LOST", _itemsFound.ToString());
+        if (won && _itemsFound > 0)
+            box.AddChild(new Label { Text = "NEW GEAR IS IN YOUR BAG: PAUSE > INVENTORY", HorizontalAlignment = HorizontalAlignment.Center, LabelSettings = S(13, new Color(0.6f, 1f, 0.7f)) });
         box.AddChild(new Label
         {
             Text = won ? "ATTACK  back to the map      DODGE  play again" : "ATTACK  back to the map      DODGE  try again",

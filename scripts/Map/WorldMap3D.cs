@@ -50,6 +50,7 @@ public partial class WorldMap3D : Node3D
     private ShopMenu? _shop;
     private StatTent _tent = null!;
     private PauseMenu? _pause;
+    private InventoryMenu? _inventory;
     private bool _pauseHeld = true;
     private double _clock;
     private Label _worldTitle = null!, _nodeTitle = null!, _nodeInfo = null!, _squad = null!;
@@ -497,7 +498,7 @@ public partial class WorldMap3D : Node3D
         _focus = _focus.Lerp(_avatar.Position, 1f - Mathf.Exp(-4f * dt));
         PlaceCamera(1f - Mathf.Exp(-3f * dt));
 
-        if (_shop is not null || _pause is not null || _tent.IsOpen || _walkingTo is not null) return;
+        if (_shop is not null || _pause is not null || _inventory is not null || _tent.IsOpen || _walkingTo is not null) return;
         PollPause();
         if (_pause is not null) return;
         PollJoins();
@@ -616,7 +617,7 @@ public partial class WorldMap3D : Node3D
         if (!fresh) return;
         var items = new List<(PauseMenu.Choice, string)>
         {
-            (PauseMenu.Choice.Resume, "RESUME"), (PauseMenu.Choice.Stats, "STAT TENT"),
+            (PauseMenu.Choice.Resume, "RESUME"), (PauseMenu.Choice.Stats, "STAT TENT"), (PauseMenu.Choice.Inventory, "INVENTORY"),
             (PauseMenu.Choice.Title, "SAVE & QUIT TO TITLE"), (PauseMenu.Choice.Quit, "SAVE & QUIT GAME"),
         };
         _pause = new PauseMenu(items, new List<int>(Campaign.SquadDevices), choice =>
@@ -627,6 +628,13 @@ public partial class WorldMap3D : Node3D
             switch (choice)
             {
                 case PauseMenu.Choice.Stats: _tent.Open(); break;
+                case PauseMenu.Choice.Inventory:
+                    var inv = new InventoryMenu(Seats());
+                    inv.Closed += () => { foreach (MapPad p in _pads) p.Swallow(); RefreshInfo(); };
+                    AddChild(inv);
+                    _inventory = inv;
+                    inv.Closed += () => _inventory = null;
+                    break;
                 case PauseMenu.Choice.Title: SaveSystem.Save(); GetTree().ChangeSceneToFile(Campaign.TitleScene); break;
                 case PauseMenu.Choice.Quit: SaveSystem.Save(); GetTree().Quit(); break;
             }

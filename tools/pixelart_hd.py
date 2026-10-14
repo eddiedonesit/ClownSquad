@@ -112,6 +112,16 @@ class HDCanvas:
             if ((x - cx) / rx) ** 2 + ((y - cy) / ry) ** 2 <= 1.0:
                 self._set(X, Y, m)
 
+    def ellipse_rot(self, cx, cy, rx, ry, angle, m):
+        """An ellipse whose rx axis points along `angle` (radians, screen space)."""
+        ca, sa = math.cos(angle), math.sin(angle)
+        r = max(rx, ry)
+        for X, Y, x, y in self._box(cx - r, cy - r, cx + r, cy + r):
+            dx, dy = x - cx, y - cy
+            u, v = dx * ca + dy * sa, -dx * sa + dy * ca
+            if (u / rx) ** 2 + (v / ry) ** 2 <= 1.0:
+                self._set(X, Y, m)
+
     def capsule(self, x0, y0, x1, y1, r0, r1, m):
         """A tapered limb from (x0, y0) radius r0 to (x1, y1) radius r1."""
         dx, dy = x1 - x0, y1 - y0

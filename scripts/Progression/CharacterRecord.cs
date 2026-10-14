@@ -101,9 +101,10 @@ public static class Leveling
     private const float CritPerLuck = 0.015f;
     private const float MaxCrit = 0.50f;
 
-    /// <summary>XP needed to go from this level to the next. 40 at level 1, about 7,900 at 49.</summary>
+    /// <summary>XP needed to go from this level to the next. 120 at level 1, about 23,600 at 49
+    /// (tripled on 2026-10-14: levels came far too fast).</summary>
     public static int XpToNext(int level) =>
-        level >= MaxLevel ? 0 : (int)Math.Round(40.0 * Math.Pow(level, 1.35));
+        level >= MaxLevel ? 0 : (int)Math.Round(120.0 * Math.Pow(level, 1.35));
 
     /// <summary>Add XP, levelling as many times as it pays for. Returns levels gained.</summary>
     public static int Grant(CharacterRecord r, int xp)

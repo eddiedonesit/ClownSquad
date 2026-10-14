@@ -203,7 +203,8 @@ public partial class StageScenery : Node3D
         var stops = new List<float>(encounters) { exitX };
         foreach (float stop in stops)
         {
-            int count = _rng.RandiRange(0, 2);
+            // About every other stretch of road has a crate: a treat, not a buffet.
+            int count = _rng.Randf() < 0.55f ? 1 : 0;
             for (int i = 0; i < count; i++)
             {
                 float cx = _rng.RandfRange(from + 2f, stop - 3f);

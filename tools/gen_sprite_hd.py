@@ -85,24 +85,44 @@ def fist(c, x, y, far):
 
 
 def mallet_head(c, hx, hy, angle, length, head_len=44, head_rad=15):
-    """The squeaky mallet's barrel: red, with a yellow striking face and steel
-    bands, its axis across the handle. Drawn before the body when carried, so
-    it rests behind the head instead of over the face."""
+    """The squeaky mallet's barrel, drawn as a real cylinder: straight sides,
+    a foreshortened oval end at the back, the yellow striking face as an oval
+    at the front, and rubber bands that curve round the barrel the way a band
+    on a drum does. The curvature is what makes it read as round, not flat.
+    Drawn before the body when carried, so it rests behind the head."""
     r = math.radians(angle)
     mx, my = hx + math.cos(r) * length, hy - math.sin(r) * length
-    ax, ay = math.cos(r + math.pi / 2), -math.sin(r + math.pi / 2)
+    ax, ay = math.cos(r + math.pi / 2), -math.sin(r + math.pi / 2)      # along the barrel
+    nx, ny = math.cos(r), -math.sin(r)                                    # across it
     half = head_len / 2
+    # The camera looks down on the ring, so the end face that shows is
+    # whichever end of the barrel is higher on screen.
+    if my + ay * half > my - ay * half:
+        ax, ay = -ax, -ay
     e0 = (mx - ax * half, my - ay * half)
     e1 = (mx + ax * half, my + ay * half)
-    c.part()
-    c.capsule(e0[0], e0[1], e1[0], e1[1], head_rad, head_rad, RED)
+    axis_angle = math.atan2(ay, ax)
+    cap = head_rad * 0.42                                                # how much of the end face shows
 
-    def band(x, y, m):
-        t = ((x - e0[0]) * ax + (y - e0[1]) * ay) / head_len
-        return METAL if 0.16 < t < 0.24 or 0.76 < t < 0.84 else m
-    c.recolor(band)
     c.part()
-    c.ellipse(e1[0], e1[1], head_rad - 3, head_rad - 3, YELLOW)    # the striking face
+    c.poly([(e0[0] + nx * head_rad, e0[1] + ny * head_rad), (e1[0] + nx * head_rad, e1[1] + ny * head_rad),
+            (e1[0] - nx * head_rad, e1[1] - ny * head_rad), (e0[0] - nx * head_rad, e0[1] - ny * head_rad)], RED)
+    c.ellipse_rot(e0[0], e0[1], cap, head_rad, axis_angle, RED)          # the far end, rounding the back
+
+    def bands(x, y, m):
+        u = (x - e0[0]) * ax + (y - e0[1]) * ay                        # along the barrel
+        v = (x - e0[0]) * nx + (y - e0[1]) * ny                        # across it
+        bulge = cap * math.sqrt(max(0.0, 1.0 - (v / head_rad) ** 2))   # a band follows the end's curve
+        for at in (head_len * 0.2, head_len * 0.78):
+            if abs(u - (at + bulge)) < 2.4:
+                return METAL
+        return m
+    c.recolor(bands)
+
+    c.part()
+    c.ellipse_rot(e1[0], e1[1], cap, head_rad, axis_angle, YELLOW)       # the striking face
+    c.recolor(lambda x, y, m: GOLD if ((x - e1[0]) * ax + (y - e1[1]) * ay) ** 2 / (cap * 0.55) ** 2
+              + ((x - e1[0]) * nx + (y - e1[1]) * ny) ** 2 / (head_rad * 0.6) ** 2 <= 1.0 else m)
 
 
 def mallet_handle(c, hx, hy, angle, length):
