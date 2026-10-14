@@ -31,13 +31,17 @@ immediately; pads join by pressing a button.
 | Sprites | Profile only, 16 frames: idle 2, walk 4, attack 4, hit 1, dodge 3, jump 2 |
 | Weapon | Cylinder mallet, carried in every pose, swing arc 165/120/45/0 degrees |
 | Effects | Ground impact burst and camera shake, scaled by combo step |
-| Tooling | Procedural sprite and effect generators, animation probe, variant renderer |
+| Enemy AI | `BrawlerAi` as an IInputSource: closes distance, holds swing range, attacks on cooldown |
+| Boss clown | Big fat grinning enemy, 320 hp, slow, own sprite sheet and larger scale |
+| Factions | `Fighter.Hostile` gates attacks, so there is no friendly fire |
+| Tooling | Procedural sprite/effect/enemy generators, animation probe, AI probe, variant renderer |
 
 ## Not built
 
-Everything else in the GDD. Nothing exists yet for: enemies with behaviour (the
-dummies are static), rarity tiers, monster capture, classes, skill trees, item
-generation or affixes, levelling, shops, story, or online co-op.
+Everything else in the GDD. Nothing exists yet for: rarity tiers, monster
+capture, classes, skill trees, item generation or affixes, levelling, shops,
+story, or online co-op. One enemy type exists; there is no spawning system,
+no death handling beyond health reaching zero, and no win or lose state.
 
 ## Known simplifications
 

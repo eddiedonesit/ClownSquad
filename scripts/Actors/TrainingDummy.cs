@@ -5,6 +5,9 @@ using Godot;
 /// <summary>Stationary target that recovers, so combat feel can be tested in a loop.</summary>
 public partial class TrainingDummy : Fighter
 {
+    // Hostile so players can still hit it once friendly fire is disabled.
+    public override bool Hostile => true;
+
     private float _recoverDelay;
 
     public override void _Ready()

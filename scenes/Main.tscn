@@ -47,7 +47,7 @@ environment = SubResource("Env_1")
 camera_attributes = SubResource("CamAttr_1")
 
 [node name="Camera3D" type="Camera3D" parent="."]
-transform = Transform3D(1, 0, 0, 0, 0.8192, 0.5736, 0, -0.5736, 0.8192, 0, 5.162, 7.372)
+transform = Transform3D(1, 0, 0, 0, 0.8192, 0.5736, 0, -0.5736, 0.8192, 0, 6.596, 9.420)
 attributes = SubResource("CamAttr_1")
 fov = 30.0
 

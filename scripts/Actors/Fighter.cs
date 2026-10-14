@@ -16,6 +16,10 @@ public partial class Fighter : CharacterBody3D
 
     protected virtual string SheetPath => "res://assets/sprites/clown_16bit.png";
     protected virtual string FramesPath => "res://assets/sprites/clown_16bit.frames.json";
+    protected virtual float SpritePixelSize => 0.0225f;
+
+    /// <summary>Which side this fighter is on. Attacks only cross factions.</summary>
+    public virtual bool Hostile => false;
 
     [Export] public float MaxHealth { get; set; } = 100f;
     [Export] public float MoveSpeed { get; set; } = 5.0f;
@@ -64,7 +68,7 @@ public partial class Fighter : CharacterBody3D
         Health = MaxHealth;
         AddToGroup(Group);
 
-        Visual = new DirectionalSprite(SheetPath, FramesPath)
+        Visual = new DirectionalSprite(SheetPath, FramesPath, SpritePixelSize)
         {
             Position = new Vector3(0, 0.72f, 0),
         };

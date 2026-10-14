@@ -15,16 +15,18 @@ public partial class DirectionalSprite : Node3D
 {
     private readonly string _sheetPath;
     private readonly string _framesPath;
+    private readonly float _pixelSize;
     private AnimatedSprite3D _sprite = null!;
     private Vector3 _facing = Vector3.Right;
     private float _squash;
     private float _flash;
     private Color _tint = Colors.White;
 
-    public DirectionalSprite(string sheetPath, string framesPath)
+    public DirectionalSprite(string sheetPath, string framesPath, float pixelSize = 0.0225f)
     {
         _sheetPath = sheetPath;
         _framesPath = framesPath;
+        _pixelSize = pixelSize;
     }
 
     /// <summary>Per-entity tint, preserved across hit flashes.</summary>
@@ -42,7 +44,7 @@ public partial class DirectionalSprite : Node3D
         _sprite = new AnimatedSprite3D
         {
             SpriteFrames = FrameLibrary.Load(_sheetPath, _framesPath),
-            PixelSize = 0.0225f,
+            PixelSize = _pixelSize,
             Billboard = BaseMaterial3D.BillboardModeEnum.FixedY,
             TextureFilter = BaseMaterial3D.TextureFilterEnum.Nearest,
             AlphaCut = SpriteBase3D.AlphaCutMode.Discard,
@@ -68,6 +70,7 @@ public partial class DirectionalSprite : Node3D
     public void Play(string state, bool restart = false)
     {
         if (_sprite is null) return;
+        if (!_sprite.SpriteFrames.HasAnimation(state)) state = "idle";
         if (!restart && _sprite.Animation == state && _sprite.IsPlaying()) return;
         _sprite.SpeedScale = 1f;
         _sprite.Play(state);
@@ -77,6 +80,8 @@ public partial class DirectionalSprite : Node3D
     public void Pin(string state, int frame)
     {
         if (_sprite is null) return;
+        // Not every sheet authors every clip; fall back rather than throw.
+        if (!_sprite.SpriteFrames.HasAnimation(state)) state = "idle";
         if (_sprite.Animation != state) _sprite.Animation = state;
         _sprite.Pause();
         _sprite.SpeedScale = 0f;

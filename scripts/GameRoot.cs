@@ -16,10 +16,14 @@ public partial class GameRoot : Node3D
     /// <summary>Devices already driving a fighter, so a pad is never bound twice.</summary>
     private readonly HashSet<int> _boundDevices = new();
     private readonly List<TrainingDummy> _dummies = new();
+    private readonly List<BossClown> _bosses = new();
     private Label? _hud;
+    private bool _aiProbe;
 
     public override void _Ready()
     {
+        _aiProbe = System.Array.IndexOf(OS.GetCmdlineUserArgs(), "aitest") >= 0;
+
         if (System.Array.IndexOf(OS.GetCmdlineUserArgs(), "animtest") >= 0)
         {
             AddChild(new ClownSquad.Debug.AnimationProbe());
@@ -101,13 +105,23 @@ public partial class GameRoot : Node3D
 
     private void SpawnDummies()
     {
-        foreach (Vector3 pos in new[] { new Vector3(-2f, 0f, -2.5f), new Vector3(2.5f, 0f, -1.5f) })
-        {
-            var d = new TrainingDummy { Name = "Dummy" };
-            AddChild(d);
-            d.GlobalPosition = pos;
-            _dummies.Add(d);
-        }
+        var d = new TrainingDummy { Name = "Dummy" };
+        AddChild(d);
+        d.GlobalPosition = new Vector3(-3.5f, 0f, -2.5f);
+        _dummies.Add(d);
+
+        SpawnBoss(new Vector3(3.5f, 0f, -2f));
+    }
+
+    private void SpawnBoss(Vector3 at)
+    {
+        var boss = new BossClown { Name = "BossClown" };
+        boss.Source = new BrawlerAi(boss, attackRange: 2.1f, backoffRange: 1.3f,
+                                    attackCooldownMs: 1600);
+        AddChild(boss);
+        boss.GlobalPosition = at;
+        _bosses.Add(boss);
+        GD.Print("Boss clown spawned, driven by BrawlerAi.");
     }
 
     private void BuildHud()
@@ -126,8 +140,34 @@ public partial class GameRoot : Node3D
         layer.AddChild(_hud);
     }
 
+    private float _aiProbeTime;
+    private int _aiProbeTick;
+
+    /// <summary>
+    /// Headless assertion that the AI closes distance and swings. Run with:
+    ///   godot --headless --path . -- aitest
+    /// </summary>
+    private void TickAiProbe(float dt)
+    {
+        _aiProbeTime += dt;
+        if (_aiProbeTime < _aiProbeTick * 0.6f) return;
+        if (_players.Count == 0 || _bosses.Count == 0) return;
+
+        BossClown b = _bosses[0];
+        PlayerFighter p = _players[0];
+        float d = b.GlobalPosition.DistanceTo(p.GlobalPosition);
+        GD.Print($"  t={_aiProbeTime:F1}  dist={d:F2}  boss={b.DebugState} clip={b.CurrentClip}  playerHp={p.Health:F0}");
+
+        if (++_aiProbeTick > 10)
+        {
+            GD.Print("=== AI PROBE DONE ===");
+            GetTree().Quit();
+        }
+    }
+
     public override void _Process(double delta)
     {
+        if (_aiProbe) { TickAiProbe((float)delta); return; }
         if (_hud is null) return;   // probe mode builds no HUD
 
         PollForJoins((float)delta);
@@ -143,6 +183,8 @@ public partial class GameRoot : Node3D
         sb.AppendLine();
         for (int i = 0; i < _dummies.Count; i++)
             sb.AppendLine($"Dummy {i + 1}  hp {_dummies[i].Health:F0} / {_dummies[i].MaxHealth:F0}");
+        foreach (BossClown b in _bosses)
+            sb.AppendLine($"BOSS CLOWN  hp {b.Health:F0} / {b.MaxHealth:F0}  {b.DebugState}  clip={b.CurrentClip}");
         _hud.Text = sb.ToString();
     }
 }

@@ -215,6 +215,7 @@ public partial class PlayerFighter : Fighter
         foreach (Node node in GetTree().GetNodesInGroup(Group))
         {
             if (node is not Fighter other || other == this || !other.CanBeHit()) continue;
+            if (other.Hostile == Hostile) continue;   // no friendly fire
             if (_hitThisSwing.Contains(other)) continue;
 
             Vector3 to = other.GlobalPosition - GlobalPosition;
