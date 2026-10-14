@@ -29,7 +29,7 @@ public partial class StatTent : CanvasLayer
     private static readonly Color Cream = new(1f, 0.97f, 0.9f);
     private static readonly Color Dim = new(0.75f, 0.7f, 0.85f);
 
-    private readonly Func<IReadOnlyList<PlayerFighter>> _players;
+    private readonly Func<IReadOnlyList<Seat>> _seats;
     private readonly List<Card> _cards = new();
     private Font _font = null!;
     private Control _root = null!;
@@ -43,9 +43,14 @@ public partial class StatTent : CanvasLayer
 
     public event Action? Closed;
 
-    public StatTent(Func<IReadOnlyList<PlayerFighter>> players)
+    /// <summary>
+    /// Takes the players as seats (character, controller, what to refresh), so
+    /// it opens anywhere: mid-fight, where a change updates the fighter, or on
+    /// the world map, where there is no fighter at all.
+    /// </summary>
+    public StatTent(Func<IReadOnlyList<Seat>> seats)
     {
-        _players = players;
+        _seats = seats;
         Layer = 20;
         ProcessMode = ProcessModeEnum.Always;
     }
@@ -89,10 +94,9 @@ public partial class StatTent : CanvasLayer
         foreach (Card c in _cards) c.Panel.QueueFree();
         _cards.Clear();
 
-        foreach (PlayerFighter p in _players())
+        foreach (Seat seat in _seats())
         {
-            if (p.Record is null || p.Source is not LocalDeviceInput device) continue;
-            var card = new Card(p, p.Record, new MenuPad(device.Device));
+            var card = new Card(seat.Changed, seat.Record, new MenuPad(seat.Device));
             BuildCard(card);
             _cards.Add(card);
         }
@@ -173,7 +177,7 @@ public partial class StatTent : CanvasLayer
                 c.Record.StatPoints--;
                 c.Record.Set(stat, c.Record.Get(stat) + 1);
                 c.Added[(int)stat]++;
-                c.Player.ApplyProgression(c.Record);
+                c.Changed?.Invoke();
                 Sfx.Play("coin", 1f + 0.04f * c.Added[(int)stat]);
                 Bounce(c.Rows[c.Cursor].value);
                 break;
@@ -182,7 +186,7 @@ public partial class StatTent : CanvasLayer
                 c.Added[(int)stat]--;
                 c.Record.Set(stat, c.Record.Get(stat) - 1);
                 c.Record.StatPoints++;
-                c.Player.ApplyProgression(c.Record);
+                c.Changed?.Invoke();
                 Sfx.Play("pop");
                 break;
             case MenuPad.Press.Done:
@@ -214,7 +218,7 @@ public partial class StatTent : CanvasLayer
                 int at = choices.IndexOf(c.Record.EquippedIn(slot));
                 at = (at + (press == MenuPad.Press.Add ? 1 : choices.Count - 1)) % choices.Count;
                 c.Record.Equip(slot, choices[at]);
-                c.Player.ApplyProgression(c.Record);
+                c.Changed?.Invoke();
                 Sfx.Play("clack", 1.2f);
                 return;
         }
@@ -404,7 +408,7 @@ public partial class StatTent : CanvasLayer
 
     private sealed class Card
     {
-        public readonly PlayerFighter Player;
+        public readonly Action? Changed;
         public readonly CharacterRecord Record;
         public readonly MenuPad Pad;
         public readonly int[] Added = new int[4];
@@ -419,9 +423,9 @@ public partial class StatTent : CanvasLayer
         public PanelContainer Panel = null!;
         public Label Title = null!, Level = null!, Xp = null!, Points = null!, Footer = null!;
 
-        public Card(PlayerFighter player, CharacterRecord record, MenuPad pad)
+        public Card(Action? changed, CharacterRecord record, MenuPad pad)
         {
-            Player = player;
+            Changed = changed;
             Record = record;
             Pad = pad;
         }

@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://qgcehv54r3uw"
-path="res://.godot/imported/world_8.png-63705ad49c7e522e0976d9c60c4fef7d.ctex"
+uid="uid://b8je6el87hgy3"
+path="res://.godot/imported/poppy_hd_n.png-c39d86bf7175f929b7f4df224d211e80.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://assets/map/world_8.png"
-dest_files=["res://.godot/imported/world_8.png-63705ad49c7e522e0976d9c60c4fef7d.ctex"]
+source_file="res://assets/sprites/poppy_hd_n.png"
+dest_files=["res://.godot/imported/poppy_hd_n.png-c39d86bf7175f929b7f4df224d211e80.ctex"]
 
 [params]
 

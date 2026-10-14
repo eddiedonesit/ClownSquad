@@ -27,8 +27,56 @@ public static class SaveSystem
 {
     // 2: gear (Equipped, Stash). 3: campaign progress and gold.
     // Older files load as-is: missing fields take their defaults.
-    public const int CurrentVersion = 3;
-    public const string DefaultPath = "user://clownsquad_save.json";
+    // 4: a look per character (which clown), and save slots.
+    public const int CurrentVersion = 4;
+    /// <summary>Three save slots, chosen on the title screen.</summary>
+    public const int Slots = 3;
+    /// <summary>Before slots there was one file; it becomes slot 1 the first time slots are used.</summary>
+    public const string LegacyPath = "user://clownsquad_save.json";
+
+    public static string SlotPath(int slot) => $"user://clownsquad_slot{slot}.json";
+
+    /// <summary>The slot being played. Kept across scene changes for the session.</summary>
+    public static int ActiveSlot { get; set; } = 1;
+
+    /// <summary>Point saves at the active slot (moving a pre-slot save into slot 1 first).</summary>
+    public static void UseActiveSlot()
+    {
+        MigrateLegacy();
+        Path = SlotPath(ActiveSlot);
+    }
+
+    private static void MigrateLegacy()
+    {
+        string legacy = ProjectSettings.GlobalizePath(LegacyPath), first = ProjectSettings.GlobalizePath(SlotPath(1));
+        if (!File.Exists(legacy) || File.Exists(first)) return;
+        File.Move(legacy, first);
+        GD.Print($"Save: moved the old save into slot 1 ({first}).");
+    }
+
+    /// <summary>What a slot holds, for the load screen, without loading it. Null for an empty slot.</summary>
+    public static SaveData? Peek(int slot)
+    {
+        MigrateLegacy();
+        string file = ProjectSettings.GlobalizePath(SlotPath(slot));
+        if (!File.Exists(file)) return null;
+        try { return JsonSerializer.Deserialize<SaveData>(File.ReadAllText(file), Json); }
+        catch (Exception e) when (e is JsonException or IOException) { return null; }
+    }
+
+    public static DateTime? SavedAt(int slot)
+    {
+        string file = ProjectSettings.GlobalizePath(SlotPath(slot));
+        return File.Exists(file) ? File.GetLastWriteTime(file) : null;
+    }
+
+    /// <summary>Start the active slot over: an empty save, written straight away.</summary>
+    public static void StartFresh()
+    {
+        UseActiveSlot();
+        Data = new SaveData();
+        Save();
+    }
 
     // Enums are written by name, so the file is readable and survives reordering.
     private static readonly JsonSerializerOptions Json = new()
@@ -38,7 +86,7 @@ public static class SaveSystem
     };
 
     /// <summary>Where saves go. Tests point this elsewhere so they never touch a real save.</summary>
-    public static string Path { get; set; } = DefaultPath;
+    public static string Path { get; set; } = SlotPath(1);
 
     public static SaveData Data { get; private set; } = new();
 
@@ -98,13 +146,20 @@ public static class SaveSystem
             Data.Characters.Add(new CharacterRecord { Name = Data.Characters.Count == slot ? defaultName : "" });
         CharacterRecord r = Data.Characters[slot];
         if (r.Name.Length == 0) r.Name = defaultName;
+        if (r.Look.Length == 0)
+        {
+            // Older saves predate looks: match the look to the name if it is a clown's, else by slot.
+            Roster.Clown match = Roster.DefaultFor(slot);
+            foreach (Roster.Clown c in Roster.All) if (c.Name == r.Name) match = c;
+            r.Look = match.Id;
+        }
         return r;
     }
 
     /// <summary>Delete the save at the current path. Tests only.</summary>
     public static void DeleteForTests()
     {
-        if (Path == DefaultPath) throw new InvalidOperationException("refusing to delete the real save");
+        if (Path == LegacyPath || Path.StartsWith("user://clownsquad_slot")) throw new InvalidOperationException("refusing to delete a real save");
         if (File.Exists(Disk)) File.Delete(Disk);
         Data = new SaveData();
     }

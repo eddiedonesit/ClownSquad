@@ -27,7 +27,6 @@ public partial class WorldMap3D : Node3D
     private const float HeightScale = 1.5f;
     private const float SeaLevelH = 0.19f;         // heightmap value at the shoreline
     private const float WalkSpeed = 3.6f;
-    private static readonly string[] Names = { "PIP", "POPPY", "BINGO", "DOT" };
 
     private CampaignState _state = null!;
     private int _world = 1;
@@ -49,6 +48,9 @@ public partial class WorldMap3D : Node3D
     private Godot.Environment _env = null!;
     private DirectionalLight3D _sun = null!;
     private ShopMenu? _shop;
+    private StatTent _tent = null!;
+    private PauseMenu? _pause;
+    private bool _pauseHeld = true;
     private double _clock;
     private Label _worldTitle = null!, _nodeTitle = null!, _nodeInfo = null!, _squad = null!;
 
@@ -57,7 +59,7 @@ public partial class WorldMap3D : Node3D
         Engine.TimeScale = 1.0;
         GetTree().Paused = false;
         if (Sfx.Instance is null) AddChild(new Sfx());
-        SaveSystem.Path = SaveSystem.DefaultPath;
+        SaveSystem.UseActiveSlot();
         SaveSystem.Load();
         _state = SaveSystem.Data.Campaign;
         string[] cli = OS.GetCmdlineUserArgs();
@@ -74,6 +76,9 @@ public partial class WorldMap3D : Node3D
         BuildAvatar();
         BuildLabels();
         foreach (int d in Campaign.SquadDevices) _pads.Add(new MapPad(d));
+        _tent = new StatTent(Seats);
+        _tent.Closed += () => { foreach (MapPad p in _pads) p.Swallow(); RefreshInfo(); };
+        AddChild(_tent);
 
         _focus = Place(_world, _mapPos);
         PlaceCamera(1f);
@@ -82,6 +87,8 @@ public partial class WorldMap3D : Node3D
         GD.Print($"World map (3D): world {_world}, standing on {_at.Id}; {_state.Cleared.Count} node(s) cleared.");
 
         string[] args = OS.GetCmdlineUserArgs();
+        if (System.Array.IndexOf(args, "mapstats") >= 0)
+            GetTree().CreateTimer(1.5).Timeout += () => _tent.Open();
         if (System.Array.IndexOf(args, "mapshot") >= 0)
             GetTree().CreateTimer(2.5).Timeout += () =>
             {
@@ -421,7 +428,8 @@ public partial class WorldMap3D : Node3D
     {
         _avatar = new Node3D();
         AddChild(_avatar);
-        string sheet = ArtStyle.Sheet("res://assets/sprites/clown_16bit.png", "res://assets/sprites/pip_hd.png");
+        // The squad's leader walks the map, in player one's chosen colours.
+        string sheet = Roster.Sheet(Character(0).Look);
         _clown = new DirectionalSprite(sheet, ArtStyle.FramesFor(sheet), ArtStyle.Pixel(0.0225f) * 0.62f);
         _avatar.AddChild(_clown);
         var shadow = new MeshInstance3D
@@ -489,7 +497,9 @@ public partial class WorldMap3D : Node3D
         _focus = _focus.Lerp(_avatar.Position, 1f - Mathf.Exp(-4f * dt));
         PlaceCamera(1f - Mathf.Exp(-3f * dt));
 
-        if (_shop is not null || _walkingTo is not null) return;
+        if (_shop is not null || _pause is not null || _tent.IsOpen || _walkingTo is not null) return;
+        PollPause();
+        if (_pause is not null) return;
         PollJoins();
         foreach (MapPad pad in _pads)
         {
@@ -575,12 +585,9 @@ public partial class WorldMap3D : Node3D
     private void OpenShop()
     {
         int restocks = _state.ShopRestocks.TryGetValue(_world.ToString(), out int n) ? n : 0;
-        int level = Mathf.Max(_at.EnemyLevel, SaveSystem.CharacterFor(0, Names[0]).Level);
+        int level = Mathf.Max(_at.EnemyLevel, Character(0).Level);
         var shelf = ShopMenu.Stock((ulong)(_world * 1000 + restocks), level, 6, 0.3f + 0.12f * _world);
-        var shoppers = new List<Shopper>();
-        for (int i = 0; i < Campaign.SquadDevices.Count; i++)
-            shoppers.Add(new Shopper(SaveSystem.CharacterFor(i, Names[i % 4]), Campaign.SquadDevices[i], null));
-        _shop = new ShopMenu($"{Campaign.WorldNames[_world - 1]} SHOP", shelf, shoppers, pauses: false);
+        _shop = new ShopMenu($"{Campaign.WorldNames[_world - 1]} SHOP", shelf, Seats(), pauses: false);
         _shop.Closed += () =>
         {
             _shop = null;
@@ -588,6 +595,43 @@ public partial class WorldMap3D : Node3D
             RefreshInfo();
         };
         AddChild(_shop);
+    }
+
+    private static CharacterRecord Character(int i) => SaveSystem.CharacterFor(i, Roster.DefaultFor(i).Name);
+
+    /// <summary>Everyone in the squad, as seats for the Stat Tent and shops.</summary>
+    private List<Seat> Seats()
+    {
+        var seats = new List<Seat>();
+        for (int i = 0; i < Campaign.SquadDevices.Count; i++) seats.Add(new Seat(Character(i), Campaign.SquadDevices[i], null));
+        return seats;
+    }
+
+    /// <summary>Esc or Start on the map: resume, the Stat Tent, back to the title, or quit.</summary>
+    private void PollPause()
+    {
+        bool held = PauseMenu.PauseHeld(Campaign.SquadDevices);
+        bool fresh = held && !_pauseHeld;
+        _pauseHeld = held;
+        if (!fresh) return;
+        var items = new List<(PauseMenu.Choice, string)>
+        {
+            (PauseMenu.Choice.Resume, "RESUME"), (PauseMenu.Choice.Stats, "STAT TENT"),
+            (PauseMenu.Choice.Title, "SAVE & QUIT TO TITLE"), (PauseMenu.Choice.Quit, "SAVE & QUIT GAME"),
+        };
+        _pause = new PauseMenu(items, new List<int>(Campaign.SquadDevices), choice =>
+        {
+            _pause = null;
+            _pauseHeld = true;
+            foreach (MapPad p in _pads) p.Swallow();
+            switch (choice)
+            {
+                case PauseMenu.Choice.Stats: _tent.Open(); break;
+                case PauseMenu.Choice.Title: SaveSystem.Save(); GetTree().ChangeSceneToFile(Campaign.TitleScene); break;
+                case PauseMenu.Choice.Quit: SaveSystem.Save(); GetTree().Quit(); break;
+            }
+        });
+        AddChild(_pause);
     }
 
     private void PollJoins()
@@ -646,7 +690,7 @@ public partial class WorldMap3D : Node3D
         {
             Position = new Vector2(460, 46), Size = new Vector2(644, 24), HorizontalAlignment = HorizontalAlignment.Right,
             LabelSettings = Style(13, new Color(0.85f, 0.8f, 0.95f), 4),
-            Text = "WASD/STICK WALK    J/SPACE OR X/A ENTER    Q/E WORLDS    PADS PRESS A TO JOIN",
+            Text = "WASD/STICK WALK    J/SPACE OR X/A ENTER    Q/E WORLDS    ESC/START MENU",
         });
     }
 
@@ -671,7 +715,7 @@ public partial class WorldMap3D : Node3D
         var parts = new List<string>();
         for (int i = 0; i < Campaign.SquadDevices.Count; i++)
         {
-            CharacterRecord r = SaveSystem.CharacterFor(i, Names[i % 4]);
+            CharacterRecord r = Character(i);
             parts.Add($"{r.Name} LV{r.Level}  {r.Gold}G");
         }
         _squad.Text = string.Join("     ", parts);

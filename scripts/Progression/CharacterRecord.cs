@@ -14,6 +14,8 @@ public enum Stat { Pow, Guts, Zip, Luck }
 public sealed class CharacterRecord
 {
     public string Name { get; set; } = "";
+    /// <summary>Which of the squad's clowns this is (Roster id: pip, poppy, bingo, dot).</summary>
+    public string Look { get; set; } = "";
     public int Level { get; set; } = 1;
     /// <summary>XP earned toward the next level, not in total.</summary>
     public int Xp { get; set; }

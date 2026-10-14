@@ -6,8 +6,8 @@ using Godot;
 using ClownSquad.Audio;
 using ClownSquad.Progression;
 
-/// <summary>Someone browsing a shop: whose gold, which controller, and what to refresh after a purchase.</summary>
-public readonly record struct Shopper(CharacterRecord Record, int Device, Action? Changed);
+/// <summary>One player at a menu (a shop, the Stat Tent): whose character, which controller, and what to refresh after a change.</summary>
+public readonly record struct Seat(CharacterRecord Record, int Device, Action? Changed);
 
 /// <summary>
 /// A shop: a shared shelf of rolled items, one card per player browsing it on
@@ -25,7 +25,7 @@ public partial class ShopMenu : CanvasLayer
     private static readonly Color Dim = new(0.75f, 0.7f, 0.85f);
 
     private readonly string _title;
-    private readonly List<Shopper> _shoppers;
+    private readonly List<Seat> _shoppers;
     private readonly List<(ItemData item, int price)> _shelf;
     private readonly bool _pauses;
     private readonly List<Card> _cards = new();
@@ -35,11 +35,11 @@ public partial class ShopMenu : CanvasLayer
     public bool IsOpen { get; private set; }
     public event Action? Closed;
 
-    public ShopMenu(string title, IEnumerable<(ItemData, int)> shelf, IEnumerable<Shopper> shoppers, bool pauses = true)
+    public ShopMenu(string title, IEnumerable<(ItemData, int)> shelf, IEnumerable<Seat> shoppers, bool pauses = true)
     {
         _title = title;
         _shelf = new List<(ItemData, int)>(shelf);
-        _shoppers = new List<Shopper>(shoppers);
+        _shoppers = new List<Seat>(shoppers);
         _pauses = pauses;
         Layer = 21;
         ProcessMode = ProcessModeEnum.Always;
@@ -87,7 +87,7 @@ public partial class ShopMenu : CanvasLayer
         _row.OffsetTop = 96;
         root.AddChild(_row);
 
-        foreach (Shopper s in _shoppers)
+        foreach (Seat s in _shoppers)
         {
             var card = new Card(s, new MenuPad(s.Device));
             BuildCard(card);
@@ -152,8 +152,8 @@ public partial class ShopMenu : CanvasLayer
                 Sfx.Play("blip");
                 break;
             case MenuPad.Press.Add when n > 0:
-                if (!TryBuy(c.Shopper.Record, _shelf, c.Cursor, out c.Message)) { Sfx.Play("squeak", 0.7f); break; }
-                c.Shopper.Changed?.Invoke();
+                if (!TryBuy(c.Seat.Record, _shelf, c.Cursor, out c.Message)) { Sfx.Play("squeak", 0.7f); break; }
+                c.Seat.Changed?.Invoke();
                 foreach (Card other in _cards) other.Cursor = Mathf.Clamp(other.Cursor, 0, Mathf.Max(0, _shelf.Count - 1));
                 Sfx.Play("coin", 0.8f);
                 Sfx.Play("ding", 1.2f);
@@ -170,7 +170,7 @@ public partial class ShopMenu : CanvasLayer
 
     private void Refresh(Card c)
     {
-        CharacterRecord r = c.Shopper.Record;
+        CharacterRecord r = c.Seat.Record;
         c.Name.Text = r.Name;
         c.Gold.Text = $"{r.Gold} G";
         for (int i = 0; i < c.Rows.Count; i++)
@@ -250,7 +250,7 @@ public partial class ShopMenu : CanvasLayer
 
     private sealed class Card
     {
-        public readonly Shopper Shopper;
+        public readonly Seat Seat;
         public readonly MenuPad Pad;
         public readonly List<(Label name, Label price, Panel bg)> Rows = new();
         public int Cursor;
@@ -258,9 +258,9 @@ public partial class ShopMenu : CanvasLayer
         public string Message = "";
         public Label Name = null!, Gold = null!, Details = null!, Footer = null!;
 
-        public Card(Shopper shopper, MenuPad pad)
+        public Card(Seat shopper, MenuPad pad)
         {
-            Shopper = shopper;
+            Seat = shopper;
             Pad = pad;
         }
     }

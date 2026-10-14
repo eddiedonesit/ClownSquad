@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://6ygem7yk5feb"
-path="res://.godot/imported/world_2.png-c99812b9f381ba09d3760a489f7f017c.ctex"
+uid="uid://70l32xjm5oj6"
+path="res://.godot/imported/bingo_hd_n.png-6c39ad9d1147eac6404234ee533baa6e.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://assets/map/world_2.png"
-dest_files=["res://.godot/imported/world_2.png-c99812b9f381ba09d3760a489f7f017c.ctex"]
+source_file="res://assets/sprites/bingo_hd_n.png"
+dest_files=["res://.godot/imported/bingo_hd_n.png-6c39ad9d1147eac6404234ee533baa6e.ctex"]
 
 [params]
 

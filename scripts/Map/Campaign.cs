@@ -58,6 +58,7 @@ public static class Campaign
 
     public const string MapScene = "res://scenes/WorldMap.tscn";
     public const string FightScene = "res://scenes/Main.tscn";
+    public const string TitleScene = "res://scenes/Title.tscn";
 
     static Campaign()
     {

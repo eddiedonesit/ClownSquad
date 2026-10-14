@@ -40,6 +40,7 @@ public partial class ClownHud : CanvasLayer
     private readonly List<(Control root, CandyBar bar, Label name)> _panels = new();
     private readonly List<(Label level, ColorRect xp, Label points)> _progress = new();
     private readonly List<Label> _bags = new();
+    private readonly List<TextureRect> _faces = new();
     private readonly int[] _levelShown = new int[4];
     private Control _target = null!;
     private CandyBar _targetBar = null!;
@@ -161,6 +162,7 @@ public partial class ClownHud : CanvasLayer
         face.Position = new Vector2(6, 8);
         face.Size = new Vector2(52, 52);
         root.AddChild(face);
+        _faces.Add(face);
 
         var name = new Label { Position = new Vector2(74, 10), LabelSettings = Style(18, new Color(1f, 0.85f, 0.3f), 5) };
         root.AddChild(name);
@@ -365,6 +367,13 @@ public partial class ClownHud : CanvasLayer
             PlayerFighter p = players[i];
             bar.Value = p.Health / p.MaxHealth;
             name.Text = p.IsDead ? $"P{i + 1}  K.O.!" : $"P{i + 1}  {p.DisplayName}";
+
+            // The portrait shows this player's own clown.
+            if (_faces[i].Texture is AtlasTexture portrait)
+            {
+                string sheet = Roster.Sheet(p.Look);
+                if (portrait.Atlas?.ResourcePath != sheet) portrait.Atlas = GD.Load<Texture2D>(sheet);
+            }
 
             (Label level, ColorRect xp, Label points) = _progress[i];
             if (p.Record is CharacterRecord r)

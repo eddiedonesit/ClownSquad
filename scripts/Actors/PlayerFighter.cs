@@ -92,6 +92,11 @@ public partial class PlayerFighter : Fighter
     public float CritChance { get; private set; }
 
     private float _baseMoveSpeed = -1f;
+
+    /// <summary>Which squad clown this player looks like (Roster id). Set before the fighter enters the scene.</summary>
+    public string Look { get; set; } = "pip";
+
+    protected override string SheetPath => Hostile ? base.SheetPath : ClownSquad.Progression.Roster.Sheet(Look);
     private float _critMultiplier = 1.75f;
     private float _launchMultiplier = 1f;
     private float _kaboom;

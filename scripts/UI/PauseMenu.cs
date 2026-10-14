@@ -13,7 +13,7 @@ using ClownSquad.Input;
 /// </summary>
 public partial class PauseMenu : CanvasLayer
 {
-    public enum Choice { Resume, Stats, Retry, Map }
+    public enum Choice { Resume, Stats, Retry, Map, Title, Quit }
 
     private readonly List<(Choice choice, string label)> _items;
     private readonly List<int> _devices;
@@ -23,13 +23,11 @@ public partial class PauseMenu : CanvasLayer
     private int _cursor;
     private bool _closeHeld = true;
 
-    public PauseMenu(bool campaign, List<int> devices, Action<Choice> chosen)
+    public PauseMenu(IEnumerable<(Choice, string)> items, List<int> devices, Action<Choice> chosen)
     {
         _devices = devices;
         _chosen = chosen;
-        _items = new() { (Choice.Resume, "RESUME"), (Choice.Stats, "STAT TENT") };
-        if (campaign) _items.Add((Choice.Retry, "RETRY STAGE"));
-        _items.Add((Choice.Map, "BACK TO THE MAP"));
+        _items = new(items);
         Layer = 22;
         ProcessMode = ProcessModeEnum.Always;
     }

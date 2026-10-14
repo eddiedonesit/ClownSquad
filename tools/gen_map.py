@@ -1,9 +1,10 @@
-"""World map art: ten island maps and the map's node icons.
+"""World map data: the ten islands of the 3D world map.
 
 Each world is one island in its own theme, Super Mario World style: sea all
 round, a dirt road winding left to right through the stages, and the land
-dotted with that world's scenery. The game draws the nodes, paths and the
-walking clown on top; this draws everything that does not move.
+dotted with that world's scenery. Written for scripts/Map/WorldMap3D.cs:
+the painted ground (with the road), a heightmap, and the spots where scenery
+stands; the game builds the 3D island, its props, nodes and paths from them.
 
 Node positions must match scripts/Map/Campaign.cs (BuildWorld's Road and
 offsets). The map is 576 x 324 and shown at twice that size.
@@ -252,14 +253,6 @@ def world_map(w):
     with open(os.path.join(OUT, f"decos_{w}.json"), "w") as fh:
         json.dump([[x + 14, y + 28] for x, y in placed], fh)
 
-    rows = []
-    for y in range(MH):
-        r = bytearray()
-        for p in px[y]:
-            r.extend(p + (255,))
-        rows.append(r)
-    os.makedirs(OUT, exist_ok=True)
-    write_png(os.path.join(OUT, f"world_{w}.png"), MW, MH, rows)
 
 
 def write_rgba(name, px):
@@ -273,51 +266,10 @@ def write_rgba(name, px):
     write_png(os.path.join(OUT, name), MW, MH, rows)
 
 
-# ----------------------------------------------------------------- icons
-# One sheet, 24 x 24 per icon, in this order (WorldMap.cs uses the indices):
-#   0 open stage, 1 cleared stage, 2 locked, 3 boss, 4 bonus, 5 shop, 6 gate
-
-ICON_MATS = {
-    1: Material((246, 200, 84), gloss=True), 2: Material((214, 56, 66), gloss=True), 3: Material((120, 116, 130)),
-    4: Material((236, 236, 246), soft=True), 5: Material((92, 46, 112)), 6: Material((76, 146, 228)),
-    7: Material((150, 96, 58)), 8: Material((34, 22, 40), flat=True),
-}
-
-
-def icons():
-    S = 24
-    out = []
-
-    def c():
-        return HDCanvas(S, S)
-
-    a = c(); a.part(); a.ellipse(12, 13, 8, 6, 1); out.append(a)
-    b = c(); b.part(); b.ellipse(12, 13, 8, 6, 2); b.part(); b.ellipse(12, 12, 3, 2.4, 4); out.append(b)
-    l = c(); l.part(); l.ellipse(12, 13, 7, 5, 3); out.append(l)
-    t = c(); t.part(); t.poly([(1, 22), (23, 22), (12, 2)], 2)
-    t.recolor(lambda x, y, m: 4 if int(x / 3) % 2 == 0 else m); t.part(); t.ellipse(12, 3, 2, 2, 1); out.append(t)
-    pts = []
-    for i in range(10):
-        ang = -math.pi / 2 + i * math.pi / 5
-        r = 11 if i % 2 == 0 else 4.5
-        pts.append((12 + r * math.cos(ang), 13 + r * math.sin(ang)))
-    s = c(); s.part(); s.poly(pts, 1); out.append(s)
-    h = c(); h.part(); h.poly([(3, 22), (21, 22), (21, 11), (3, 11)], 7)
-    h.part(); h.poly([(1, 12), (23, 12), (19, 4), (5, 4)], 2)
-    h.recolor(lambda x, y, m: 4 if int(x / 4) % 2 == 0 else m)
-    h.part(); h.poly([(9, 22), (15, 22), (15, 15), (9, 15)], 8); out.append(h)
-    g = c(); g.part(); g.capsule(5, 22, 5, 5, 2, 2, 7); g.part(); g.capsule(19, 22, 19, 5, 2, 2, 7)
-    g.part(); g.stroke([(5, 6), (12, 2), (19, 6)], 2, 2); g.part(); g.poly([(12, 4), (12, 12), (20, 8)], 6); out.append(g)
-    shaded = [shade(x, ICON_MATS) for x in out]
-    write_png(os.path.join(OUT, "map_icons.png"), S * len(shaded), S, to_rows(shaded, S, S))
-    print("wrote {}/map_icons.png  {} icons".format(OUT, len(shaded)))
-
-
 def main():
     for w in range(1, 11):
         world_map(w)
-        print("wrote {}/world_{}.png".format(OUT, w))
-    icons()
+        print("wrote {}/ground_{w}.png, height_{w}.png, decos_{w}.json".format(OUT, w=w))
 
 
 if __name__ == "__main__":

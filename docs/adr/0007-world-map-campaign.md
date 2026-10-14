@@ -70,7 +70,7 @@ Version 1 and 2 files load unchanged, starting at 1-1 with no gold.
 
 - **The map is 3D**: every world is an island in one sea, built from the same
   map data (heightmap, ground texture and scenery spots from tools/gen_map.py)
-  with a 3D landmark per world. The 2D map script is kept but unused.
+  with a 3D landmark per world. The 2D map and its art were removed.
 - **Fights are walked through**, left to right, instead of fought in one ring.
   A stage's waves become groups waiting along the road: reaching one locks the
   camera until it is beaten; there is no wave count on screen. Bonus stages

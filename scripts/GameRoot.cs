@@ -111,7 +111,7 @@ public partial class GameRoot : Node3D
         }
         else
         {
-            SaveSystem.Path = SaveSystem.DefaultPath;
+            SaveSystem.UseActiveSlot();
             SaveSystem.Load();
         }
 
@@ -380,11 +380,13 @@ public partial class GameRoot : Node3D
             Name = $"Player{index}",
             Source = new LocalDeviceInput(device),
             PlayerIndex = index,
-            DisplayName = new[] { "PIP", "POPPY", "BINGO", "DOT" }[index % 4],
+            DisplayName = Roster.DefaultFor(index).Name,
         };
-        // Each player slot plays its saved character, created on first use.
+        // Each player slot plays its saved character, created on first use,
+        // looking like the clown chosen for it on the character select screen.
         CharacterRecord record = SaveSystem.CharacterFor(index, p.DisplayName);
         p.DisplayName = record.Name;
+        p.Look = record.Look;
         p.ApplyProgression(record);
         AddChild(p);
         Vector3 home = new(-1.5f + index * 1.5f, 0f, 1.5f);
@@ -610,10 +612,10 @@ public partial class GameRoot : Node3D
         int level = Mathf.Max(_director?.LevelFloor ?? 1, _players[0].Record?.Level ?? 1) + 3;
         // Better than any world shop: higher level, rarity pushed hard.
         var shelf = ShopMenu.Stock(_director!.Seed ^ 0xb0057UL, level, 5, 4f);
-        var shoppers = new List<Shopper>();
+        var shoppers = new List<Seat>();
         foreach (PlayerFighter p in _players)
             if (p.Record is CharacterRecord r && p.Source is LocalDeviceInput d)
-                shoppers.Add(new Shopper(r, d.Device, () => p.ApplyProgression(r)));
+                shoppers.Add(new Seat(r, d.Device, () => p.ApplyProgression(r)));
         _shop = new ShopMenu("THE SECRET SHOP", shelf, shoppers);
         _shop.Closed += () =>
         {
@@ -899,7 +901,10 @@ public partial class GameRoot : Node3D
         bool fresh = held && !_pauseHeld;
         _pauseHeld = held;
         if (!fresh) return;
-        _pause = new PauseMenu(_stage is not null, devices, choice =>
+        var items = new List<(PauseMenu.Choice, string)> { (PauseMenu.Choice.Resume, "RESUME"), (PauseMenu.Choice.Stats, "STAT TENT") };
+        if (_stage is not null) items.Add((PauseMenu.Choice.Retry, "RETRY STAGE"));
+        items.Add((PauseMenu.Choice.Map, "BACK TO THE MAP"));
+        _pause = new PauseMenu(items, devices, choice =>
         {
             _pause = null;
             _pauseHeld = true;
@@ -1013,7 +1018,14 @@ public partial class GameRoot : Node3D
         };
         AddChild(_clownHud);
 
-        _tent = new StatTent(() => _players);
+        _tent = new StatTent(() =>
+        {
+            var seats = new List<Seat>();
+            foreach (PlayerFighter p in _players)
+                if (p.Record is CharacterRecord r && p.Source is LocalDeviceInput d)
+                    seats.Add(new Seat(r, d.Device, () => p.ApplyProgression(r)));
+            return seats;
+        });
         AddChild(_tent);
     }
 

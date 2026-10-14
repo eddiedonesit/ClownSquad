@@ -396,8 +396,30 @@ def write_sheet(name, frames, mats):
     print("wrote {} (+ normal map)  {}x{}  {} frames".format(out, W * len(shaded), H, len(shaded)))
 
 
+# The squad: four clowns, one body, each in their own colours. PIP is MATS as
+# drawn; the others recolour suit, diamonds, hat-and-shoes and hair. Kept clear
+# of the grunts' green, purple and teal so friend and foe never blur.
+def squad_mats(suit, diamond, red, hair):
+    m = dict(MATS)
+    m[SUIT] = Material(suit)
+    m[DIAMOND] = Material(diamond)
+    m[RED] = Material(red)
+    m[HAIR] = Material(hair)
+    return m
+
+
+SQUAD = {
+    "poppy": squad_mats((236, 112, 170), (250, 214, 96), (120, 70, 200), (90, 210, 220)),
+    "bingo": squad_mats((236, 140, 56), (70, 130, 230), (40, 150, 110), (110, 70, 40)),
+    "dot": squad_mats((244, 204, 70), (214, 56, 66), (60, 60, 160), (40, 30, 50)),
+}
+
+
 def main():
-    write_sheet("pip_hd", player_frames(), MATS)
+    frames = player_frames()
+    write_sheet("pip_hd", frames, MATS)
+    for name, mats in SQUAD.items():
+        write_sheet(name + "_hd", frames, mats)
     write_sheet("grunt_hd", grunt_frames(), GRUNT_MATS)
     spin, ms = mallet_frames()
     out = os.path.join("assets", "sprites", "mallet_spin_hd.png")

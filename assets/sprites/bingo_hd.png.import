@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://cklv0g55blphs"
-path="res://.godot/imported/map_icons.png-a4cd749c94bc2a7680b3942033987822.ctex"
+uid="uid://bhct3gx2xa13n"
+path="res://.godot/imported/bingo_hd.png-e0babcf74e33a08a13047c1c7b515939.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://assets/map/map_icons.png"
-dest_files=["res://.godot/imported/map_icons.png-a4cd749c94bc2a7680b3942033987822.ctex"]
+source_file="res://assets/sprites/bingo_hd.png"
+dest_files=["res://.godot/imported/bingo_hd.png-e0babcf74e33a08a13047c1c7b515939.ctex"]
 
 [params]
 

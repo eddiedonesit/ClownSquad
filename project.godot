@@ -7,7 +7,7 @@ config_version=5
 
 config/name="Clown Squad"
 config/features=PackedStringArray("4.7", "C#", "Forward Plus")
-run/main_scene="res://scenes/Main.tscn"
+run/main_scene="res://scenes/Title.tscn"
 
 [dotnet]
 
