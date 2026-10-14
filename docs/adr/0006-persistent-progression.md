@@ -45,6 +45,11 @@ Later versions migrate older files on load rather than refusing them.
 
 Gear, skills and captures are not in version 1; they arrive with their systems.
 
+**Version 2** (2026-10-14) adds gear: each character has `Equipped` and `Stash`
+lists of items (`Id`, `Slot`, `Name`, `Rarity`, `Level`, `Quality`, `Affixes`
+of `Kind` and `Value`). Enums are written by name. Version 1 files load
+unchanged, with no gear.
+
 ## Open
 
 

@@ -5,6 +5,7 @@ using Godot;
 using ClownSquad.Actors;
 using ClownSquad.Audio;
 using ClownSquad.Input;
+using ClownSquad.Progression;
 
 /// <summary>
 /// Runs the fight: waves of enemies in from the screen edges, a shared pool of
@@ -33,6 +34,16 @@ public partial class WaveDirector : Node
     private const float SpawnInterval = 0.7f;
 
     public ulong Seed { get; set; } = 20261014;
+
+    /// <summary>The level enemies scale to: the host's (GDD 7). Set by whoever runs the stage.</summary>
+    public Func<int> HostLevel { get; set; } = () => 1;
+
+    /// <summary>Forces every grunt to one rank, for tests. Null rolls normally.</summary>
+    public EnemyRank? ForceRank { get; set; }
+
+    // GDD 3 spawn weights: Common 1000, Rare 150, Epic 30, wild Legendary 1.
+    private static readonly (EnemyRank rank, int weight)[] RankWeights =
+        { (EnemyRank.Common, 1000), (EnemyRank.Rare, 150), (EnemyRank.Epic, 30), (EnemyRank.Legendary, 1) };
 
     public Phase Current { get; private set; } = Phase.Intermission;
     public int WaveNumber { get; private set; } = 1;
@@ -139,6 +150,9 @@ public partial class WaveDirector : Node
             : new BrawlerAi(enemy, attackRange: 1.35f, backoffRange: 0.7f, attackCooldownMs: 1300);
 
         _world.AddChild(enemy);
+        enemy.ApplyEnemyRank(HostLevel(), boss ? EnemyRank.Common : RollRank());
+        if (enemy.Rank != EnemyRank.Common)
+            GD.Print($"{enemy.DisplayName} appears (level {enemy.EnemyLevel}).");
 
         // In from alternating sides, at the screen edge, at a random depth.
         Vector3 at = Vector3.Zero;
@@ -153,6 +167,20 @@ public partial class WaveDirector : Node
         enemy.GlobalPosition = at;
         enemy.Died += OnEnemyDied;
         EnemiesAlive++;
+    }
+
+    private EnemyRank RollRank()
+    {
+        if (ForceRank is EnemyRank forced) return forced;
+        int total = 0;
+        foreach ((_, int w) in RankWeights) total += w;
+        int roll = _rng.RandiRange(1, total);
+        foreach ((EnemyRank rank, int w) in RankWeights)
+        {
+            roll -= w;
+            if (roll <= 0) return rank;
+        }
+        return EnemyRank.Common;
     }
 
     private void OnEnemyDied(Fighter enemy)

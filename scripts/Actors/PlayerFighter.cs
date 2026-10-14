@@ -92,6 +92,14 @@ public partial class PlayerFighter : Fighter
     public float CritChance { get; private set; }
 
     private float _baseMoveSpeed = -1f;
+    private float _critMultiplier = 1.75f;
+    private float _launchMultiplier = 1f;
+    private float _kaboom;
+    private bool _kaboomed;
+
+    /// <summary>Enemy level and rank, set by whoever spawns it (GDD 3, 7). Players leave them alone.</summary>
+    public int EnemyLevel { get; private set; } = 1;
+    public EnemyRank Rank { get; private set; } = EnemyRank.Common;
     private readonly RandomNumberGenerator _critRng = new();
 
     private State _state = State.Free;
@@ -185,8 +193,44 @@ public partial class PlayerFighter : Fighter
         DamageMultiplier = Leveling.DamageMultiplier(record);
         MoveSpeed = _baseMoveSpeed * Leveling.SpeedMultiplier(record);
         CritChance = Leveling.CritChance(record);
+        _critMultiplier = Leveling.CritMultiplier(record);
+        _launchMultiplier = Leveling.LaunchMultiplier(record);
+        _kaboom = Leveling.Kaboom(record);
         _critRng.Randomize();
         if (IsInsideTree() && !IsDead && MaxHealth > oldMax) Heal(MaxHealth - oldMax);
+    }
+
+    /// <summary>
+    /// Scale an enemy to a level and give it a rank: health and damage grow with
+    /// level, then by rank, and ranked enemies get a colour and a glowing aura so
+    /// they are spotted at a glance (GDD 3).
+    /// </summary>
+    public void ApplyEnemyRank(int level, EnemyRank rank)
+    {
+        EnemyLevel = Mathf.Max(1, level);
+        Rank = rank;
+        float stats = Leveling.RankStats(rank);
+        ScaleHealth(Leveling.EnemyHealthScale(EnemyLevel) * stats);
+        DamageMultiplier *= Leveling.EnemyDamageScale(EnemyLevel) * (rank == EnemyRank.Common ? 1f : Mathf.Sqrt(stats));
+        if (rank == EnemyRank.Common) return;
+
+        (Color tint, Color aura, string tag, float size) = rank switch
+        {
+            EnemyRank.Rare => (new Color(1.12f, 1.04f, 0.8f), new Color(1f, 0.85f, 0.35f), "RARE", 1.05f),
+            EnemyRank.Epic => (new Color(1.1f, 0.85f, 1.25f), new Color(0.75f, 0.4f, 1f), "EPIC", 1.12f),
+            _ => (new Color(1.3f, 0.95f, 0.65f), new Color(1f, 0.5f, 0.1f), "LEGENDARY", 1.2f),
+        };
+        BaseTint = tint;
+        Visual.Scale = Vector3.One * size;
+        DisplayName = $"{tag} {DisplayName}";
+        AddChild(new OmniLight3D
+        {
+            LightColor = aura,
+            // A halo on the floor and a rim on the sprite, not a floodlight.
+            LightEnergy = rank switch { EnemyRank.Legendary => 2.4f, EnemyRank.Epic => 1.4f, _ => 0.9f },
+            OmniRange = rank == EnemyRank.Legendary ? 2.6f : 1.7f,
+            Position = new Vector3(0f, 0.35f, -0.35f),
+        });
     }
 
     protected override void Tick(float dt)
@@ -317,6 +361,7 @@ public partial class PlayerFighter : Fighter
         _phaseTime = 0f;
         _hitThisSwing.Clear();
         _impactSpawned = false;
+        _kaboomed = false;
         _sinceCombo = 0f;
         AssistLane();
         Sfx.Play("whoosh", 1f + 0.12f * _comboIndex);
@@ -435,7 +480,24 @@ public partial class PlayerFighter : Fighter
             _hitThisSwing.Add(other);
             // Knock straight along the facing, so hits shove down the lane
             // instead of scattering sideways.
-            Strike(other, step.Damage, Facing, step.Knockback, step.Hitstop, step.Launch);
+            Strike(other, step.Damage, Facing, step.Knockback, step.Hitstop, step.Launch * _launchMultiplier);
+        }
+
+        // KABOOM gear: the finisher goes off like a firework, once per swing.
+        if (_kaboom > 0f && _comboIndex == Combo.Length - 1 && _hitThisSwing.Count > 0 && !_kaboomed)
+        {
+            _kaboomed = true;
+            Vector3 at = GlobalPosition + Facing * (step.Range * ReachScale * 0.7f);
+            ImpactEffect.Spawn(GetParent(), at + new Vector3(0f, 0.3f, 0f), 1.8f);
+            Sfx.Play("kaboom", 1.4f, -6f);
+            CameraShake.Request(this, 0.12f, 0.25f);
+            foreach (Fighter other in Opponents())
+            {
+                Vector3 d = other.GlobalPosition - at;
+                d.Y = 0f;
+                if (d.Length() > 1.8f) continue;
+                other.TakeDamage(new DamageInfo(_kaboom * DamageMultiplier, d.LengthSquared() > 0.01f ? d.Normalized() : Facing, 5f, 0.08f, this, 4f, 0.35f));
+            }
         }
     }
 
@@ -689,7 +751,7 @@ public partial class PlayerFighter : Fighter
     private bool RollCrit() => CritChance > 0f && _critRng.Randf() < CritChance;
 
     private float Scaled(float damage, bool crit) =>
-        damage * DamageMultiplier * ExtraDamageMultiplier * (crit ? Leveling.CritMultiplier : 1f);
+        damage * DamageMultiplier * ExtraDamageMultiplier * (crit ? _critMultiplier : 1f);
 
     private void Spark(Fighter other, bool crit = false)
     {

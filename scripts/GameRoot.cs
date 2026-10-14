@@ -57,6 +57,14 @@ public partial class GameRoot : Node3D
     private const int GruntXp = 15;
     private const int BossXp = 150;
 
+    // Loot (ADR 0006): picked up into a bag for the stage, banked on a win, lost on a loss.
+    private readonly RandomNumberGenerator _lootRng = new();
+    private readonly Dictionary<PlayerFighter, List<ItemData>> _bags = new();
+    private readonly List<LootDrop> _drops = new();
+    private readonly HashSet<string> _swept = new();
+    private int _dropsSpawned;
+    private int _itemsBanked;
+
     private bool _aiProbe;
     private string _outcomeProbe = "";   // "win" or "lose" when a wave probe is running
 
@@ -124,6 +132,8 @@ public partial class GameRoot : Node3D
         AddChild(_director);
         _director.PhaseChanged += OnPhaseChanged;
         _director.EnemyDefeated += OnEnemyDefeated;
+        _director.HostLevel = () => _players.Count > 0 && _players[0].Record is CharacterRecord host ? host.Level : 1;
+        _lootRng.Seed = _director.Seed ^ 0x5eed10075UL;
         _director.Begin(this);
 
         if (_outcomeProbe.Length > 0) StartOutcomeProbe();
@@ -135,6 +145,14 @@ public partial class GameRoot : Node3D
     {
         PlayerFighter p = _players[0];
         Leveling.Grant(p.Record!, 200);
+        // A few banked items so the GEAR page has something to show.
+        for (int i = 0; i < 7; i++)
+        {
+            ItemData item = Loot.Roll(_lootRng, 3, 2.5f);
+            p.Record!.Stash.Add(item);
+            if (p.Record.EquippedIn(item.Slot) is not ItemData worn || Loot.Score(item) > Loot.Score(worn))
+                p.Record.Equip(item.Slot, item);
+        }
         p.ApplyProgression(p.Record!);
         SceneTreeTimer first = GetTree().CreateTimer(3.0, processAlways: true);
         first.Timeout += () =>
@@ -144,7 +162,12 @@ public partial class GameRoot : Node3D
             GetTree().CreateTimer(0.6, processAlways: true).Timeout += () =>
             {
                 GetViewport().GetTexture().GetImage().SavePng("C:/Claude/ClownSquad/debug/stat_tent.png");
-                GetTree().Quit();
+                _tent.ShowPage(1);
+                GetTree().CreateTimer(0.4, processAlways: true).Timeout += () =>
+                {
+                    GetViewport().GetTexture().GetImage().SavePng("C:/Claude/ClownSquad/debug/gear_page.png");
+                    GetTree().Quit();
+                };
             };
         };
     }
@@ -353,7 +376,8 @@ public partial class GameRoot : Node3D
         WaveDirector d = _director!;
         GD.Print($"[{GameClock.Seconds:F1}s] phase={phase} wave={d.WaveNumber}/{d.WaveCount} lives={d.Lives}");
         if (phase == WaveDirector.Phase.Intermission) SaveSystem.Save();
-        if (phase == WaveDirector.Phase.Victory) CrowdCheer(6f, 20);
+        if (phase == WaveDirector.Phase.Victory) { CrowdCheer(6f, 20); BankLoot(); }
+        if (phase == WaveDirector.Phase.Defeat) LoseLoot();
         if (phase is WaveDirector.Phase.Victory or WaveDirector.Phase.Defeat)
         {
             _endedAt = GameClock.Seconds;
@@ -381,15 +405,28 @@ public partial class GameRoot : Node3D
     private void OnEnemyDefeated(Fighter enemy)
     {
         bool boss = enemy is BossClown;
-        int xp = boss ? BossXp : GruntXp;
-        CrowdCheer(boss ? 4f : 0.9f, boss ? 14 : 1);
+        var foe = enemy as PlayerFighter;
+        int level = foe?.EnemyLevel ?? 1;
+        EnemyRank rank = foe?.Rank ?? EnemyRank.Common;
+        int xp = (int)Mathf.Round((boss ? BossXp : GruntXp) * Leveling.EnemyXpScale(level) * Leveling.RankXp(rank));
+        CrowdCheer(boss ? 4f : rank != EnemyRank.Common ? 2f : 0.9f, boss ? 14 : 1 + (int)rank * 3);
+        CameraShake.RequestPunch(this, boss ? 1.3f : 0.35f + 0.25f * (int)rank);
         PopText.Spawn(this, enemy.GlobalPosition + new Vector3(0f, enemy.BodyHeight + 0.2f, 0f),
                       $"+{xp} XP", new Color(1f, 0.85f, 0.3f), boss ? 1.3f : 0.8f);
+
+        // Gear that heals on a knockout pays the one who landed it.
+        if (enemy.LastAttacker is PlayerFighter killer && killer.Record is CharacterRecord kr && !killer.IsDead)
+        {
+            float heal = Leveling.LifeOnKill(kr);
+            if (heal > 0f) killer.Heal(heal);
+        }
+
+        RollDrops(enemy, boss, rank, level);
 
         foreach (PlayerFighter p in _players)
         {
             if (p.Record is not CharacterRecord r) continue;
-            if (Leveling.Grant(r, xp) == 0) continue;
+            if (Leveling.Grant(r, (int)Mathf.Round(xp * Leveling.XpMultiplier(r))) == 0) continue;
 
             // A level-up is a full heal: the classic reward for surviving.
             p.ApplyProgression(r);
@@ -399,6 +436,123 @@ public partial class GameRoot : Node3D
             ClownSquad.Audio.Sfx.Play("level_up");
             GD.Print($"{r.Name} reached level {r.Level} ({r.StatPoints} stat point(s) to spend).");
         }
+        SaveSystem.Save();
+    }
+
+    // ---------------------------------------------------------------- loot
+
+    /// <summary>
+    /// Drops on a knockout. Better enemies drop more often and better (GDD 6.3):
+    /// a common grunt one time in five, ranked grunts nearly always, the boss
+    /// twice, and the wild legendary twice with the rarity weights pushed hard.
+    /// The host's LUCK and FORTUNE gear push them further.
+    /// </summary>
+    private void RollDrops(Fighter enemy, bool boss, EnemyRank rank, int level)
+    {
+        float boost = _players.Count > 0 && _players[0].Record is CharacterRecord host ? Leveling.LootBoost(host) : 0f;
+        (float chance, int count, float push) = boss ? (1f, 2, 1.5f) : rank switch
+        {
+            EnemyRank.Rare => (0.75f, 1, 0.6f),
+            EnemyRank.Epic => (1f, 1, 1.2f),
+            EnemyRank.Legendary => (1f, 2, 3f),
+            _ => (0.2f, 1, 0f),
+        };
+        if (_lootRng.Randf() > chance) return;
+        for (int i = 0; i < count; i++)
+            SpawnDrop(Loot.Roll(_lootRng, level, push + boost), enemy.GlobalPosition);
+    }
+
+    private void SpawnDrop(ItemData item, Vector3 at)
+    {
+        var toss = new Vector3(_lootRng.RandfRange(-2.2f, 2.2f), _lootRng.RandfRange(5f, 6.5f), _lootRng.RandfRange(-1.2f, 1.2f));
+        var drop = new LootDrop(item, toss);
+        AddChild(drop);
+        drop.GlobalPosition = at + new Vector3(0f, 0.6f, 0f);
+        drop.PickedUp += OnPickedUp;
+        _drops.Add(drop);
+        _dropsSpawned++;
+        if (item.Rarity >= ItemRarity.Rare) ClownSquad.Audio.Sfx.Play("ding", 1.3f + 0.1f * (int)item.Rarity);
+        GD.Print($"Drop: {item.Rarity} {item.Name} (level {item.Level}).");
+    }
+
+    private void OnPickedUp(LootDrop drop, PlayerFighter p)
+    {
+        _drops.Remove(drop);
+        ItemData item = drop.Item;
+        // Swept items were already counted into a bag at the stage clear.
+        if (!_swept.Contains(item.Id)) Bag(p).Add(item);
+        PopText.Spawn(this, p.GlobalPosition + new Vector3(0f, p.BodyHeight + 0.25f, 0f), item.Name,
+                      Loot.RarityColor(item.Rarity), 0.7f, 0.9f);
+        ClownSquad.Audio.Sfx.Play("coin", 0.9f + 0.08f * (int)item.Rarity);
+    }
+
+    private List<ItemData> Bag(PlayerFighter p)
+    {
+        if (!_bags.TryGetValue(p, out List<ItemData>? bag)) _bags[p] = bag = new List<ItemData>();
+        return bag;
+    }
+
+    public int BagCount(PlayerFighter p) => _bags.TryGetValue(p, out List<ItemData>? bag) ? bag.Count : 0;
+
+    /// <summary>
+    /// Stage cleared: anything still on the floor flies to the nearest player,
+    /// then every bag is banked to its character. Empty slots are filled, and an
+    /// item that scores better than what is worn is put on.
+    /// </summary>
+    private void BankLoot()
+    {
+        foreach (LootDrop drop in _drops.ToArray())
+        {
+            if (!IsInstanceValid(drop)) continue;
+            PlayerFighter? nearest = null;
+            float best = float.MaxValue;
+            foreach (PlayerFighter p in _players)
+            {
+                float d = p.GlobalPosition.DistanceTo(drop.GlobalPosition);
+                if (d < best) { best = d; nearest = p; }
+            }
+            if (nearest is null) continue;
+            Bag(nearest).Add(drop.Item);
+            _swept.Add(drop.Item.Id);
+            drop.SendTo(nearest);
+        }
+
+        foreach (PlayerFighter p in _players)
+        {
+            if (p.Record is not CharacterRecord r) continue;
+            List<ItemData> bag = Bag(p);
+            if (bag.Count == 0) continue;
+            foreach (ItemData item in bag)
+            {
+                r.Stash.Add(item);
+                ItemData? worn = r.EquippedIn(item.Slot);
+                if (worn is null || Loot.Score(item) > Loot.Score(worn)) r.Equip(item.Slot, item);
+            }
+            _itemsBanked += bag.Count;
+            p.ApplyProgression(r);
+            PopText.Spawn(this, p.GlobalPosition + new Vector3(0f, p.BodyHeight + 0.6f, 0f),
+                          $"LOOT BANKED x{bag.Count}", new Color(1f, 0.85f, 0.3f), 1.1f, 1.2f);
+            GD.Print($"{r.Name} banked {bag.Count} item(s); wearing {r.Equipped.Count}, stash {r.Stash.Count}.");
+            bag.Clear();
+        }
+        SaveSystem.Save();
+    }
+
+    /// <summary>Stage failed: XP stays, the bag is lost (ADR 0006).</summary>
+    private void LoseLoot()
+    {
+        foreach (PlayerFighter p in _players)
+        {
+            int lost = BagCount(p);
+            Bag(p).Clear();
+            if (lost == 0) continue;
+            PopText.Spawn(this, p.GlobalPosition + new Vector3(0f, p.BodyHeight + 0.6f, 0f),
+                          $"LOOT LOST x{lost}", new Color(0.7f, 0.7f, 0.75f), 1.0f, 1.0f);
+            GD.Print($"{p.DisplayName} lost {lost} item(s) with the stage.");
+        }
+        foreach (LootDrop drop in _drops)
+            if (IsInstanceValid(drop)) drop.QueueFree();
+        _drops.Clear();
         SaveSystem.Save();
     }
 
@@ -445,6 +599,8 @@ public partial class GameRoot : Node3D
         // Wall bounces arrive with no attacker and extend whatever is running.
         bool byPlayer = attacker is null ? victim.Hostile && _comboHits > 0 : !attacker.Hostile;
         if (!byPlayer) return;
+        // Big hits lean the camera in: finishers and crits, harder for the biggest.
+        if (amount >= 20f) CameraShake.RequestPunch(this, Mathf.Min(1f, amount / 45f));
         _comboHits++;
         _comboExpires = GameClock.Seconds + ComboLull;
         // The crowd loves a long combo.
@@ -473,7 +629,7 @@ public partial class GameRoot : Node3D
         _hud.Visible = false;
         _banner.Visible = false;
         _clownHud = new ClownSquad.UI.ClownHud(() => _players, () => _director,
-            () => _endedAt >= 0 && GameClock.Seconds - _endedAt > 1.5);
+            () => _endedAt >= 0 && GameClock.Seconds - _endedAt > 1.5) { BagCount = BagCount };
         AddChild(_clownHud);
 
         _tent = new StatTent(() => _players);
@@ -602,11 +758,19 @@ public partial class GameRoot : Node3D
     {
         Engine.TimeScale = 4.0;
         GD.Print($"=== WAVE PROBE: expecting {_outcomeProbe} ===");
-        if (_outcomeProbe != "win") return;
+        if (_outcomeProbe != "win")
+        {
+            // A loss must cost the bag: start the losing run already carrying an item.
+            Bag(_players[0]).Add(Loot.Roll(_lootRng, 1, 0f));
+            return;
+        }
 
         PlayerFighter p = _players[0];
         p.Source = new BrawlerAi(p, attackRange: 1.7f, backoffRange: 0.8f, attackCooldownMs: 350);
         p.ExtraDamageMultiplier = 2.5f;
+        // Every grunt ranked Rare, so the run is certain to drop loot and to
+        // exercise the ranked-enemy path.
+        _director!.ForceRank = EnemyRank.Rare;
     }
 
     /// <summary>
@@ -636,6 +800,22 @@ public partial class GameRoot : Node3D
         return levelled && applied && persisted;
     }
 
+    /// <summary>
+    /// After a won stage: drops fell, everything was banked, the bank survived
+    /// a save and reload, and enemies were scaled to the host.
+    /// </summary>
+    private bool CheckLoot()
+    {
+        CharacterRecord r = SaveSystem.Data.Characters[0];
+        int owned = r.Stash.Count + r.Equipped.Count;
+        bool dropped = _dropsSpawned > 0;
+        bool banked = _itemsBanked == _dropsSpawned && owned == _itemsBanked;
+        bool worn = r.Equipped.Count > 0;
+        GD.Print($"  loot: {_dropsSpawned} dropped, {_itemsBanked} banked, {owned} owned after reload, {r.Equipped.Count} worn; " +
+                 $"dropped={dropped} banked={banked} worn={worn}");
+        return dropped && banked && worn;
+    }
+
     private void TickOutcomeProbe()
     {
         WaveDirector d = _director!;
@@ -661,9 +841,13 @@ public partial class GameRoot : Node3D
         GD.Print($"  sound banks loaded: {ClownSquad.Audio.Sfx.BankCount}; played: {string.Join(" ", heard)}");
         GD.Print($"  sound names with no file: {(ClownSquad.Audio.Sfx.Missing.Count == 0 ? "none" : string.Join(" ", ClownSquad.Audio.Sfx.Missing))}");
         ok &= ClownSquad.Audio.Sfx.Missing.Count == 0;
-        if (_outcomeProbe == "win") ok &= CheckProgression();
+        if (_outcomeProbe == "win") ok &= CheckProgression() & CheckLoot();
         if (_outcomeProbe == "lose")
         {
+            CharacterRecord r = _players[0].Record!;
+            bool lost = BagCount(_players[0]) == 0 && r.Stash.Count == 0 && r.Equipped.Count == 0;
+            GD.Print($"  loot on a loss: bag {BagCount(_players[0])}, stash {r.Stash.Count}, worn {r.Equipped.Count} -> lost={lost}");
+            ok &= lost;
             GD.Print($"  player blinked while lying dead: {_sawDeadBlink}");
             ok &= _sawDeadBlink;
         }

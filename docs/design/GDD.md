@@ -209,6 +209,7 @@ Affixes should be tagged so they can be restricted by item type, class, or level
   Built 2026-10-14; see STATUS for the numbers
 - **Enemies scale to the host/primary player's level**, so co-op partners of
   different levels can play together
+- Built 2026-10-14: enemies scale to the host (player one); see STATUS.
 - **Open:** does a level-5 player joining a level-40 host get flattened? Options:
   scale to the *average*, scale to the *highest*, or scale enemies per-player.
   Each has a different feel and a different implementation cost.

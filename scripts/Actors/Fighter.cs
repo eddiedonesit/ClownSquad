@@ -394,6 +394,7 @@ public partial class Fighter : CharacterBody3D
         if (!CanBeHit()) return;
 
         Health = Mathf.Max(0f, Health - info.Amount);
+        if (info.Source is Fighter by) LastAttacker = by;
         HitstopRemaining = info.Hitstop;
         _hitAnimRemaining = 0.22f;
         Visual?.Flash();
@@ -506,4 +507,14 @@ public partial class Fighter : CharacterBody3D
     }
 
     public void Heal(float amount) => Health = Mathf.Min(MaxHealth, Health + amount);
+
+    /// <summary>Multiply maximum health and refill to it. For scaling a fighter that has just spawned.</summary>
+    public void ScaleHealth(float factor)
+    {
+        MaxHealth *= factor;
+        Health = MaxHealth;
+    }
+
+    /// <summary>Who landed the most recent hit, for crediting a knockout.</summary>
+    public Fighter? LastAttacker { get; private set; }
 }

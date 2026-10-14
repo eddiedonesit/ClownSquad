@@ -492,6 +492,51 @@ def main():
     write_prop("prop_tub", prop_tub())
     write_prop("prop_crates", prop_crates())
     write_prop("prop_cannon", prop_cannon())
+    loot_icons()
+
+
+
+# ---------------------------------------------------------------- loot icons
+# What a drop looks like lying in the sawdust: one icon per slot, side by side
+# in a single sheet in ItemSlot order (Mallet, Hat, Ruff, Shoes).
+
+def loot_icons():
+    S = 64
+    sheets = []
+    def icon(kind):
+        c = HDCanvas(S, S)
+        if kind == "mallet":
+            c.part()
+            c.capsule(14, 52, 40, 22, 3, 3, WOOD)
+            c.part()
+            c.capsule(30, 12, 52, 34, 11, 11, RED)
+            c.part()
+            c.ellipse(52, 34, 8, 8, YEL)
+        elif kind == "hat":
+            c.part()
+            c.poly([(14, 50), (50, 50), (30, 8)], RED)
+            c.recolor(lambda x, y, m: YEL if int((x + y * 0.7) / 6) % 3 == 0 else m)
+            c.part()
+            c.ellipse(32, 50, 20, 5, YEL)
+            c.part()
+            c.ellipse(30, 8, 5, 5, WHT)
+        elif kind == "ruff":
+            for i, x in enumerate(range(10, 56, 9)):
+                c.part()
+                c.ellipse(x, 34 + abs(x - 32) * 0.12, 7, 9, WHT if i % 2 == 0 else YEL)
+        else:
+            c.part()
+            c.ellipse(28, 44, 20, 9, RED)
+            c.ellipse(44, 42, 13, 11, RED)
+            c.recolor(lambda x, y, m: WOOD_D if y > 50 else m)
+            c.part()
+            c.ellipse(26, 33, 6, 3, WHT)
+        return c
+    for k in ("mallet", "hat", "ruff", "shoes"):
+        sheets.append(shade(icon(k), PROP_MATS))
+    write_png(os.path.join(OUT, "loot_icons.png"), S * 4, S, to_rows(sheets, S, S))
+    print("wrote {}/loot_icons.png  4 icons".format(OUT))
+
 
 
 if __name__ == "__main__":

@@ -1,6 +1,7 @@
 namespace ClownSquad.Progression;
 
 using System;
+using System.Collections.Generic;
 
 /// <summary>The four stats a level-up's points go into.</summary>
 public enum Stat { Pow, Guts, Zip, Luck }
@@ -26,6 +27,31 @@ public sealed class CharacterRecord
     public int Guts { get; set; }
     public int Zip { get; set; }
     public int Luck { get; set; }
+
+    /// <summary>What is worn, at most one item per slot.</summary>
+    public List<ItemData> Equipped { get; set; } = new();
+    /// <summary>Everything else banked from cleared stages.</summary>
+    public List<ItemData> Stash { get; set; } = new();
+
+    public ItemData? EquippedIn(ItemSlot slot) => Equipped.Find(i => i.Slot == slot);
+
+    /// <summary>Wear an item from the stash (or nothing), returning whatever it replaces to the stash.</summary>
+    public void Equip(ItemSlot slot, ItemData? item)
+    {
+        ItemData? old = EquippedIn(slot);
+        if (old is not null) { Equipped.Remove(old); Stash.Add(old); }
+        if (item is null) return;
+        Stash.Remove(item);
+        Equipped.Add(item);
+    }
+
+    /// <summary>Total of one affix across everything worn.</summary>
+    public float Gear(AffixKind kind)
+    {
+        float total = 0f;
+        foreach (ItemData i in Equipped) total += i.Sum(kind);
+        return total;
+    }
 
     public int Get(Stat s) => s switch
     {
@@ -58,7 +84,7 @@ public static class Leveling
     public const int StatPointsPerLevel = 3;
     public const int SkillPointsPerLevel = 1;
 
-    public const float CritMultiplier = 1.75f;
+    private const float BaseCritMultiplier = 1.75f;
 
     // Per point. Zip and Luck are capped so neither can be stacked into nonsense.
     private const float HealthPerGuts = 8f;
@@ -93,14 +119,47 @@ public static class Leveling
         return gained;
     }
 
+    // Each stat is points and gear together; caps apply to the total.
     public static float MaxHealth(CharacterRecord r) =>
-        100f + HealthPerGuts * r.Guts + HealthPerLevel * (r.Level - 1);
+        100f + HealthPerGuts * r.Guts + HealthPerLevel * (r.Level - 1) + r.Gear(AffixKind.Health);
 
-    public static float DamageMultiplier(CharacterRecord r) => 1f + DamagePerPow * r.Pow;
+    public static float DamageMultiplier(CharacterRecord r) => 1f + DamagePerPow * r.Pow + r.Gear(AffixKind.Damage) / 100f;
 
-    public static float SpeedMultiplier(CharacterRecord r) => 1f + Math.Min(SpeedPerZip * r.Zip, MaxSpeedBonus);
+    public static float SpeedMultiplier(CharacterRecord r) =>
+        1f + Math.Min(SpeedPerZip * r.Zip + r.Gear(AffixKind.Speed) / 100f, MaxSpeedBonus);
 
-    public static float CritChance(CharacterRecord r) => Math.Min(BaseCrit + CritPerLuck * r.Luck, MaxCrit);
+    public static float CritChance(CharacterRecord r) =>
+        Math.Min(BaseCrit + CritPerLuck * r.Luck + r.Gear(AffixKind.Crit) / 100f, MaxCrit);
+
+    public static float CritMultiplier(CharacterRecord r) => BaseCritMultiplier + r.Gear(AffixKind.CritDamage) / 100f;
+
+    public static float XpMultiplier(CharacterRecord r) => 1f + r.Gear(AffixKind.XpGain) / 100f;
+
+    public static float LifeOnKill(CharacterRecord r) => r.Gear(AffixKind.LifeOnKill);
+
+    /// <summary>Damage of the finisher's explosion; zero without a KABOOM item.</summary>
+    public static float Kaboom(CharacterRecord r) => r.Gear(AffixKind.Kaboom);
+
+    public static float LaunchMultiplier(CharacterRecord r) => 1f + r.Gear(AffixKind.Bouncy) / 100f;
+
+    /// <summary>How far drop rarity leans toward the good end: LUCK and FORTUNE items.</summary>
+    public static float LootBoost(CharacterRecord r) => r.Luck * 0.03f + r.Gear(AffixKind.Lucky) / 100f;
+
+    // ---- enemies (GDD 3 and 7): scaled to the host's level, then by rank ----
+
+    public static float EnemyHealthScale(int level) => 1f + 0.12f * (level - 1);
+    public static float EnemyDamageScale(int level) => 1f + 0.08f * (level - 1);
+    public static float EnemyXpScale(int level) => 1f + 0.15f * (level - 1);
+
+    public static float RankStats(EnemyRank r) => r switch
+    {
+        EnemyRank.Rare => 1.6f, EnemyRank.Epic => 2.5f, EnemyRank.Legendary => 5f, _ => 1f,
+    };
+
+    public static float RankXp(EnemyRank r) => r switch
+    {
+        EnemyRank.Rare => 2.5f, EnemyRank.Epic => 5f, EnemyRank.Legendary => 15f, _ => 1f,
+    };
 
     /// <summary>Name, one-line pitch, and the current effect, for the stat menu.</summary>
     public static (string name, string blurb, string effect) Describe(Stat s, CharacterRecord r) => s switch

@@ -70,6 +70,16 @@ public partial class MalletProjectile : Node3D
         }
         AddChild(_sprite);
         _sprite.Play("mallet_spin");
+
+        // It carries its own light, so a throw sweeps a warm glow across
+        // everyone it passes.
+        AddChild(new OmniLight3D
+        {
+            LightColor = new Color(1f, 0.6f, 0.4f),
+            LightEnergy = 1.8f,
+            OmniRange = 2.2f,
+            Position = new Vector3(0f, FlightHeight, 0.35f),
+        });
     }
 
     public override void _PhysicsProcess(double delta)

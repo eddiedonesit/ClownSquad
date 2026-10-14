@@ -3,8 +3,11 @@ namespace ClownSquad.Visuals;
 using Godot;
 
 /// <summary>
-/// Positional camera shake. Attach to a Camera3D; it stores the rest position
-/// and offsets from it, so the camera framing is never permanently disturbed.
+/// Positional camera shake, and the punch-in: a quick narrowing of the field of
+/// view on a big hit that springs back, which reads as the camera leaning in.
+/// Attach to a Camera3D; it stores the rest position and field of view and
+/// offsets from them, so the framing is never permanently disturbed (and the
+/// arena walls, which are derived from the rest framing, stay put).
 /// </summary>
 public partial class CameraShake : Node
 {
@@ -16,12 +19,17 @@ public partial class CameraShake : Node
     private float _remaining;
     private float _duration;
     private readonly RandomNumberGenerator _rng = new();
+    private float _restFov;
+    private float _punch;
+    private const float PunchDegrees = 2.6f;
+    private const float PunchDecay = 5.5f;
 
     public override void _Ready()
     {
         AddToGroup(Group);
         _camera = GetParent<Camera3D>();
         _rest = _camera.Position;
+        _restFov = _camera.Fov;
         _rng.Randomize();
     }
 
@@ -30,6 +38,13 @@ public partial class CameraShake : Node
     {
         if (from.GetTree()?.GetFirstNodeInGroup(Group) is CameraShake s)
             s.Shake(amplitude, duration);
+    }
+
+    /// <summary>Lean the camera in for a big hit; strength about 0.5 for a finisher, 1 for a knockout.</summary>
+    public static void RequestPunch(Node from, float strength)
+    {
+        if (from.GetTree()?.GetFirstNodeInGroup(Group) is CameraShake s)
+            s._punch = Mathf.Max(s._punch, Mathf.Clamp(strength, 0f, 1.5f));
     }
 
     public void Shake(float amplitude, float duration)
@@ -44,6 +59,16 @@ public partial class CameraShake : Node
 
     public override void _Process(double delta)
     {
+        if (_punch > 0f)
+        {
+            _punch = Mathf.Max(0f, _punch - PunchDecay * (float)delta * Mathf.Max(_punch, 0.25f));
+            _camera.Fov = _restFov - PunchDegrees * _punch;
+        }
+        else if (_camera is not null && _camera.Fov != _restFov)
+        {
+            _camera.Fov = _restFov;
+        }
+
         if (_remaining <= 0f)
         {
             if (_camera is not null && _camera.Position != _rest) _camera.Position = _rest;

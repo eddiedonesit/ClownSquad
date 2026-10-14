@@ -23,10 +23,16 @@ public sealed class SaveData
 /// </summary>
 public static class SaveSystem
 {
-    public const int CurrentVersion = 1;
+    // 2: gear (Equipped, Stash). Version 1 files load as-is, with no gear.
+    public const int CurrentVersion = 2;
     public const string DefaultPath = "user://clownsquad_save.json";
 
-    private static readonly JsonSerializerOptions Json = new() { WriteIndented = true };
+    // Enums are written by name, so the file is readable and survives reordering.
+    private static readonly JsonSerializerOptions Json = new()
+    {
+        WriteIndented = true,
+        Converters = { new System.Text.Json.Serialization.JsonStringEnumConverter() },
+    };
 
     /// <summary>Where saves go. Tests point this elsewhere so they never touch a real save.</summary>
     public static string Path { get; set; } = DefaultPath;

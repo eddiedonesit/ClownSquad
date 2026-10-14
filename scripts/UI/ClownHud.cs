@@ -39,6 +39,7 @@ public partial class ClownHud : CanvasLayer
     private Font _font = null!;
     private readonly List<(Control root, CandyBar bar, Label name)> _panels = new();
     private readonly List<(Label level, ColorRect xp, Label points)> _progress = new();
+    private readonly List<Label> _bags = new();
     private readonly int[] _levelShown = new int[4];
     private Control _target = null!;
     private CandyBar _targetBar = null!;
@@ -68,6 +69,9 @@ public partial class ClownHud : CanvasLayer
     private bool _f1Down;
 
     public int Combo { get; set; }
+
+    /// <summary>Items each player is carrying this stage, banked on a clear.</summary>
+    public Func<PlayerFighter, int>? BagCount { get; set; }
 
     public ClownHud(Func<IReadOnlyList<PlayerFighter>> players, Func<WaveDirector?> director, Func<bool> canReplay)
     {
@@ -182,6 +186,15 @@ public partial class ClownHud : CanvasLayer
         points.AddThemeStyleboxOverride("normal", Plate(new Color(0.18f, 0.12f, 0.28f, 0.92f), new Color(1f, 0.85f, 0.3f, 0.8f), 8, 2));
         root.AddChild(points);
         _progress.Add((level, xp, points));
+        var bag = new Label
+        {
+            Position = new Vector2(186, 64), Size = new Vector2(70, 20),
+            HorizontalAlignment = HorizontalAlignment.Right,
+            LabelSettings = Style(13, new Color(0.6f, 1f, 0.7f), 4),
+            Visible = false,
+        };
+        root.AddChild(bag);
+        _bags.Add(bag);
         return (root, bar, name);
     }
 
@@ -361,7 +374,10 @@ public partial class ClownHud : CanvasLayer
                 int need = Leveling.XpToNext(r.Level);
                 xp.Size = new Vector2(need > 0 ? 180f * r.Xp / need : 180f, 4f);
                 points.Visible = r.StatPoints > 0;
-                points.Text = $"+{r.StatPoints} POINTS!  TAB / SELECT";
+                points.Text = $"+{r.StatPoints} PTS  TAB";
+                int carried = BagCount?.Invoke(p) ?? 0;
+                _bags[i].Visible = carried > 0;
+                _bags[i].Text = $"LOOT {carried}";
                 points.Modulate = new Color(1f, 1f, 1f, 0.65f + 0.35f * Mathf.Sin((float)_clock * 6f));
             }
         }
