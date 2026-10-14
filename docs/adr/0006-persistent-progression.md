@@ -1,6 +1,6 @@
 # 6. Persistent characters, level-based progression
 
-- **Status:** Accepted (direction); save format not yet designed
+- **Status:** Accepted; save format version 1 implemented 2026-10-14
 - **Date:** 2026-10-14
 
 ## Context
@@ -33,7 +33,20 @@ move forward, so a loss is never wasted time; gear only arrives on a clear,
 so every stage still has something at stake. Loot picked up mid-stage is
 held provisionally and banked to the character on the stage-clear screen.
 
-## Open, needed before the save system
+## Save format (version 1)
+
+One JSON file, `user://clownsquad_save.json`, holding `Version` and a list of
+`Characters`, one per player slot by index. A character is `Name`, `Level`,
+`Xp` (toward the next level), `TotalXp`, `StatPoints`, `SkillPoints`, and the
+four stats `Pow`, `Guts`, `Zip`, `Luck`. Writes go to a temporary file that
+then replaces the save, so a crash cannot leave half a file; a save that fails
+to parse, or comes from a newer build, is renamed aside and a fresh one started.
+Later versions migrate older files on load rather than refusing them.
+
+Gear, skills and captures are not in version 1; they arrive with their systems.
+
+## Open
+
 
 - Slots per player, and whether a co-op guest brings their own character.
 - Whether gear rolls happen on the host only (ADR 0003 says yes for fairness).

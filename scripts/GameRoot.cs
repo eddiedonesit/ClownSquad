@@ -7,6 +7,9 @@ using Godot;
 using ClownSquad.Actors;
 using ClownSquad.Combat;
 using ClownSquad.Input;
+using ClownSquad.Progression;
+using ClownSquad.UI;
+using ClownSquad.Visuals;
 using ClownSquad.World;
 
 /// <summary>
@@ -44,6 +47,15 @@ public partial class GameRoot : Node3D
     private float _joinCooldown;
     private double _endedAt = -1;
 
+    private StatTent? _tent;
+    private bool _tentHeld;
+    private double _tentDueAt = -1;
+    private bool _restartHeld = true;
+
+    // XP per enemy, paid to every player. Starting numbers, not balance.
+    private const int GruntXp = 15;
+    private const int BossXp = 150;
+
     private bool _aiProbe;
     private string _outcomeProbe = "";   // "win" or "lose" when a wave probe is running
 
@@ -53,6 +65,19 @@ public partial class GameRoot : Node3D
     {
         string[] args = OS.GetCmdlineUserArgs();
         bool Has(string flag) => Array.IndexOf(args, flag) >= 0;
+
+        // Tests run against a throwaway save, so they never read or touch a real one.
+        bool probe = Has("animtest") || Has("movetest") || Has("aitest") || Has("wavetest") || Has("losetest") || Has("tentshot");
+        if (probe)
+        {
+            SaveSystem.Path = "user://probe_save.json";
+            SaveSystem.DeleteForTests();
+        }
+        else
+        {
+            SaveSystem.Path = SaveSystem.DefaultPath;
+            SaveSystem.Load();
+        }
 
         GameClock.Reset();
         AttackTokens.Reset();
@@ -93,13 +118,36 @@ public partial class GameRoot : Node3D
         _director = new WaveDirector();
         AddChild(_director);
         _director.PhaseChanged += OnPhaseChanged;
+        _director.EnemyDefeated += OnEnemyDefeated;
         _director.Begin(this);
 
         if (_outcomeProbe.Length > 0) StartOutcomeProbe();
+        if (Has("tentshot")) StartTentShot();
+    }
+
+    /// <summary>"-- tentshot": a levelled character, a HUD still, then the Stat Tent open. Needs a window.</summary>
+    private void StartTentShot()
+    {
+        PlayerFighter p = _players[0];
+        Leveling.Grant(p.Record!, 200);
+        p.ApplyProgression(p.Record!);
+        SceneTreeTimer first = GetTree().CreateTimer(3.0, processAlways: true);
+        first.Timeout += () =>
+        {
+            GetViewport().GetTexture().GetImage().SavePng("C:/Claude/ClownSquad/debug/hud_level.png");
+            _tent!.Open();
+            GetTree().CreateTimer(0.6, processAlways: true).Timeout += () =>
+            {
+                GetViewport().GetTexture().GetImage().SavePng("C:/Claude/ClownSquad/debug/stat_tent.png");
+                GetTree().Quit();
+            };
+        };
     }
 
     public override void _ExitTree()
     {
+        // Leaving the scene (quit, or replaying the stage) always saves.
+        SaveSystem.Save();
         Fighter.HitLanded -= OnHitLanded;
         Arena.Current = null;
     }
@@ -177,6 +225,10 @@ public partial class GameRoot : Node3D
             PlayerIndex = index,
             DisplayName = new[] { "PIP", "POPPY", "BINGO", "DOT" }[index % 4],
         };
+        // Each player slot plays its saved character, created on first use.
+        CharacterRecord record = SaveSystem.CharacterFor(index, p.DisplayName);
+        p.DisplayName = record.Name;
+        p.ApplyProgression(record);
         AddChild(p);
         Vector3 home = new(-1.5f + index * 1.5f, 0f, 1.5f);
         p.GlobalPosition = home;
@@ -252,8 +304,61 @@ public partial class GameRoot : Node3D
     {
         WaveDirector d = _director!;
         GD.Print($"[{GameClock.Seconds:F1}s] phase={phase} wave={d.WaveNumber}/{d.WaveCount} lives={d.Lives}");
+        if (phase == WaveDirector.Phase.Intermission) SaveSystem.Save();
         if (phase is WaveDirector.Phase.Victory or WaveDirector.Phase.Defeat)
+        {
             _endedAt = GameClock.Seconds;
+            // Win or lose, XP is kept (ADR 0006). Anyone with points to spend
+            // is shown the Stat Tent once the ending has had a moment.
+            SaveSystem.Save();
+            foreach (PlayerFighter p in _players)
+                if (p.Record is { StatPoints: > 0 }) _tentDueAt = GameClock.Seconds + 2.0;
+        }
+    }
+
+    // --------------------------------------------------------- progression
+
+    /// <summary>
+    /// Every player earns the full XP for every enemy, fallen players included:
+    /// no kill stealing in co-op, and nobody is left behind for dying.
+    /// </summary>
+    private void OnEnemyDefeated(Fighter enemy)
+    {
+        bool boss = enemy is BossClown;
+        int xp = boss ? BossXp : GruntXp;
+        PopText.Spawn(this, enemy.GlobalPosition + new Vector3(0f, enemy.BodyHeight + 0.2f, 0f),
+                      $"+{xp} XP", new Color(1f, 0.85f, 0.3f), boss ? 1.3f : 0.8f);
+
+        foreach (PlayerFighter p in _players)
+        {
+            if (p.Record is not CharacterRecord r) continue;
+            if (Leveling.Grant(r, xp) == 0) continue;
+
+            // A level-up is a full heal: the classic reward for surviving.
+            p.ApplyProgression(r);
+            if (!p.IsDead) p.Heal(p.MaxHealth);
+            PopText.Spawn(this, p.GlobalPosition + new Vector3(0f, p.BodyHeight + 0.35f, 0f),
+                          "LEVEL UP!", new Color(0.5f, 0.9f, 1f), 1.2f, 1.3f);
+            ClownSquad.Audio.Sfx.Play("level_up");
+            GD.Print($"{r.Name} reached level {r.Level} ({r.StatPoints} stat point(s) to spend).");
+        }
+        SaveSystem.Save();
+    }
+
+    /// <summary>Tab or Back/Select opens the Stat Tent at any time; it also opens itself after a stage.</summary>
+    private void PollStatTent()
+    {
+        if (_tent is null || _tent.IsOpen || _outcomeProbe.Length > 0) return;
+
+        bool held = false;
+        foreach (PlayerFighter p in _players)
+            if (p.Source is LocalDeviceInput d && MenuPad.OpenHeld(d.Device)) held = true;
+        bool pressed = held && !_tentHeld;
+        _tentHeld = held;
+
+        bool due = _tentDueAt >= 0 && GameClock.Seconds >= _tentDueAt;
+        if (due) _tentDueAt = -1;
+        if (pressed || due) _tent.Open();
     }
 
     /// <summary>Once the fight is over, any attack or start press plays it again.</summary>
@@ -265,7 +370,12 @@ public partial class GameRoot : Node3D
         foreach (int pad in Godot.Input.GetConnectedJoypads())
             pressed |= Godot.Input.IsJoyButtonPressed(pad, JoyButton.X)
                     || Godot.Input.IsJoyButtonPressed(pad, JoyButton.Start);
-        if (pressed) GetTree().ReloadCurrentScene();
+        // A fresh press only, and not straight out of the Stat Tent, whose
+        // buttons overlap: the press that spent a point must not restart.
+        bool fresh = pressed && !_restartHeld;
+        _restartHeld = pressed;
+        if (_tent is not null && (_tent.IsOpen || _tent.MsSinceClosed < 400 || _tentDueAt >= 0)) return;
+        if (fresh) GetTree().ReloadCurrentScene();
     }
 
     // Combo counter: consecutive hits by players, reset after a short lull.
@@ -306,6 +416,9 @@ public partial class GameRoot : Node3D
         _clownHud = new ClownSquad.UI.ClownHud(() => _players, () => _director,
             () => _endedAt >= 0 && GameClock.Seconds - _endedAt > 1.5);
         AddChild(_clownHud);
+
+        _tent = new StatTent(() => _players);
+        AddChild(_tent);
     }
 
     private static Label MakeLabel(int size, int outline)
@@ -376,6 +489,7 @@ public partial class GameRoot : Node3D
         if (_hud is null) return;   // probe modes that build no HUD
 
         PollForJoins((float)delta);
+        PollStatTent();
         PollForRestart();
         UpdateHud();
     }
@@ -385,6 +499,7 @@ public partial class GameRoot : Node3D
     private float _aiProbeTime;
     private int _aiProbeTick;
     private bool _hangShot;
+    private bool _punchShot;
 
     /// <summary>Boss AI closes distance, swings and slams. "-- aitest"</summary>
     private void TickAiProbe(float dt)
@@ -402,6 +517,12 @@ public partial class GameRoot : Node3D
         {
             _hangShot = true;
             GetViewport().GetTexture().GetImage().SavePng("C:/Claude/ClownSquad/debug/flop_hang.png");
+        }
+
+        if (b.DebugState.StartsWith("ATK") && !_punchShot && !DisplayServer.GetName().Contains("headless"))
+        {
+            _punchShot = true;
+            GetViewport().GetTexture().GetImage().SavePng("C:/Claude/ClownSquad/debug/boss_punch.png");
         }
 
         if (++_aiProbeTick > 26)
@@ -426,7 +547,34 @@ public partial class GameRoot : Node3D
 
         PlayerFighter p = _players[0];
         p.Source = new BrawlerAi(p, attackRange: 1.7f, backoffRange: 0.8f, attackCooldownMs: 350);
-        p.DamageMultiplier = 2.5f;
+        p.ExtraDamageMultiplier = 2.5f;
+    }
+
+    /// <summary>
+    /// After a won stage: the player has levelled, a spent point changes the
+    /// fighter, and what was saved reads back from disk identical.
+    /// </summary>
+    private bool CheckProgression()
+    {
+        PlayerFighter p = _players[0];
+        CharacterRecord r = p.Record!;
+        bool levelled = r.Level >= 2 && r.StatPoints >= Leveling.StatPointsPerLevel;
+
+        float before = p.MaxHealth;
+        r.StatPoints--;
+        r.Guts++;
+        p.ApplyProgression(r);
+        bool applied = Mathf.IsEqualApprox(p.MaxHealth, before + 8f);
+
+        bool wrote = SaveSystem.Save();
+        SaveSystem.Load();
+        CharacterRecord back = SaveSystem.Data.Characters[0];
+        bool persisted = wrote && back.Name == r.Name && back.Level == r.Level && back.Xp == r.Xp
+                      && back.TotalXp == r.TotalXp && back.StatPoints == r.StatPoints && back.Guts == r.Guts;
+
+        GD.Print($"  progression: {r.Name} level {r.Level}, {r.TotalXp} xp total, {r.StatPoints} point(s) unspent; " +
+                 $"levelled={levelled} guts point applied={applied} ({before:F0} -> {p.MaxHealth:F0} hp) reloaded from disk={persisted}");
+        return levelled && applied && persisted;
     }
 
     private void TickOutcomeProbe()
@@ -454,6 +602,7 @@ public partial class GameRoot : Node3D
         GD.Print($"  sound banks loaded: {ClownSquad.Audio.Sfx.BankCount}; played: {string.Join(" ", heard)}");
         GD.Print($"  sound names with no file: {(ClownSquad.Audio.Sfx.Missing.Count == 0 ? "none" : string.Join(" ", ClownSquad.Audio.Sfx.Missing))}");
         ok &= ClownSquad.Audio.Sfx.Missing.Count == 0;
+        if (_outcomeProbe == "win") ok &= CheckProgression();
         if (_outcomeProbe == "lose")
         {
             GD.Print($"  player blinked while lying dead: {_sawDeadBlink}");

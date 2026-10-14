@@ -22,6 +22,9 @@ public sealed class LocalDeviceInput : IInputSource
 
     public LocalDeviceInput(int device) => _device = device;
 
+    /// <summary>The device this reads, so menus can poll the same one.</summary>
+    public int Device => _device;
+
     public string Describe() => _device == Keyboard ? "Keyboard" : $"Gamepad {_device}";
 
     public InputCommand Poll()

@@ -353,6 +353,32 @@ place(vic, cymbal(0.9), 0.82, 0.4)
 place(vic, kazoo(392, 523, 0.5), 0.82, 0.18)
 write("victory", vic)
 
+# ------------------------------------------------------------ progression
+
+# Level up: a fast calliope run up the arpeggio, a bell on top, a kazoo cheer.
+lvl = silence(1.4)
+for i, n in enumerate(("C5", "E5", "G5", "C6", "E6")):
+    place(lvl, organ(n, 0.09), i * 0.065)
+place(lvl, organ("G6", 0.5, 0.7), 0.33)
+place(lvl, organ("C6", 0.5, 0.45), 0.33)
+place(lvl, bell(2093, 1.0), 0.33, 0.5)
+place(lvl, kazoo(523, 784, 0.35), 0.36, 0.22)
+place(lvl, cymbal(0.8), 0.33, 0.25)
+write("level_up", lvl)
+
+# Crit: a harder bonk with a bright ting riding on it.
+crit = silence(0.5)
+place(crit, bonk(1.25), 0, 0.8)
+place(crit, bell(2637, 0.45), 0.01, 0.45)
+write("crit", crit)
+
+# Menus: a soft calliope tick to move, a coin-ish double ting to spend.
+write("blip", organ("G5", 0.05, 0.6))
+coin = silence(0.35)
+place(coin, bell(1976, 0.3), 0, 0.7)
+place(coin, bell(2637, 0.3), 0.06, 0.8)
+write("coin", coin)
+
 # --------------------------------------------------------------- music
 
 def march():

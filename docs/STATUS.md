@@ -1,6 +1,6 @@
 # Status — what is actually built
 
-Updated 2026-10-13. The [GDD](design/GDD.md) describes the intended game; this
+Updated 2026-10-14. The [GDD](design/GDD.md) describes the intended game; this
 records what exists in the repository today.
 
 ## Running it
@@ -28,8 +28,8 @@ C:/Tools/Godot/4.7.2/Godot_v4.7.2-stable_mono_win64_console.exe --headless --pat
 bash tools/refresh_sprites.sh
 ```
 
-Controls: **WASD** move, **J** attack, **Space** jump, **K/Shift** dodge. Hold attack to charge.
-Gamepad: stick, **X** attack, **A** jump, **B/RB** dodge. Keyboard plays
+Controls: **WASD** move, **J** attack, **Space** jump, **K/Shift** dodge, **Tab** Stat Tent. Hold attack to charge.
+Gamepad: stick, **X** attack, **A** jump, **B/RB** dodge, **Back/Select** Stat Tent. Keyboard plays
 immediately; pads join by pressing a button.
 
 ## Built
@@ -47,6 +47,10 @@ immediately; pads join by pressing a button.
 | Grunt | Weak, bare-handed, launchable enemy with its own recoloured sheet |
 | Death | Killing blow lifts the body; it lies in a floored pose, blinks and is removed |
 | Enemy AI | Turn-taking by attack token, waiting ring, crowd spacing, depth line-up; timed on game time |
+| Saving | One JSON save in the Godot user folder (`user://clownsquad_save.json`), written atomically; an unreadable save is set aside, never overwritten. Saved on every kill, wave clear, stage end, Stat Tent close and quit. Tests use a separate throwaway save |
+| Levelling | XP from every enemy to every player (grunt 15, boss 150); curve 40 x level^1.35 to a cap of 50; each level gives 3 stat points, 1 banked skill point, and a full heal. Failing a stage keeps XP |
+| Stats | POW +4% damage, GUTS +8 max health, ZIP +2% speed (cap +40%), LUCK +1.5% crit chance (base 3%, cap 50%, crits x1.75). Spent in the Stat Tent: one card per player on their own controller, game paused, undo until closed; opens on Tab / Back and after a stage |
+| Bertie's fists | No arms: two gloves float beside him and fly at the target on each punch (jab, cross, both for the finisher); hands up and waving through the belly-flop hang |
 | Feel helpers | Lane assist, dodge-cancel from recovery, hit sparks, combo counter, attack tokens |
 | Dodge | Ground slide with i-frames 0.05-0.26s of a 0.35s roll |
 | Jump | Gravity 26, jump speed 8.5, apex ~1.4 units, airtime ~0.65s |

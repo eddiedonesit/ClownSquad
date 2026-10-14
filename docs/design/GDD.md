@@ -204,6 +204,9 @@ Affixes should be tagged so they can be restricted by item type, class, or level
 
 - **Level cap is 50.** Players gain levels through combat, earning 1 skill point
   per level and a capture slot every 10 levels
+- **3 stat points per level**, spent freely across POW (damage), GUTS (health),
+  ZIP (speed, capped) and LUCK (crit chance, capped; later also loot quality).
+  Built 2026-10-14; see STATUS for the numbers
 - **Enemies scale to the host/primary player's level**, so co-op partners of
   different levels can play together
 - **Open:** does a level-5 player joining a level-40 host get flattened? Options:

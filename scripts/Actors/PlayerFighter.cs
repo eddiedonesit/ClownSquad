@@ -5,6 +5,7 @@ using Godot;
 using ClownSquad.Audio;
 using ClownSquad.Combat;
 using ClownSquad.Input;
+using ClownSquad.Progression;
 using ClownSquad.Visuals;
 
 /// <summary>
@@ -81,6 +82,18 @@ public partial class PlayerFighter : Fighter
     /// <summary>Scales all damage this fighter deals. Weak enemies sit below one.</summary>
     public float DamageMultiplier { get; set; } = 1f;
 
+    /// <summary>A multiplier on top of the stats, for tests and debugging; never saved.</summary>
+    public float ExtraDamageMultiplier { get; set; } = 1f;
+
+    /// <summary>The persistent character this fighter plays, if any. Enemies have none.</summary>
+    public CharacterRecord? Record { get; private set; }
+
+    /// <summary>Chance per hit of a critical, from LUCK. Zero for anything without a record.</summary>
+    public float CritChance { get; private set; }
+
+    private float _baseMoveSpeed = -1f;
+    private readonly RandomNumberGenerator _critRng = new();
+
     private State _state = State.Free;
     private InputCommand _cmd;
     private int _comboIndex;
@@ -136,6 +149,45 @@ public partial class PlayerFighter : Fighter
     /// be hit. Too tight and combat feels finicky; too loose and depth stops
     /// mattering.</summary>
     protected virtual float DepthBand => 0.85f;
+
+    /// <summary>
+    /// Stretches every combo swing in time. Above one gives a big fighter a
+    /// readable wind-up and a longer punish window after it.
+    /// </summary>
+    protected virtual float SwingTimeScale => 1f;
+
+    /// <summary>
+    /// The swing in progress, if any: combo index, time into it, and its startup,
+    /// active window and reach. For subclasses that animate a prop to match.
+    /// </summary>
+    protected bool TryGetSwing(out int index, out float time, out float startup, out float active, out float reach)
+    {
+        index = _comboIndex;
+        time = _phaseTime;
+        AttackStep step = Combo[_comboIndex];
+        startup = step.Startup;
+        active = step.Active;
+        reach = step.Range * ReachScale;
+        return _state == State.Attacking;
+    }
+
+    /// <summary>
+    /// Play a persistent character and take on its stats. Called again whenever
+    /// the record changes (a level gained, points spent); extra max health from
+    /// GUTS arrives as health too, so spending points mid-fight is never a loss.
+    /// </summary>
+    public void ApplyProgression(CharacterRecord record)
+    {
+        Record = record;
+        if (_baseMoveSpeed < 0f) _baseMoveSpeed = MoveSpeed;
+        float oldMax = MaxHealth;
+        MaxHealth = Leveling.MaxHealth(record);
+        DamageMultiplier = Leveling.DamageMultiplier(record);
+        MoveSpeed = _baseMoveSpeed * Leveling.SpeedMultiplier(record);
+        CritChance = Leveling.CritChance(record);
+        _critRng.Randomize();
+        if (IsInsideTree() && !IsDead && MaxHealth > oldMax) Heal(MaxHealth - oldMax);
+    }
 
     protected override void Tick(float dt)
     {
@@ -299,7 +351,7 @@ public partial class PlayerFighter : Fighter
     {
         AttackStep step = Combo[_comboIndex];
         float prev = _phaseTime;
-        _phaseTime += dt;
+        _phaseTime += dt / SwingTimeScale;
 
         // Slight forward drift makes swings feel committed rather than static.
         float drift = _phaseTime < step.Startup + step.Active ? 2.2f : 0.6f;
@@ -620,20 +672,33 @@ public partial class PlayerFighter : Fighter
     private void Strike(Fighter other, float damage, Vector3 dir, float knockback,
                         float hitstop, float launch = 0f, float stun = 0.26f)
     {
-        other.TakeDamage(new DamageInfo(damage * DamageMultiplier, dir, knockback, hitstop, this, launch, stun));
-        ApplyHitstop(hitstop);
-        Spark(other);
+        bool crit = RollCrit();
+        other.TakeDamage(new DamageInfo(Scaled(damage, crit), dir, knockback, crit ? hitstop * 1.6f : hitstop, this, launch, stun));
+        ApplyHitstop(crit ? hitstop * 1.6f : hitstop);
+        Spark(other, crit);
     }
 
     /// <summary>A hit delivered by this fighter's thrown weapon rather than its body.</summary>
     public void StrikeFromProjectile(Fighter other, float damage, Vector3 dir, float knockback, float launch)
     {
-        other.TakeDamage(new DamageInfo(damage * DamageMultiplier, dir, knockback, 0.06f, this, launch, 0.35f));
-        Spark(other);
+        bool crit = RollCrit();
+        other.TakeDamage(new DamageInfo(Scaled(damage, crit), dir, knockback, 0.06f, this, launch, 0.35f));
+        Spark(other, crit);
     }
 
-    private void Spark(Fighter other) =>
-        ImpactEffect.Spawn(GetParent(), other.GlobalPosition + new Vector3(0f, other.BodyHeight * 0.55f, 0f), 0.34f);
+    private bool RollCrit() => CritChance > 0f && _critRng.Randf() < CritChance;
+
+    private float Scaled(float damage, bool crit) =>
+        damage * DamageMultiplier * ExtraDamageMultiplier * (crit ? Leveling.CritMultiplier : 1f);
+
+    private void Spark(Fighter other, bool crit = false)
+    {
+        Vector3 at = other.GlobalPosition + new Vector3(0f, other.BodyHeight * 0.55f, 0f);
+        ImpactEffect.Spawn(GetParent(), at, crit ? 0.7f : 0.34f);
+        if (!crit) return;
+        PopText.Spawn(GetParent(), at + new Vector3(0f, 0.5f, 0f), "CRIT!", new Color(1f, 0.45f, 0.3f), 0.8f, 0.6f);
+        Sfx.Play("crit");
+    }
 
     // -------------------------------------------------------------- hooks
 

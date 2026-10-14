@@ -48,6 +48,9 @@ public partial class DirectionalSprite : Node3D
     public string CurrentClip => _sprite is null ? "-" : _sprite.Animation.ToString();
     public bool Flipped => _sprite is not null && _sprite.FlipH;
 
+    /// <summary>Colour this frame, hit flash included, for attached props to match.</summary>
+    public Color CurrentModulate => _sprite?.Modulate ?? _tint;
+
     public override void _Ready()
     {
         _sprite = new AnimatedSprite3D

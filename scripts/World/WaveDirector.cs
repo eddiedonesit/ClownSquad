@@ -42,6 +42,8 @@ public partial class WaveDirector : Node
     public int Lives { get; private set; } = 3;
 
     public event Action<Phase>? PhaseChanged;
+    /// <summary>An enemy went down for good. Where XP is paid out.</summary>
+    public event Action<Fighter>? EnemyDefeated;
 
     private readonly RandomNumberGenerator _rng = new();
     private Node3D _world = null!;
@@ -157,6 +159,7 @@ public partial class WaveDirector : Node
     {
         EnemiesAlive--;
         enemy.BeginDespawn();
+        EnemyDefeated?.Invoke(enemy);
 
         // The last blow of the fight lands in slow motion.
         bool finalBlow = WaveNumber >= WaveCount && EnemiesAlive == 0 && _gruntsToSpawn == 0 && !_bossToSpawn;

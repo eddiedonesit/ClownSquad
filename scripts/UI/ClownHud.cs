@@ -4,6 +4,7 @@ using System;
 using System.Collections.Generic;
 using Godot;
 using ClownSquad.Actors;
+using ClownSquad.Progression;
 using ClownSquad.World;
 
 /// <summary>
@@ -36,6 +37,8 @@ public partial class ClownHud : CanvasLayer
 
     private Font _font = null!;
     private readonly List<(Control root, CandyBar bar, Label name)> _panels = new();
+    private readonly List<(Label level, ColorRect xp, Label points)> _progress = new();
+    private readonly int[] _levelShown = new int[4];
     private Control _target = null!;
     private CandyBar _targetBar = null!;
     private Label _targetName = null!;
@@ -154,12 +157,36 @@ public partial class ClownHud : CanvasLayer
         root.AddChild(name);
         var bar = new CandyBar { Position = new Vector2(72, 36), Size = new Vector2(184, 20) };
         root.AddChild(bar);
+
+        // Level at the right of the name, a thin XP bar under the health bar,
+        // and a nudge to spend points whenever there are some.
+        var level = new Label
+        {
+            Position = new Vector2(186, 12), Size = new Vector2(70, 22),
+            HorizontalAlignment = HorizontalAlignment.Right,
+            LabelSettings = Style(15, new Color(0.6f, 0.92f, 1f), 4),
+            PivotOffset = new Vector2(55, 11),
+        };
+        root.AddChild(level);
+        root.AddChild(new ColorRect { Position = new Vector2(74, 57), Size = new Vector2(180, 4), Color = new Color(0.08f, 0.05f, 0.12f) });
+        var xp = new ColorRect { Position = new Vector2(74, 57), Size = new Vector2(0, 4), Color = new Color(0.5f, 0.9f, 1f) };
+        root.AddChild(xp);
+        // On its own little plate, or it is lost against whatever walks behind it.
+        var points = new Label
+        {
+            Position = new Vector2(66, 64),
+            LabelSettings = Style(13, new Color(1f, 0.85f, 0.3f), 4),
+            Visible = false,
+        };
+        points.AddThemeStyleboxOverride("normal", Plate(new Color(0.18f, 0.12f, 0.28f, 0.92f), new Color(1f, 0.85f, 0.3f, 0.8f), 8, 2));
+        root.AddChild(points);
+        _progress.Add((level, xp, points));
         return (root, bar, name);
     }
 
     private void BuildTarget()
     {
-        _target = new Control { Position = new Vector2(34, 84), Size = new Vector2(240, 44), Visible = false };
+        _target = new Control { Position = new Vector2(34, 100), Size = new Vector2(240, 44), Visible = false };
         AddChild(_target);
         _targetFace = Face(GruntSheet, ClownHead);
         _targetFace.Size = new Vector2(36, 36);
@@ -272,16 +299,16 @@ public partial class ClownHud : CanvasLayer
     {
         _hint = new Label
         {
-            Text = "MOVE  WASD / stick     ATTACK  J / X     JUMP  Space / A     DODGE  K / B\n" +
-                   "hold ATTACK: throw the mallet  -  hold ATTACK + left/right: spin  -  ATTACK in the air: flip\n" +
-                   "F1 controls   F3 debug",
+            Text = "move WASD/stick   attack J/X   jump Space/A   dodge K/B\n" +
+                   "hold attack: throw   +left/right: spin   attack in air: flip\n" +
+                   "TAB/SELECT stats   F1 controls   F3 debug",
             HorizontalAlignment = HorizontalAlignment.Right,
             LabelSettings = Style(11, new Color(1f, 1f, 1f, 0.95f), 4),
         };
         // Top right: clear of the boss bar, the combo and the player panels.
         _hint.SetAnchorsPreset(Control.LayoutPreset.TopRight);
-        _hint.Position = new Vector2(-652, 10);
-        _hint.Size = new Vector2(640, 60);
+        _hint.Position = new Vector2(-442, 10);
+        _hint.Size = new Vector2(430, 60);
         AddChild(_hint);
         // Shown for the first moments of a fight, then out of the way.
         CreateTween().TweenProperty(_hint, "modulate:a", 0f, 1.2f).SetDelay(9.0);
@@ -320,6 +347,22 @@ public partial class ClownHud : CanvasLayer
             PlayerFighter p = players[i];
             bar.Value = p.Health / p.MaxHealth;
             name.Text = p.IsDead ? $"P{i + 1}  K.O.!" : $"P{i + 1}  {p.DisplayName}";
+
+            (Label level, ColorRect xp, Label points) = _progress[i];
+            if (p.Record is CharacterRecord r)
+            {
+                level.Text = $"LV {r.Level}";
+                if (r.Level != _levelShown[i])
+                {
+                    if (_levelShown[i] > 0) Pop(level, 2.2f);
+                    _levelShown[i] = r.Level;
+                }
+                int need = Leveling.XpToNext(r.Level);
+                xp.Size = new Vector2(need > 0 ? 180f * r.Xp / need : 180f, 4f);
+                points.Visible = r.StatPoints > 0;
+                points.Text = $"+{r.StatPoints} POINTS!  TAB / SELECT";
+                points.Modulate = new Color(1f, 1f, 1f, 0.65f + 0.35f * Mathf.Sin((float)_clock * 6f));
+            }
         }
 
         UpdateTarget();
