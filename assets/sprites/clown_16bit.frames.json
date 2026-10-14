@@ -1,7 +1,7 @@
 {
   "frame_width": 104,
   "frame_height": 64,
-  "count": 11,
+  "count": 14,
   "clips": {
     "idle": [
       0,
@@ -21,6 +21,11 @@
     ],
     "hit": [
       10
+    ],
+    "dodge": [
+      11,
+      12,
+      13
     ]
   }
 }

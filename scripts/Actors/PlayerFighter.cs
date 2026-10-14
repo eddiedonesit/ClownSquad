@@ -100,8 +100,14 @@ public partial class PlayerFighter : Fighter
         if (cmd.DodgePressed)
         {
             _dodgeDir = move.LengthSquared() > 0.001f ? move.Normalized() : Facing;
+            // Turn into the slide, so the pose never reads as moonwalking when
+            // dodging away from the current facing.
+            if (Mathf.Abs(_dodgeDir.X) > 0.1f)
+                Facing = new Vector3(Mathf.Sign(_dodgeDir.X), 0f, 0f);
             _state = State.Dodging;
             _dodgeTime = 0f;
+            // scuff of dust kicked up as the slide launches
+            ImpactEffect.Spawn(GetParent(), GlobalPosition + new Vector3(0f, 0.1f, 0f), 0.3f);
             return;
         }
 
@@ -211,7 +217,12 @@ public partial class PlayerFighter : Fighter
     {
         _dodgeTime += dt;
         float t = _dodgeTime / DodgeDuration;
-        if (!InHitAnim) PlayClip("walk");
+
+        // Pinned rather than played, so the slide pose tracks the actual
+        // movement curve: drop, hold the extended slide, gather to recover.
+        if (!InHitAnim)
+            PinClipFrame("dodge", t < 0.22f ? 0 : t < 0.72f ? 1 : 2);
+
         ApplyGroundMovement(_dodgeDir * DodgeSpeed * (1f - t * 0.75f), dt);
 
         if (_dodgeTime >= DodgeDuration)

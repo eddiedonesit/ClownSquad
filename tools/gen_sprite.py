@@ -262,6 +262,17 @@ add("attack", spose(lean=4, body_dy=1, near_arm=9, far_arm=5,
 add("hit", spose(lean=-4, head_dy=-2, body_dy=2,
                  near_arm=-7, far_arm=-5, arm_lift=-2))
 
+# dodge slide: body drops, leading leg extends, arms trail behind
+add("dodge", spose(body_dy=3, lean=4, head_dy=1,
+                   near_leg=7, far_leg=-4,
+                   near_arm=-8, far_arm=-6, arm_lift=-3))
+add("dodge", spose(body_dy=7, lean=7, head_dy=2,
+                   near_leg=13, far_leg=-7,
+                   near_arm=-12, far_arm=-9, arm_lift=-6))
+add("dodge", spose(body_dy=3, lean=3, head_dy=1,
+                   near_leg=5, far_leg=-2,
+                   near_arm=-5, far_arm=-3, arm_lift=-2))
+
 SHEET_W = W * len(FRAMES)
 shaded = [shade(b) for _, b in FRAMES]
 rows = []
