@@ -158,14 +158,18 @@ public partial class GameRoot : Node3D
         if (GetNodeOrNull<DirectionalLight3D>("DirectionalLight3D") is DirectionalLight3D sun)
         {
             sun.LookAtFromPosition(sun.GlobalPosition, sun.GlobalPosition + new Vector3(0.55f, -0.7f, -0.45f), Vector3.Up);
-            sun.LightEnergy = 1.25f;
+            sun.LightEnergy = 0.85f;     // lower, so lamps, spots and hit flashes read
+            sun.LightVolumetricFogEnergy = 0f;   // haze shows only the spotlight beams
         }
         if (GetNodeOrNull<WorldEnvironment>("WorldEnvironment")?.Environment is Godot.Environment env)
         {
-            env.AmbientLightEnergy = 0.45f;
+            env.AmbientLightEnergy = 0.35f;
             // Both reference games are saturated and clean, not hazy: less fog,
             // and a grade that keeps the sprites' colours vivid through the tonemap.
-            env.VolumetricFogDensity = 0.003f;
+            // Haze that only lights up where a beam passes: no emission of its
+            // own, and only the follow-spots scatter into it.
+            env.VolumetricFogDensity = 0.012f;
+            env.VolumetricFogEmission = Colors.Black;
             env.AdjustmentEnabled = true;
             env.AdjustmentContrast = 1.1f;
             env.AdjustmentSaturation = 1.22f;
@@ -173,12 +177,17 @@ public partial class GameRoot : Node3D
 
         void Lamp(Vector3 at, Color color, float energy)
         {
-            var lamp = new OmniLight3D { LightColor = color, LightEnergy = energy, OmniRange = 11f, OmniAttenuation = 1.2f };
+            var lamp = new OmniLight3D { LightColor = color, LightEnergy = energy, OmniRange = 11f, OmniAttenuation = 1.2f, LightVolumetricFogEnergy = 0f };
             AddChild(lamp);
             lamp.GlobalPosition = at;
         }
         Lamp(new Vector3(-6.5f, 3.2f, 0.5f), new Color(1f, 0.55f, 0.45f), 3.4f);   // warm, stage left
         Lamp(new Vector3(6.5f, 3.2f, 0.5f), new Color(0.45f, 0.7f, 1f), 3.0f);     // cool, stage right
+
+        // The circus ring replaces the grey test room.
+        foreach (string old in new[] { "Ground", "PropBack" })
+            if (GetNodeOrNull<Node3D>(old) is Node3D n) n.Visible = false;
+        AddChild(new CircusArena());
     }
 
     public override void _ExitTree()

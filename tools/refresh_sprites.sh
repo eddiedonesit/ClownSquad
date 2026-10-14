@@ -12,6 +12,7 @@ python tools/gen_effects.py
 python tools/gen_enemy.py
 python tools/gen_sprite_hd.py
 python tools/gen_enemy_hd.py
+python tools/gen_arena.py
 python tools/gen_audio.py >/dev/null
 "$GODOT" --headless --path . --import >/dev/null 2>&1
 echo "sprites regenerated and reimported"
