@@ -36,7 +36,12 @@ public partial class ImpactEffect : Node3D
             Transparent = true,
             Shaded = false,
             CastShadow = GeometryInstance3D.ShadowCastingSetting.Off,
-            NoDepthTest = false,
+            // The burst is an upright billboard standing at the mallet, so its
+            // lower half sits below y=0 and the ground plane depth-culls it,
+            // slicing the blast flat and z-fighting into speckled holes where
+            // the surfaces are near-coplanar. Impact VFX draw on top instead.
+            NoDepthTest = true,
+            RenderPriority = 10,
         };
         AddChild(sprite);
         sprite.AnimationFinished += QueueFree;
