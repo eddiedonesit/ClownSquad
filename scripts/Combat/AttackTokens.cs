@@ -2,6 +2,7 @@ namespace ClownSquad.Combat;
 
 using System.Collections.Generic;
 using Godot;
+using ClownSquad.World;
 
 /// <summary>
 /// Caps how many enemies may be attacking at once. Without it a crowd dogpiles
@@ -20,9 +21,11 @@ public static class AttackTokens
     private static readonly Dictionary<ulong, ulong> Leases = new();   // instance id -> expiry ms
     private static readonly List<ulong> Expired = new();
 
+    public static void Reset() => Leases.Clear();
+
     public static bool TryAcquire(GodotObject holder, ulong leaseMs)
     {
-        ulong now = Time.GetTicksMsec();
+        ulong now = GameClock.Ms;
 
         Expired.Clear();
         foreach (KeyValuePair<ulong, ulong> lease in Leases)

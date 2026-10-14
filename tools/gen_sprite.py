@@ -14,7 +14,7 @@ Run: bash tools/refresh_sprites.sh   (never this file alone - see tools/README)
 import os, sys, json, math
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from pixelart import Canvas, shade, pack_rows, rotated, touches_border
+from pixelart import Canvas, shade, pack_rows, rotated, touches_border, laid_down, MATS
 from pixelpng import write_png
 
 BODY_H = 64              # the character is authored in a 48 x 64 space
@@ -191,6 +191,13 @@ for step in range(8):
 for name, kw in BASE:
     add("empty_" + name, draw_side(spose(**kw)))
 
+# floored: the recoil pose tipped onto its back. Drawn empty-handed in both
+# sets, since a mallet rotated with the body runs off the canvas.
+HIT_POSE = dict(lean=-4, head_dy=-2, body_dy=2, near_arm=-7, far_arm=-5, arm_lift=-2)
+FLOORED = laid_down(draw_side(spose(**HIT_POSE)), 24 + DRAW_X, 40 + DRAW_Y, BASELINE)
+add("down", FLOORED)
+add("empty_down", FLOORED)
+
 clipped = sorted({n for n, cv in FRAMES if touches_border(cv)})
 if clipped:
     print("WARNING: art touches the canvas edge (clipped) in: " + ", ".join(clipped))
@@ -233,3 +240,34 @@ with open(os.path.join("assets", "sprites", "mallet_spin.frames.json"), "w") as 
     json.dump({"frame_width": MS, "frame_height": MS, "count": len(spin_frames),
                "clips": {"mallet_spin": list(range(len(spin_frames)))}}, f, indent=2)
 print("wrote {}  {} frames".format(mout, len(spin_frames)))
+
+# ---- the grunt: the same body, bare-handed, in different colours ----
+# Recolouring at the shading step keeps one set of artwork while making the
+# rank-and-file instantly distinguishable from the player.
+GRUNT_MATS = dict(MATS)
+GRUNT_MATS[5] = ((86, 160, 92), (52, 112, 60), (134, 204, 138))     # suit: green
+GRUNT_MATS[11] = ((58, 110, 66), (38, 78, 46), (92, 150, 100))      # far-side suit
+GRUNT_MATS[1] = ((142, 70, 160), (98, 44, 114), (186, 118, 202))    # hat and shoes: purple
+GRUNT_MATS[13] = ((104, 50, 120), (72, 32, 86), (140, 84, 158))     # far-side shoe
+GRUNT_MATS[7] = ((120, 200, 210), (76, 148, 160), (170, 232, 238))  # hair: teal
+GRUNT_MATS[10] = ((246, 203, 90), (190, 142, 52), (255, 234, 158))  # suit diamonds: yellow
+
+grunt = []
+for name, kw in BASE:
+    if name in ("idle", "walk", "hit"):
+        grunt.append((name, draw_side(spose(**kw))))
+# a straight punch: draw back, throw, recover
+grunt.append(("attack", draw_side(spose(lean=-4, body_dy=1, near_arm=-9, far_arm=5, arm_lift=9, near_leg=-3, far_leg=3))))
+grunt.append(("attack", draw_side(spose(lean=5, body_dy=0, near_arm=15, far_arm=-6, arm_lift=11, near_leg=7, far_leg=-5))))
+grunt.append(("attack", draw_side(spose(lean=3, body_dy=1, near_arm=9, far_arm=-3, arm_lift=6, near_leg=4, far_leg=-2))))
+grunt.append(("down", FLOORED))
+
+gout = os.path.join("assets", "sprites", "grunt_clown.png")
+write_png(gout, W * len(grunt), H, pack_rows([shade(cv, GRUNT_MATS) for _, cv in grunt], W, H))
+gclips = {}
+for i, (name, _) in enumerate(grunt):
+    gclips.setdefault(name, []).append(i)
+with open(os.path.join("assets", "sprites", "grunt_clown.frames.json"), "w") as f:
+    json.dump({"frame_width": W, "frame_height": H, "baseline": BASELINE,
+               "count": len(grunt), "clips": gclips}, f, indent=2)
+print("wrote {}  {} frames".format(gout, len(grunt)))

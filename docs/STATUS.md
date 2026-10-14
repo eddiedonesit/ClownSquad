@@ -12,6 +12,12 @@ C:/Tools/Godot/4.7.2/Godot_v4.7.2-stable_mono_win64.exe --path C:/Claude/ClownSq
 # automated checks (headless; prints clip/state/position assertions)
 C:/Tools/Godot/4.7.2/Godot_v4.7.2-stable_mono_win64_console.exe --headless --path C:/Claude/ClownSquad -- animtest
 
+# the whole fight, unattended and fast: an AI must win it / an idle player must lose it
+C:/Tools/Godot/4.7.2/Godot_v4.7.2-stable_mono_win64_console.exe --headless --path C:/Claude/ClownSquad -- wavetest
+C:/Tools/Godot/4.7.2/Godot_v4.7.2-stable_mono_win64_console.exe --headless --path C:/Claude/ClownSquad -- losetest
+
+# the old training room (dummy and respawning boss): add  -- sandbox
+
 # moves: screen walls, charge throw, spin, flip, launch and wall bounce (17 checks)
 C:/Tools/Godot/4.7.2/Godot_v4.7.2-stable_mono_win64_console.exe --headless --path C:/Claude/ClownSquad -- movetest
 
@@ -34,6 +40,10 @@ immediately; pads join by pressing a button.
 | Hit reactions | Hitstun, launch and juggle with decaying lift, ground bounce, knockdown, get-up invulnerability, wall bounce (ADR 0005) |
 | Mallet moves | Hold attack 3s standing: boomerang throw. Hold attack + left/right: travelling spin. Attack in the air: front flip |
 | Arena | Screen edges are walls for players and enemies, derived from the camera frustum |
+| The fight | Three waves (3 grunts, 5 grunts, boss + 2), staggered in from the screen edges; 3 shared lives; win and game-over states; press attack to replay |
+| Grunt | Weak, bare-handed, launchable enemy with its own recoloured sheet |
+| Death | Killing blow lifts the body; it lies in a floored pose, blinks and is removed |
+| Enemy AI | Turn-taking by attack token, waiting ring, crowd spacing, depth line-up; timed on game time |
 | Feel helpers | Lane assist, dodge-cancel from recovery, hit sparks, combo counter, attack tokens |
 | Dodge | Ground slide with i-frames 0.05-0.26s of a 0.35s roll |
 | Jump | Gravity 26, jump speed 8.5, apex ~1.4 units, airtime ~0.65s |
@@ -49,10 +59,10 @@ immediately; pads join by pressing a button.
 
 ## Not built
 
-Everything else in the GDD. Nothing exists yet for: rarity tiers, monster
-capture, classes, skill trees, item generation or affixes, levelling, shops,
-story, or online co-op. One enemy type exists; there is no spawning system,
-no death handling beyond health reaching zero, and no win or lose state.
+Everything else in the GDD: rarity tiers, monster capture, classes, skill trees,
+item generation and affixes, levelling, shops, story, online co-op. The fight is
+one fixed arena with one fixed wave list; there are no levels, scrolling or
+pickups, and no sound.
 
 ## Known simplifications
 

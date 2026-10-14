@@ -83,6 +83,8 @@ public partial class DirectionalSprite : Node3D
         if (_sprite is not null) _sprite.FlipH = FlipOverride ?? (_facing.X < 0f);
     }
 
+    public bool HasClip(string state) => _sprite is not null && _sprite.SpriteFrames.HasAnimation(state);
+
     private string Resolve(string state)
     {
         SpriteFrames frames = _sprite.SpriteFrames;

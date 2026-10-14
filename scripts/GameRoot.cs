@@ -1,33 +1,59 @@
 namespace ClownSquad;
 
+using System;
 using System.Collections.Generic;
 using System.Text;
 using Godot;
 using ClownSquad.Actors;
+using ClownSquad.Combat;
 using ClownSquad.Input;
 using ClownSquad.World;
 
 /// <summary>
-/// Combat test bootstrap. Binds every detected device to its own fighter, which
-/// is local co-op exercising the full multi-player path with no networking.
+/// Scene bootstrap. Sets up the arena, binds devices to fighters (local co-op
+/// exercising the full multi-player path with no networking), and runs either
+/// the wave fight or, with "-- sandbox", the old training room.
+///
+/// Command-line modes after "--":
+///   (none)     the wave fight
+///   sandbox    training dummy and a respawning boss, nothing ends
+///   wavetest   an AI plays the waves; expects a win       (headless-safe)
+///   losetest   nobody plays; expects a game over          (headless-safe)
+///   aitest     boss AI assertions, in the sandbox
+///   animtest   clip-selection assertions
+///   movetest   bounds and mallet-move assertions
 /// </summary>
 public partial class GameRoot : Node3D
 {
     private readonly List<PlayerFighter> _players = new();
+    private readonly Dictionary<PlayerFighter, Vector3> _homes = new();
     /// <summary>Devices already driving a fighter, so a pad is never bound twice.</summary>
     private readonly HashSet<int> _boundDevices = new();
+    private readonly HashSet<int> _joinHeld = new();
     private readonly List<TrainingDummy> _dummies = new();
     private readonly List<BossClown> _bosses = new();
-    private Label? _hud;
-    private bool _aiProbe;
+    private readonly List<(Fighter fighter, Vector3 at, double due)> _pendingRespawns = new();
 
-    /// <summary>Fighters waiting to respawn, with the time left and where to go.</summary>
-    private readonly List<(Fighter fighter, Vector3 at, double at_time)> _pendingRespawns = new();
-    private double _clock;
+    private Label? _hud;
+    private Label? _banner;
+    private WaveDirector? _director;
+    private Camera3D? _arenaCamera;
+    private Transform3D _arenaCameraRest;
+    private float _joinCooldown;
+    private double _endedAt = -1;
+
+    private bool _aiProbe;
+    private string _outcomeProbe = "";   // "win" or "lose" when a wave probe is running
+
+    // ------------------------------------------------------------- startup
 
     public override void _Ready()
     {
-        _aiProbe = System.Array.IndexOf(OS.GetCmdlineUserArgs(), "aitest") >= 0;
+        string[] args = OS.GetCmdlineUserArgs();
+        bool Has(string flag) => Array.IndexOf(args, flag) >= 0;
+
+        GameClock.Reset();
+        AttackTokens.Reset();
 
         // The arena is whatever the camera sees, captured before any shake, and
         // rebuilt whenever the window changes shape so the walls stay at the
@@ -43,20 +69,28 @@ public partial class GameRoot : Node3D
 
         Fighter.HitLanded += OnHitLanded;
 
-        if (System.Array.IndexOf(OS.GetCmdlineUserArgs(), "animtest") >= 0)
+        if (Has("animtest")) { AddChild(new ClownSquad.Debug.AnimationProbe()); return; }
+        if (Has("movetest")) { AddChild(new ClownSquad.Debug.MovesProbe()); return; }
+
+        _aiProbe = Has("aitest");
+        if (Has("wavetest")) _outcomeProbe = "win";
+        if (Has("losetest")) _outcomeProbe = "lose";
+
+        SpawnPlayers();
+        BuildHud();
+
+        if (Has("sandbox") || _aiProbe)
         {
-            AddChild(new ClownSquad.Debug.AnimationProbe());
-            return;
-        }
-        if (System.Array.IndexOf(OS.GetCmdlineUserArgs(), "movetest") >= 0)
-        {
-            AddChild(new ClownSquad.Debug.MovesProbe());
+            SpawnSandbox();
             return;
         }
 
-        SpawnPlayers();
-        SpawnDummies();
-        BuildHud();
+        _director = new WaveDirector();
+        AddChild(_director);
+        _director.PhaseChanged += OnPhaseChanged;
+        _director.Begin(this);
+
+        if (_outcomeProbe.Length > 0) StartOutcomeProbe();
     }
 
     public override void _ExitTree()
@@ -64,9 +98,6 @@ public partial class GameRoot : Node3D
         Fighter.HitLanded -= OnHitLanded;
         Arena.Current = null;
     }
-
-    private Camera3D? _arenaCamera;
-    private Transform3D _arenaCameraRest;
 
     private void RebuildArena()
     {
@@ -84,33 +115,19 @@ public partial class GameRoot : Node3D
         Arena.Current = new Arena(_arenaCameraRest, _arenaCamera.Fov, view.X / Mathf.Max(view.Y, 1f));
     }
 
-    // Combo counter: consecutive hits by players, reset after a short lull.
-    private const double ComboLull = 1.6;
-    private int _comboHits;
-    private double _comboExpires;
-
-    private void OnHitLanded(Fighter? attacker, Fighter victim, float amount)
-    {
-        // Wall bounces arrive with no attacker and extend whatever is running.
-        bool byPlayer = attacker is null ? victim.Hostile && _comboHits > 0 : !attacker.Hostile;
-        if (!byPlayer) return;
-        _comboHits++;
-        _comboExpires = _clock + ComboLull;
-    }
+    // ------------------------------------------------------------- players
 
     private void SpawnPlayers()
     {
         // Keyboard always joins. Pads join on a button press rather than on
-        // detection: tools like DS4Windows expose one physical controller as two
-        // devices, and auto-binding both drives two fighters from one stick.
+        // detection: one physical controller can appear as two devices, and
+        // auto-binding both drives two fighters from one stick.
         AddPlayer(LocalDeviceInput.Keyboard, 0);
 
         foreach (int pad in Godot.Input.GetConnectedJoypads())
             GD.Print($"  pad {pad}: name=\"{Godot.Input.GetJoyName(pad)}\" guid={Godot.Input.GetJoyGuid(pad)}");
         GD.Print("Press A / X on a controller to join.");
     }
-
-    private float _joinCooldown;
 
     /// <summary>
     /// Let an unbound pad join on a fresh button press. One join per cooldown
@@ -140,12 +157,8 @@ public partial class GameRoot : Node3D
         }
     }
 
-    private readonly HashSet<int> _joinHeld = new();
-
     private void AddPlayer(int device, int index)
     {
-        // Godot raises JoyConnectionChanged for pads that were already present
-        // at startup, so without this guard one pad drives two fighters.
         if (!_boundDevices.Add(device))
         {
             GD.Print($"Device {device} already bound; ignoring duplicate.");
@@ -159,53 +172,44 @@ public partial class GameRoot : Node3D
             PlayerIndex = index,
         };
         AddChild(p);
-        Vector3 home = new(-1.5f + index * 3f, 0f, 2f);
+        Vector3 home = new(-1.5f + index * 1.5f, 0f, 1.5f);
         p.GlobalPosition = home;
-        p.Died += f => ScheduleRespawn(f, home, 1.5);
+        _homes[p] = home;
+        p.Died += OnPlayerDied;
         _players.Add(p);
     }
 
-    private void SpawnDummies()
-    {
-        var d = new TrainingDummy { Name = "Dummy" };
-        AddChild(d);
-        d.GlobalPosition = new Vector3(-3.5f, 0f, -2.5f);
-        _dummies.Add(d);
-
-        SpawnBoss(new Vector3(3.5f, 0f, -2f));
-    }
-
-    private void SpawnBoss(Vector3 at)
-    {
-        var boss = new BossClown { Name = "BossClown" };
-        boss.Source = new BrawlerAi(boss, attackRange: 2.2f, backoffRange: 1.2f,
-                                    attackCooldownMs: 700,
-                                    specialCooldownMs: 5000, specialRange: 6.0f);
-        AddChild(boss);
-        boss.GlobalPosition = at;
-        boss.Died += f => ScheduleRespawn(f, at, 3.0);
-        _bosses.Add(boss);
-        GD.Print("Boss clown spawned, driven by BrawlerAi.");
-    }
-
     /// <summary>
-    /// Death is a respawn in the test room. Without it a downed fighter stops
-    /// being a valid AI target, and enemies stand idle forever with nothing to
-    /// chase - which looks exactly like the AI having broken.
+    /// In the sandbox death is just a respawn. In the wave fight it spends one
+    /// of the shared lives, and when a player falls with none left and nobody
+    /// else is standing or on the way back, the fight is lost.
     /// </summary>
+    private void OnPlayerDied(Fighter f)
+    {
+        Vector3 home = f is PlayerFighter p && _homes.TryGetValue(p, out Vector3 h) ? h : Vector3.Zero;
+
+        if (_director is null) { ScheduleRespawn(f, home, 1.5); return; }
+        if (_director.TryUseLife()) { ScheduleRespawn(f, home, 2.0); return; }
+
+        GD.Print($"{f.Name} is out: no lives left.");
+        bool anyoneLeft = _pendingRespawns.Count > 0;
+        foreach (PlayerFighter other in _players)
+            if (!other.IsDead) anyoneLeft = true;
+        if (!anyoneLeft) _director.DeclareDefeat();
+    }
+
     private void ScheduleRespawn(Fighter f, Vector3 at, double delay)
     {
         GD.Print($"{f.Name} down; respawning in {delay:F1}s.");
-        _pendingRespawns.Add((f, at, _clock + delay));
+        _pendingRespawns.Add((f, at, GameClock.Seconds + delay));
     }
 
-    private void TickRespawns(double delta)
+    private void TickRespawns()
     {
-        _clock += delta;
         for (int i = _pendingRespawns.Count - 1; i >= 0; i--)
         {
             (Fighter f, Vector3 at, double due) = _pendingRespawns[i];
-            if (_clock < due) continue;
+            if (GameClock.Seconds < due) continue;
             _pendingRespawns.RemoveAt(i);
             if (GodotObject.IsInstanceValid(f))
             {
@@ -215,29 +219,155 @@ public partial class GameRoot : Node3D
         }
     }
 
+    // ------------------------------------------------------------- sandbox
+
+    private void SpawnSandbox()
+    {
+        var d = new TrainingDummy { Name = "Dummy" };
+        AddChild(d);
+        d.GlobalPosition = new Vector3(-3.5f, 0f, -2.5f);
+        _dummies.Add(d);
+
+        Vector3 at = new(3.5f, 0f, -2f);
+        var boss = new BossClown { Name = "BossClown" };
+        boss.Source = new BrawlerAi(boss, attackRange: 2.2f, backoffRange: 1.2f,
+                                    attackCooldownMs: 700,
+                                    specialCooldownMs: 5000, specialRange: 6.0f);
+        AddChild(boss);
+        boss.GlobalPosition = at;
+        boss.Died += f => ScheduleRespawn(f, at, 3.0);
+        _bosses.Add(boss);
+        GD.Print("Sandbox: training dummy and boss clown.");
+    }
+
+    // ----------------------------------------------------------- the fight
+
+    private void OnPhaseChanged(WaveDirector.Phase phase)
+    {
+        WaveDirector d = _director!;
+        GD.Print($"[{GameClock.Seconds:F1}s] phase={phase} wave={d.WaveNumber}/{d.WaveCount} lives={d.Lives}");
+        if (phase is WaveDirector.Phase.Victory or WaveDirector.Phase.Defeat)
+            _endedAt = GameClock.Seconds;
+    }
+
+    /// <summary>Once the fight is over, any attack or start press plays it again.</summary>
+    private void PollForRestart()
+    {
+        if (_endedAt < 0 || GameClock.Seconds - _endedAt < 1.5 || _outcomeProbe.Length > 0) return;
+
+        bool pressed = Godot.Input.IsKeyPressed(Key.J) || Godot.Input.IsKeyPressed(Key.Enter);
+        foreach (int pad in Godot.Input.GetConnectedJoypads())
+            pressed |= Godot.Input.IsJoyButtonPressed(pad, JoyButton.X)
+                    || Godot.Input.IsJoyButtonPressed(pad, JoyButton.Start);
+        if (pressed) GetTree().ReloadCurrentScene();
+    }
+
+    // Combo counter: consecutive hits by players, reset after a short lull.
+    private const double ComboLull = 1.6;
+    private int _comboHits;
+    private double _comboExpires;
+
+    private void OnHitLanded(Fighter? attacker, Fighter victim, float amount)
+    {
+        // Wall bounces arrive with no attacker and extend whatever is running.
+        bool byPlayer = attacker is null ? victim.Hostile && _comboHits > 0 : !attacker.Hostile;
+        if (!byPlayer) return;
+        _comboHits++;
+        _comboExpires = GameClock.Seconds + ComboLull;
+    }
+
+    // ----------------------------------------------------------------- hud
+
     private void BuildHud()
     {
         var layer = new CanvasLayer();
         AddChild(layer);
-        _hud = new Label
-        {
-            Position = new Vector2(16, 12),
-            Theme = new Theme(),
-        };
-        _hud.AddThemeFontSizeOverride("font_size", 15);
-        _hud.AddThemeColorOverride("font_color", new Color(1f, 1f, 1f));
-        _hud.AddThemeColorOverride("font_outline_color", new Color(0f, 0f, 0f));
-        _hud.AddThemeConstantOverride("outline_size", 5);
+
+        _hud = MakeLabel(15, 5);
+        _hud.Position = new Vector2(16, 12);
         layer.AddChild(_hud);
+
+        _banner = MakeLabel(44, 10);
+        _banner.HorizontalAlignment = HorizontalAlignment.Center;
+        _banner.SetAnchorsPreset(Control.LayoutPreset.TopWide);
+        _banner.OffsetTop = 120;
+        layer.AddChild(_banner);
     }
+
+    private static Label MakeLabel(int size, int outline)
+    {
+        var label = new Label { Theme = new Theme() };
+        label.AddThemeFontSizeOverride("font_size", size);
+        label.AddThemeColorOverride("font_color", new Color(1f, 1f, 1f));
+        label.AddThemeColorOverride("font_outline_color", new Color(0f, 0f, 0f));
+        label.AddThemeConstantOverride("outline_size", outline);
+        return label;
+    }
+
+    private void UpdateHud()
+    {
+        if (_hud is null || _banner is null) return;
+
+        var sb = new StringBuilder();
+        if (_director is WaveDirector d)
+        {
+            sb.AppendLine($"WAVE {d.WaveNumber}/{d.WaveCount}    ENEMIES {d.EnemiesAlive}    LIVES {d.Lives}");
+            _banner.Text = d.Banner;
+            if (_endedAt >= 0 && GameClock.Seconds - _endedAt > 1.5)
+                _banner.Text += "\npress attack to play again";
+        }
+        else
+        {
+            sb.AppendLine("SANDBOX");
+            _banner.Text = "";
+        }
+
+        sb.AppendLine();
+        foreach (PlayerFighter p in _players)
+            sb.AppendLine($"P{p.PlayerIndex + 1} [{p.Source.Describe()}]  hp {p.Health:F0}  {p.DebugState}");
+        for (int i = 0; i < _dummies.Count; i++)
+            sb.AppendLine($"Dummy  hp {_dummies[i].Health:F0} / {_dummies[i].MaxHealth:F0}");
+        foreach (BossClown b in _bosses)
+            sb.AppendLine($"BOSS  hp {b.Health:F0} / {b.MaxHealth:F0}  {b.DebugState}");
+
+        if (_comboHits > 0 && GameClock.Seconds > _comboExpires) _comboHits = 0;
+        if (_comboHits > 1)
+        {
+            sb.AppendLine();
+            sb.AppendLine($">>> {_comboHits} HITS <<<");
+        }
+
+        sb.AppendLine();
+        sb.AppendLine("WASD move | J attack | Space jump | K dodge      pad: stick | X | A | B");
+        sb.AppendLine("hold attack 3s: throw mallet | hold attack + left/right: spin | attack in air: flip");
+        _hud.Text = sb.ToString();
+    }
+
+    // -------------------------------------------------------------- frames
+
+    public override void _PhysicsProcess(double delta)
+    {
+        GameClock.Advance(delta);
+        TickRespawns();
+        if (_outcomeProbe.Length > 0) TickOutcomeProbe();
+    }
+
+    public override void _Process(double delta)
+    {
+        if (_aiProbe) { TickAiProbe((float)delta); return; }
+        if (_hud is null) return;   // probe modes that build no HUD
+
+        PollForJoins((float)delta);
+        PollForRestart();
+        UpdateHud();
+    }
+
+    // -------------------------------------------------------------- probes
 
     private float _aiProbeTime;
     private int _aiProbeTick;
 
-    /// <summary>
-    /// Headless assertion that the AI closes distance and swings. Run with:
-    ///   godot --headless --path . -- aitest
-    /// </summary>
+    /// <summary>Boss AI closes distance, swings and slams. "-- aitest"</summary>
     private void TickAiProbe(float dt)
     {
         _aiProbeTime += dt;
@@ -249,12 +379,6 @@ public partial class GameRoot : Node3D
         float d = b.GlobalPosition.DistanceTo(p.GlobalPosition);
         GD.Print($"  t={_aiProbeTime:F1}  dist={d:F2}  boss={b.DebugState} clip={b.CurrentClip}  playerHp={p.Health:F0}");
 
-        if (!DisplayServer.GetName().Contains("headless") && _aiProbeTick % 3 == 0)
-        {
-            Image img = GetViewport().GetTexture().GetImage();
-            img.SavePng($"C:/Claude/ClownSquad/debug/ai_{_aiProbeTick}.png");
-        }
-
         if (++_aiProbeTick > 26)
         {
             GD.Print("=== AI PROBE DONE ===");
@@ -262,35 +386,45 @@ public partial class GameRoot : Node3D
         }
     }
 
-    public override void _Process(double delta)
+    private int _shots;
+
+    /// <summary>
+    /// Plays the whole fight unattended, fast. For "win" an AI drives the
+    /// player; for "lose" nobody does. Either way the outcome is asserted.
+    /// </summary>
+    private void StartOutcomeProbe()
     {
-        TickRespawns(delta);
-        if (_aiProbe) { TickAiProbe((float)delta); return; }
-        if (_hud is null) return;   // probe mode builds no HUD
+        Engine.TimeScale = 4.0;
+        GD.Print($"=== WAVE PROBE: expecting {_outcomeProbe} ===");
+        if (_outcomeProbe != "win") return;
 
-        PollForJoins((float)delta);
+        PlayerFighter p = _players[0];
+        p.Source = new BrawlerAi(p, attackRange: 1.7f, backoffRange: 0.8f, attackCooldownMs: 350);
+        p.DamageMultiplier = 2.5f;
+    }
 
-        var sb = new StringBuilder();
-        sb.AppendLine("CLOWN SQUAD - combat test");
-        sb.AppendLine("Keyboard: WASD move | J attack | Space jump | K or Shift dodge");
-        sb.AppendLine("Gamepad:  stick move | X attack | A jump | B or RB dodge");
-        sb.AppendLine("Hold attack 3s standing: throw mallet | hold attack + left/right: spin");
-        sb.AppendLine("Attack in the air: front flip | dodge cancels a swing");
-        sb.AppendLine("Unjoined pad? Press A / X to join.");
-        sb.AppendLine();
-        foreach (PlayerFighter p in _players)
-            sb.AppendLine($"P{p.PlayerIndex + 1} [{p.Source.Describe()}]  hp {p.Health:F0}  {p.DebugState}  clip={p.CurrentClip}");
-        sb.AppendLine();
-        for (int i = 0; i < _dummies.Count; i++)
-            sb.AppendLine($"Dummy {i + 1}  hp {_dummies[i].Health:F0} / {_dummies[i].MaxHealth:F0}");
-        foreach (BossClown b in _bosses)
-            sb.AppendLine($"BOSS CLOWN  hp {b.Health:F0} / {b.MaxHealth:F0}  {b.DebugState}  clip={b.CurrentClip}");
-        if (_comboHits > 0 && _clock > _comboExpires) _comboHits = 0;
-        if (_comboHits > 1)
+    private void TickOutcomeProbe()
+    {
+        WaveDirector d = _director!;
+
+        // A few stills along the way, when there is a window to take them from.
+        if (!DisplayServer.GetName().Contains("headless") && GameClock.Seconds > 4.0 + _shots * 5.0 && _shots < 6)
         {
-            sb.AppendLine();
-            sb.AppendLine($">>> {_comboHits} HITS <<<");
+            GetViewport().GetTexture().GetImage().SavePng($"C:/Claude/ClownSquad/debug/wave_{_shots}.png");
+            _shots++;
         }
-        _hud.Text = sb.ToString();
+
+        bool over = d.Current is WaveDirector.Phase.Victory or WaveDirector.Phase.Defeat;
+        if (!over && GameClock.Seconds < 300) return;
+        if (over && GameClock.Seconds - _endedAt < 2.0) return;   // let the ending show
+
+        string got = d.Current == WaveDirector.Phase.Victory ? "win"
+                   : d.Current == WaveDirector.Phase.Defeat ? "lose" : "timeout";
+        bool ok = got == _outcomeProbe;
+        GD.Print($"=== WAVE PROBE {(ok ? "PASS" : "FAIL")}: got {got}, expected {_outcomeProbe}; " +
+                 $"wave {d.WaveNumber}/{d.WaveCount}, lives {d.Lives}, {GameClock.Seconds:F0}s of game time ===");
+        _outcomeProbe = "";
+        Engine.TimeScale = 1.0;
+        GetTree().Quit(ok ? 0 : 1);
     }
 }

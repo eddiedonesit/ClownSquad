@@ -93,6 +93,7 @@ public partial class Fighter : CharacterBody3D
     private bool _groundBounced;
     private bool _wallBounced;
     private Color _pendingTint = Colors.White;
+    private float _despawnIn;
 
     public event Action<Fighter>? Died;
 
@@ -134,6 +135,14 @@ public partial class Fighter : CharacterBody3D
     public override void _PhysicsProcess(double delta)
     {
         float dt = (float)delta;
+
+        if (_despawnIn > 0f)
+        {
+            _despawnIn -= dt;
+            if (_despawnIn <= 0f) { QueueFree(); return; }
+            // Blink out over the last moments, the way arcade bodies always have.
+            if (_despawnIn < 0.7f) Visual.Visible = (int)(_despawnIn / 0.07f) % 2 == 0;
+        }
 
         // Hitstop: nothing moves, nothing advances, and velocity is kept so a
         // mid-air hit resumes its arc afterwards instead of dropping dead.
@@ -206,12 +215,14 @@ public partial class Fighter : CharacterBody3D
         // Airborne bodies keep their momentum; that travel is the juggle.
         if (Grounded) ApplyGroundMovement(Vector3.Zero, dt);
 
-        PinClipFrame("hit", 0);
+        bool floored = (Down || IsDead) && Grounded;
+        bool hasFlooredArt = Visual.HasClip("down");
+        PinClipFrame(floored && hasFlooredArt ? "down" : "hit", 0);
 
         if (Down || IsDead)
         {
-            // No lying-down art yet, so a floored body is the hit pose pressed flat.
-            Visual?.Squash(0.7f);
+            // Sheets without a floored frame fall back to the hit pose pressed flat.
+            if (floored && !hasFlooredArt) Visual?.Squash(0.7f);
             if (!IsDead)
             {
                 _downRemaining -= dt;
@@ -315,6 +326,8 @@ public partial class Fighter : CharacterBody3D
             float launch = info.Launch * LaunchScale;
             // Any hit on a body already in the air keeps it up a little longer.
             if (Launched && !Grounded && LaunchScale > 0f) launch = Mathf.Max(launch, 3.4f);
+            // A killing blow always lifts the body, so a knockout reads as one.
+            if (IsDead && LaunchScale > 0f) launch = Mathf.Max(launch, 4.8f);
             if (launch > 0f)
             {
                 // Each successive juggle hit lifts less, so juggles end on their
@@ -357,6 +370,15 @@ public partial class Fighter : CharacterBody3D
             hits++;
         }
         return hits;
+    }
+
+    /// <summary>
+    /// Leave the fight for good: stop being a target, lie there, blink, vanish.
+    /// </summary>
+    public void BeginDespawn(float lieFor = 0.9f)
+    {
+        RemoveFromGroup(Group);
+        _despawnIn = lieFor + 0.7f;
     }
 
     public void ApplyHitstop(float seconds)

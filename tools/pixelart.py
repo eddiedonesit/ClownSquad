@@ -152,3 +152,22 @@ def touches_border(canvas):
     b, w, h = canvas.buf, canvas.w, canvas.h
     return (any(b[0]) or any(b[h - 1])
             or any(b[y][0] for y in range(h)) or any(b[y][w - 1] for y in range(h)))
+
+
+def laid_down(canvas, cx, cy, baseline):
+    """Tip a standing figure onto its back and rest it on the baseline row.
+
+    Rotates a quarter turn anticlockwise (falling backwards when facing right),
+    then slides the result down until its lowest pixel sits on the ground.
+    """
+    out = rotated(canvas, -90, cx, cy)
+    rows = [y for y in range(out.h) if any(out.buf[y])]
+    if not rows:
+        return out
+    shift = (baseline - 1) - rows[-1]
+    moved = Canvas(out.w, out.h, out.ox, out.oy)
+    for y in range(out.h):
+        sy = y - shift
+        if 0 <= sy < out.h:
+            moved.buf[y] = list(out.buf[sy])
+    return moved

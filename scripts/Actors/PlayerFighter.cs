@@ -66,6 +66,9 @@ public partial class PlayerFighter : Fighter
     /// <summary>False while a thrown mallet is in flight. Unarmed fighters cannot attack.</summary>
     public bool Armed { get; private set; } = true;
 
+    /// <summary>Scales all damage this fighter deals. Weak enemies sit below one.</summary>
+    public float DamageMultiplier { get; set; } = 1f;
+
     private State _state = State.Free;
     private InputCommand _cmd;
     private int _comboIndex;
@@ -297,9 +300,12 @@ public partial class PlayerFighter : Fighter
         if (!_impactSpawned && _phaseTime >= activeStart + step.Active * 0.5f)
         {
             _impactSpawned = true;
-            Vector3 at = GlobalPosition + Facing * MalletForward + new Vector3(0f, MalletHeight, 0f);
-            ImpactEffect.Spawn(GetParent(), at, 0.7f + _comboIndex * 0.25f);
-            CameraShake.Request(this, 0.035f + _comboIndex * 0.03f, 0.16f + _comboIndex * 0.04f);
+            if (HasMalletMoves)   // only a mallet strikes the ground
+            {
+                Vector3 at = GlobalPosition + Facing * MalletForward + new Vector3(0f, MalletHeight, 0f);
+                ImpactEffect.Spawn(GetParent(), at, 0.7f + _comboIndex * 0.25f);
+                CameraShake.Request(this, 0.035f + _comboIndex * 0.03f, 0.16f + _comboIndex * 0.04f);
+            }
         }
 
         // Pin the swing frame to the phase, so the visible swing is the hitbox.
@@ -587,7 +593,7 @@ public partial class PlayerFighter : Fighter
     private void Strike(Fighter other, float damage, Vector3 dir, float knockback,
                         float hitstop, float launch = 0f, float stun = 0.26f)
     {
-        other.TakeDamage(new DamageInfo(damage, dir, knockback, hitstop, this, launch, stun));
+        other.TakeDamage(new DamageInfo(damage * DamageMultiplier, dir, knockback, hitstop, this, launch, stun));
         ApplyHitstop(hitstop);
         Spark(other);
     }
@@ -595,7 +601,7 @@ public partial class PlayerFighter : Fighter
     /// <summary>A hit delivered by this fighter's thrown weapon rather than its body.</summary>
     public void StrikeFromProjectile(Fighter other, float damage, Vector3 dir, float knockback, float launch)
     {
-        other.TakeDamage(new DamageInfo(damage, dir, knockback, 0.06f, this, launch, 0.35f));
+        other.TakeDamage(new DamageInfo(damage * DamageMultiplier, dir, knockback, 0.06f, this, launch, 0.35f));
         Spark(other);
     }
 

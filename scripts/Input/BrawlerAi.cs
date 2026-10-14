@@ -3,11 +3,17 @@ namespace ClownSquad.Input;
 using Godot;
 using ClownSquad.Actors;
 using ClownSquad.Combat;
+using ClownSquad.World;
 
 /// <summary>
-/// Drives a fighter toward the nearest opposing fighter and swings when close.
-/// Per ADR 0003 this is just another input source: nothing downstream knows the
-/// commands came from code rather than a gamepad.
+/// Drives a fighter against the nearest opposing fighter. Per ADR 0003 this is
+/// just another input source: nothing downstream knows the commands came from
+/// code rather than a gamepad.
+///
+/// Enemies take turns. One holding an attack token closes in, lines up on the
+/// target's depth lane and swings; the rest wait in a loose ring, spaced apart,
+/// until a token frees up. That turn-taking is what gives a crowd readable
+/// openings instead of a dogpile.
 /// </summary>
 public sealed class BrawlerAi : IInputSource
 {
@@ -19,6 +25,10 @@ public sealed class BrawlerAi : IInputSource
     private readonly float _specialRange;
     private readonly float _depthTolerance;
 
+    // Per-enemy quirks, fixed at birth, so a crowd does not move in lockstep.
+    private readonly float _standoff;
+    private readonly float _laneBias;
+
     private ulong _nextAttackMs;
     private ulong _nextSpecialMs;
 
@@ -29,12 +39,17 @@ public sealed class BrawlerAi : IInputSource
         _self = self;
         _attackRange = attackRange;
         _backoffRange = backoffRange;
-        _attackCooldownMs = attackCooldownMs;
         _specialCooldownMs = specialCooldownMs;
         _specialRange = specialRange;
         _depthTolerance = depthTolerance;
+
+        ulong id = self.GetInstanceId();
+        _attackCooldownMs = (ulong)(attackCooldownMs * (0.8f + (id % 7) / 7f * 0.5f));
+        _standoff = attackRange + 1.3f + (id % 3) * 0.5f;
+        _laneBias = ((int)(id % 5) - 2) * 0.6f;
+
         // Stagger the first special so it is not thrown the instant combat opens.
-        _nextSpecialMs = Time.GetTicksMsec() + specialCooldownMs / 2;
+        _nextSpecialMs = GameClock.Ms + specialCooldownMs / 2;
     }
 
     public string Describe() => "AI";
@@ -50,46 +65,80 @@ public sealed class BrawlerAi : IInputSource
         if (dist < 0.01f) return InputCommand.None;
 
         Vector3 dir = delta / dist;
-        Vector2 move = Vector2.Zero;
-        bool attack = false;
-        ulong nowMs = Time.GetTicksMsec();
+        ulong now = GameClock.Ms;
 
-        // Specials reach further than a swing, so they are checked first and can
-        // open from outside melee range - that is what makes them threatening.
-        if (_specialCooldownMs > 0 && dist <= _specialRange && nowMs >= _nextSpecialMs)
+        // Specials reach further than a swing and are checked first, so they
+        // can open from outside melee range.
+        if (_specialCooldownMs > 0 && dist <= _specialRange && now >= _nextSpecialMs)
         {
-            _nextSpecialMs = nowMs + _specialCooldownMs;
+            _nextSpecialMs = now + _specialCooldownMs;
             return new InputCommand(Vector2.Zero, false, false, false, true);
         }
 
-        float depthOffset = Mathf.Abs(delta.Z);
+        Vector2 move = Vector2.Zero;
+        bool attack = false;
 
-        if (dist > _attackRange)
+        // Player-side AI (used by tests) is never rationed; enemies need a token.
+        bool rested = now >= _nextAttackMs;
+        bool engaged = rested && (!_self.Hostile || AttackTokens.TryAcquire(_self, 500));
+
+        if (engaged)
         {
-            move = new Vector2(dir.X, dir.Z);
-        }
-        else if (depthOffset > _depthTolerance)
-        {
-            // In range but off the lane: step along depth only. Swinging from
-            // here would whiff, which reads as the enemy being broken.
-            move = new Vector2(0f, Mathf.Sign(delta.Z));
-        }
-        else if (dist < _backoffRange)
-        {
-            // Too close to swing comfortably; give ground rather than overlap.
-            move = new Vector2(-dir.X, -dir.Z);
+            if (dist > _attackRange)
+            {
+                move = new Vector2(dir.X, dir.Z);
+            }
+            else if (Mathf.Abs(delta.Z) > _depthTolerance)
+            {
+                // In range but off the lane: step along depth only. Swinging
+                // from here would whiff.
+                move = new Vector2(0f, Mathf.Sign(delta.Z));
+            }
+            else if (dist < _backoffRange)
+            {
+                move = new Vector2(-dir.X, -dir.Z);
+            }
+            else
+            {
+                attack = true;
+                _nextAttackMs = now + _attackCooldownMs;   // and the token lapses
+            }
         }
         else
         {
-            // Only so many enemies may swing at once; the rest hold position.
-            if (nowMs >= _nextAttackMs && AttackTokens.TryAcquire(_self, 900))
+            // Wait on our own side of the target, offset in depth.
+            float side = _self.GlobalPosition.X >= target.GlobalPosition.X ? 1f : -1f;
+            Vector3 hold = target.GlobalPosition + new Vector3(side * _standoff, 0f, _laneBias);
+            Vector3 toHold = hold - _self.GlobalPosition;
+            toHold.Y = 0f;
+            if (toHold.Length() > 0.4f)
             {
-                attack = true;
-                _nextAttackMs = nowMs + _attackCooldownMs;
+                Vector3 h = toHold.Normalized() * 0.75f;
+                move = new Vector2(h.X, h.Z);
             }
         }
 
+        move += Separation();
         return new InputCommand(move, attack, false, false);
+    }
+
+    /// <summary>Steer away from allies standing too close, so a crowd spreads out.</summary>
+    private Vector2 Separation()
+    {
+        const float Personal = 1.15f;
+        Vector2 push = Vector2.Zero;
+        foreach (Node node in _self.GetTree().GetNodesInGroup(Fighter.Group))
+        {
+            if (node is not Fighter f || f == _self || f.Hostile != _self.Hostile || f.IsDead) continue;
+            Vector3 away = _self.GlobalPosition - f.GlobalPosition;
+            away.Y = 0f;
+            float d = away.Length();
+            if (d >= Personal) continue;
+            // Two bodies on exactly the same spot still need a direction to part in.
+            Vector3 n = d < 0.01f ? new Vector3(_laneBias >= 0f ? 1f : -1f, 0f, 0.5f) : away / d;
+            push += new Vector2(n.X, n.Z) * (1f - d / Personal);
+        }
+        return push * 0.9f;
     }
 
     /// <summary>Nearest living fighter on the opposing side.</summary>
