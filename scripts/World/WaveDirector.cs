@@ -5,6 +5,7 @@ using Godot;
 using ClownSquad.Actors;
 using ClownSquad.Audio;
 using ClownSquad.Input;
+using ClownSquad.Map;
 using ClownSquad.Progression;
 
 /// <summary>
@@ -19,10 +20,26 @@ public partial class WaveDirector : Node
 {
     public enum Phase { Intermission, Fighting, Victory, Defeat }
 
-    private readonly record struct Wave(int Grunts, bool Boss);
+    // The fight run with no stage chosen (tests, the sandbox): teach, press,
+    // then test - a few, more, then the boss with company.
+    private static readonly WaveDef[] DefaultWaves = { new(3, false), new(5, false), new(2, true) };
 
-    // Teach, press, then test: a few, more, then the boss with company.
-    private static readonly Wave[] Waves = { new(3, false), new(5, false), new(2, true) };
+    /// <summary>The waves to run. A stage from the world map replaces the default.</summary>
+    public WaveDef[] Waves { get; set; } = DefaultWaves;
+
+    /// <summary>Enemies never fall below this level, however low the host is.</summary>
+    public int LevelFloor { get; set; } = 1;
+
+    /// <summary>Multiplies the Rare, Epic and Legendary spawn weights; later worlds raise it.</summary>
+    public float RankBoost { get; set; } = 1f;
+
+    /// <summary>Time between a grunt's attacks; later worlds shorten it.</summary>
+    public int GruntCooldownMs { get; set; } = 1300;
+
+    /// <summary>Above zero, this is a bonus stage: harmless pinatas stream in until the clock runs out.</summary>
+    public float BonusSeconds { get; set; }
+    public float BonusLeft { get; private set; }
+    public bool IsBonus => BonusSeconds > 0f;
 
     private const float Intermission = 2.2f;
 
@@ -72,11 +89,14 @@ public partial class WaveDirector : Node
         _rng.Seed = Seed;
         _normalTimeScale = Engine.TimeScale;
         _timer = Intermission;
+        BonusLeft = BonusSeconds;
     }
 
     public string Banner => Current switch
     {
+        Phase.Intermission when IsBonus => "PINATA PARTY!",
         Phase.Intermission => WaveNumber == WaveCount ? "FINAL WAVE" : $"WAVE {WaveNumber}",
+        Phase.Victory when IsBonus => "PARTY'S OVER!",
         Phase.Victory => "YOU WIN!",
         Phase.Defeat => "GAME OVER",
         _ => "",
@@ -99,11 +119,13 @@ public partial class WaveDirector : Node
     {
         float dt = (float)delta;
 
+        if (IsBonus) { TickBonus(dt); return; }
+
         if (Current == Phase.Intermission)
         {
             _timer -= dt;
             if (_timer > 0f) return;
-            Wave wave = Waves[WaveNumber - 1];
+            WaveDef wave = Waves[WaveNumber - 1];
             _gruntsToSpawn = wave.Grunts;
             _bossToSpawn = wave.Boss;
             _spawnTimer = 0f;
@@ -130,6 +152,36 @@ public partial class WaveDirector : Node
         }
     }
 
+    /// <summary>
+    /// The bonus stage: pinatas keep coming, a few at a time, and the party
+    /// ends when the clock does. Nothing fights back, so it cannot be lost.
+    /// </summary>
+    private void TickBonus(float dt)
+    {
+        if (Current == Phase.Intermission)
+        {
+            _timer -= dt;
+            if (_timer <= 0f) Set(Phase.Fighting);
+            return;
+        }
+        if (Current != Phase.Fighting) return;
+        BonusLeft -= dt;
+        if (BonusLeft <= 0f)
+        {
+            BonusLeft = 0f;
+            foreach (Node n in GetTree().GetNodesInGroup(Fighter.Group))
+                if (n is GruntClown g && !g.IsDead) g.BeginDespawn(0.1f);
+            Set(Phase.Victory);
+            return;
+        }
+        _spawnTimer -= dt;
+        if (_spawnTimer <= 0f && EnemiesAlive < 6)
+        {
+            _spawnTimer = 0.55f;
+            Spawn(boss: false, harmless: true);
+        }
+    }
+
     public override void _Process(double delta)
     {
         // Slow motion is timed on the wall clock, since game time is what it bends.
@@ -140,17 +192,20 @@ public partial class WaveDirector : Node
         }
     }
 
-    private void Spawn(bool boss)
+    private void Spawn(bool boss, bool harmless = false)
     {
         PlayerFighter enemy = boss ? new BossClown { Name = "BossClown" } : new GruntClown { Name = "Grunt" };
-        if (!boss) enemy.DisplayName = GruntNames[_rng.RandiRange(0, GruntNames.Length - 1)];
+        if (!boss) enemy.DisplayName = harmless ? "PINATA" : GruntNames[_rng.RandiRange(0, GruntNames.Length - 1)];
         enemy.Source = boss
             ? new BrawlerAi(enemy, attackRange: 2.2f, backoffRange: 1.2f, attackCooldownMs: 700,
                             specialCooldownMs: 5000, specialRange: 6.0f)
-            : new BrawlerAi(enemy, attackRange: 1.35f, backoffRange: 0.7f, attackCooldownMs: 1300);
+            : new BrawlerAi(enemy, attackRange: 1.35f, backoffRange: 0.7f,
+                            attackCooldownMs: harmless ? 99999999UL : (ulong)GruntCooldownMs);
 
         _world.AddChild(enemy);
-        enemy.ApplyEnemyRank(HostLevel(), boss ? EnemyRank.Common : RollRank());
+        int level = Mathf.Max(LevelFloor, HostLevel());
+        enemy.ApplyEnemyRank(level, boss || harmless ? EnemyRank.Common : RollRank());
+        if (harmless) enemy.DamageMultiplier = 0f;
         if (enemy.Rank != EnemyRank.Common)
             GD.Print($"{enemy.DisplayName} appears (level {enemy.EnemyLevel}).");
 
@@ -172,12 +227,13 @@ public partial class WaveDirector : Node
     private EnemyRank RollRank()
     {
         if (ForceRank is EnemyRank forced) return forced;
+        int Weight(EnemyRank r, int w) => r == EnemyRank.Common ? w : (int)Mathf.Round(w * RankBoost);
         int total = 0;
-        foreach ((_, int w) in RankWeights) total += w;
+        foreach ((EnemyRank r, int w) in RankWeights) total += Weight(r, w);
         int roll = _rng.RandiRange(1, total);
         foreach ((EnemyRank rank, int w) in RankWeights)
         {
-            roll -= w;
+            roll -= Weight(rank, w);
             if (roll <= 0) return rank;
         }
         return EnemyRank.Common;
@@ -190,7 +246,7 @@ public partial class WaveDirector : Node
         EnemyDefeated?.Invoke(enemy);
 
         // The last blow of the fight lands in slow motion.
-        bool finalBlow = WaveNumber >= WaveCount && EnemiesAlive == 0 && _gruntsToSpawn == 0 && !_bossToSpawn;
+        bool finalBlow = !IsBonus && WaveNumber >= WaveCount && EnemiesAlive == 0 && _gruntsToSpawn == 0 && !_bossToSpawn;
         if (finalBlow && Engine.TimeScale <= 1.01)
         {
             Engine.TimeScale = 0.3;

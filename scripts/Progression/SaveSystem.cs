@@ -12,6 +12,8 @@ public sealed class SaveData
     public int Version { get; set; } = SaveSystem.CurrentVersion;
     /// <summary>One character per player slot, by index.</summary>
     public List<CharacterRecord> Characters { get; set; } = new();
+    /// <summary>World map progress, shared by the whole squad.</summary>
+    public ClownSquad.Map.CampaignState Campaign { get; set; } = new();
 }
 
 /// <summary>
@@ -23,8 +25,9 @@ public sealed class SaveData
 /// </summary>
 public static class SaveSystem
 {
-    // 2: gear (Equipped, Stash). Version 1 files load as-is, with no gear.
-    public const int CurrentVersion = 2;
+    // 2: gear (Equipped, Stash). 3: campaign progress and gold.
+    // Older files load as-is: missing fields take their defaults.
+    public const int CurrentVersion = 3;
     public const string DefaultPath = "user://clownsquad_save.json";
 
     // Enums are written by name, so the file is readable and survives reordering.

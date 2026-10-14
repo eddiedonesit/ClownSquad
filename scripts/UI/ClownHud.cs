@@ -70,8 +70,12 @@ public partial class ClownHud : CanvasLayer
 
     public int Combo { get; set; }
 
-    /// <summary>Items each player is carrying this stage, banked on a clear.</summary>
-    public Func<PlayerFighter, int>? BagCount { get; set; }
+    /// <summary>What each player is carrying this stage (items and gold), banked on a clear.</summary>
+    public Func<PlayerFighter, string>? BagText { get; set; }
+
+    /// <summary>Shown before the wave count, e.g. "1-3  ".</summary>
+    public string StageLabel { get; set; } = "";
+    public string ReplayText { get; set; } = "press ATTACK to play again";
 
     public ClownHud(Func<IReadOnlyList<PlayerFighter>> players, Func<WaveDirector?> director, Func<bool> canReplay)
     {
@@ -375,9 +379,9 @@ public partial class ClownHud : CanvasLayer
                 xp.Size = new Vector2(need > 0 ? 180f * r.Xp / need : 180f, 4f);
                 points.Visible = r.StatPoints > 0;
                 points.Text = $"+{r.StatPoints} PTS  TAB";
-                int carried = BagCount?.Invoke(p) ?? 0;
-                _bags[i].Visible = carried > 0;
-                _bags[i].Text = $"LOOT {carried}";
+                string carried = BagText?.Invoke(p) ?? "";
+                _bags[i].Visible = carried.Length > 0;
+                _bags[i].Text = carried;
                 points.Modulate = new Color(1f, 1f, 1f, 0.65f + 0.35f * Mathf.Sin((float)_clock * 6f));
             }
         }
@@ -406,7 +410,8 @@ public partial class ClownHud : CanvasLayer
         _ticket.Visible = d is not null;
         if (d is not null)
         {
-            _ticketText.Text = $"WAVE  {d.WaveNumber} / {d.WaveCount}";
+            _ticketText.Text = d.IsBonus ? $"PARTY  {Mathf.CeilToInt(d.BonusLeft)}s"
+                             : $"{StageLabel}WAVE {d.WaveNumber}/{d.WaveCount}";
             _balloons.Count = d.Lives;
         }
 
@@ -449,6 +454,6 @@ public partial class ClownHud : CanvasLayer
             _banner.Text = text;
             if (text.Length > 0) Pop(_banner, 0.2f);
         }
-        _subBanner.Text = _canReplay() ? "press ATTACK to play again" : "";
+        _subBanner.Text = _canReplay() ? ReplayText : "";
     }
 }

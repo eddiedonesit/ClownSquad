@@ -17,6 +17,8 @@ C:/Tools/Godot/4.7.2/Godot_v4.7.2-stable_mono_win64_console.exe --headless --pat
 C:/Tools/Godot/4.7.2/Godot_v4.7.2-stable_mono_win64_console.exe --headless --path C:/Claude/ClownSquad -- losetest
 
 # the old training room (dummy and respawning boss): add  -- sandbox
+# the game opens on the world map; run one stage directly with  -- stage 2-3  (or  -- fight  for the old free fight)
+# campaign checks: add  stage 1-1  to wavetest (bonus: stage 1-*; secret shop: stage 1-3 secret)
 
 # moves: screen walls, charge throw, spin, flip, launch and wall bounce (17 checks)
 C:/Tools/Godot/4.7.2/Godot_v4.7.2-stable_mono_win64_console.exe --headless --path C:/Claude/ClownSquad -- movetest
@@ -58,6 +60,9 @@ immediately; pads join by pressing a button.
 | Enemy scaling | Enemies take the host's level (health +12%, damage +8%, XP +15% per level). Grunts roll a rank: Common / Rare (x1.6) / Epic (x2.5) / wild Legendary (x5) at 1000/150/30/1, with a tint, size and glow; ranked enemies give 2.5x / 5x / 15x XP |
 | Loot | Mallet, Hat, Ruff, Shoes. Base item, quality roll 85-115%, rarity Common to Legendary (1000/300/60/12/1, pushed by enemy rank, bosses, LUCK and FORTUNE), 0-6 affixes; ability affixes on Epic and Legendary (KABOOM finisher, BOING launches, FORTUNE drops). Drops glow in their rarity colour with a beam for Rare+, and drift to a nearby player; carried in a bag for the stage, banked on a clear (best item per slot is put on), lost on a fail. GEAR page in the Stat Tent (Q/E or bumpers) to swap what each slot wears |
 | Polish | Camera punch-in on big hits and knockouts; the thrown mallet carries its own light |
+| World map | Super Mario World style overworld (scenes/WorldMap.tscn): ten themed islands (tools/gen_map.py), a road of stages 1-1 to 1-5 and a boss per world, a shop off the road, a bonus branch, a gate to the next world. Stages unlock as they are cleared; Q/E views reached worlds; pads join on the map. ADR 0007 |
+| Difficulty | Generated per stage (scripts/Map/Campaign.cs): level floor rising 5 a world, more and bigger waves, rank spawns boosted up to 2.5x, grunt cooldowns 1.3s to 0.65s by world 10. Enemies scale to the host when above the floor |
+| Gold and shops | Enemies pay gold into the stage bag (banked on a clear, lost on a fail). A shop per world (6 items, restocks on every clear there); a secret shop appears between waves in ~7% of stages with much better items. Bonus stages: 40s pinata parties, triple gold, can't be lost |
 | Bertie's fists | No arms: two gloves float beside him and fly at the target on each punch (jab, cross, both for the finisher); hands up and waving through the belly-flop hang |
 | Feel helpers | Lane assist, dodge-cancel from recovery, hit sparks, combo counter, attack tokens |
 | Dodge | Ground slide with i-frames 0.05-0.26s of a 0.35s roll |

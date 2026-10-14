@@ -493,6 +493,7 @@ def main():
     write_prop("prop_crates", prop_crates())
     write_prop("prop_cannon", prop_cannon())
     loot_icons()
+    write_prop("secret_curtain", secret_curtain())
 
 
 
@@ -537,6 +538,22 @@ def loot_icons():
     write_png(os.path.join(OUT, "loot_icons.png"), S * 4, S, to_rows(sheets, S, S))
     print("wrote {}/loot_icons.png  4 icons".format(OUT))
 
+
+
+def secret_curtain():
+    """The secret shop: a little velvet booth with a gold star and a question mark."""
+    mats = PROP_MATS
+    c = HDCanvas(120, 150)
+    c.part()
+    c.poly([(16, 148), (104, 148), (104, 46), (16, 46)], 1)            # booth body (red)
+    c.recolor(lambda x, y, m: 6 if int(x / 11) % 2 == 0 else m)         # blue and red stripes
+    c.part()
+    c.poly([(8, 50), (112, 50), (60, 6)], 2)                            # gold roof
+    c.part()
+    c.poly([(36, 148), (84, 148), (84, 72), (36, 72)], 8)               # dark doorway
+    c.part()
+    c.ellipse(60, 30, 9, 9, 3)                                          # the star's ball
+    return c
 
 
 if __name__ == "__main__":

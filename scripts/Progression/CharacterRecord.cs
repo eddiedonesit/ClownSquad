@@ -28,6 +28,9 @@ public sealed class CharacterRecord
     public int Zip { get; set; }
     public int Luck { get; set; }
 
+    /// <summary>Banked gold, spent in shops.</summary>
+    public int Gold { get; set; }
+
     /// <summary>What is worn, at most one item per slot.</summary>
     public List<ItemData> Equipped { get; set; } = new();
     /// <summary>Everything else banked from cleared stages.</summary>

@@ -7,6 +7,7 @@ using Godot;
 using ClownSquad.Actors;
 using ClownSquad.Combat;
 using ClownSquad.Input;
+using ClownSquad.Map;
 using ClownSquad.Progression;
 using ClownSquad.UI;
 using ClownSquad.Visuals;
@@ -48,6 +49,11 @@ public partial class GameRoot : Node3D
     private double _endedAt = -1;
 
     private StatTent? _tent;
+    private StageDef? _stage;
+    private readonly Dictionary<PlayerFighter, int> _bagGold = new();
+    private int _secretWave = -1;
+    private Node3D? _secretCurtain;
+    private ShopMenu? _shop;
     private CircusArena? _circus;
     private bool _tentHeld;
     private double _tentDueAt = -1;
@@ -91,6 +97,19 @@ public partial class GameRoot : Node3D
             SaveSystem.Load();
         }
 
+        // A stage chosen on the world map, or named on the command line
+        // ("-- stage 2-3"). With neither, and no test or sandbox asked for, the
+        // game opens on the world map.
+        _stage = Campaign.Pending;
+        int stageArg = Array.IndexOf(args, "stage");
+        if (stageArg >= 0 && stageArg + 1 < args.Length) _stage = Campaign.Get(args[stageArg + 1]);
+        Campaign.Pending = null;
+        if (!probe && !Has("sandbox") && !Has("fight") && _stage is null)
+        {
+            CallDeferred(MethodName.GoToMap);
+            return;
+        }
+
         GameClock.Reset();
         AttackTokens.Reset();
         Engine.TimeScale = GameClock.Speed;
@@ -129,6 +148,22 @@ public partial class GameRoot : Node3D
         }
 
         _director = new WaveDirector();
+        if (_stage is StageDef st && Campaign.IsFight(st))
+        {
+            _director.Waves = st.Waves.Length > 0 ? st.Waves : _director.Waves;
+            _director.LevelFloor = st.EnemyLevel;
+            _director.RankBoost = st.RankBoost;
+            _director.GruntCooldownMs = st.GruntCooldownMs;
+            _director.BonusSeconds = st.BonusSeconds;
+            int clears = SaveSystem.Data.Campaign.Cleared.Count;
+            _director.Seed = (ulong)GD.Hash(st.Id) * 7919UL + (ulong)clears;
+            // A rare chance of the secret shop appearing before one of the later waves.
+            var roll = new RandomNumberGenerator { Seed = _director.Seed ^ 0x5ec2e7UL };
+            if (st.Kind != StageKind.Bonus && st.Waves.Length > 1 && (roll.Randf() < SecretShopChance || Has("secret")))
+                _secretWave = roll.RandiRange(2, st.Waves.Length);
+            GD.Print($"Stage {st.Id}: {st.Waves.Length} wave(s), enemy level floor {st.EnemyLevel}, rank boost {st.RankBoost:F2}" +
+                     (_secretWave > 0 ? $", secret shop before wave {_secretWave}" : ""));
+        }
         AddChild(_director);
         _director.PhaseChanged += OnPhaseChanged;
         _director.EnemyDefeated += OnEnemyDefeated;
@@ -243,10 +278,11 @@ public partial class GameRoot : Node3D
 
     private void SpawnPlayers()
     {
-        // Keyboard always joins. Pads join on a button press rather than on
+        // The squad from the map: keyboard first, then any pads that joined
+        // there. More pads can still join here on a button press rather than on
         // detection: one physical controller can appear as two devices, and
         // auto-binding both drives two fighters from one stick.
-        AddPlayer(LocalDeviceInput.Keyboard, 0);
+        for (int i = 0; i < Campaign.SquadDevices.Count; i++) AddPlayer(Campaign.SquadDevices[i], i);
 
         foreach (int pad in Godot.Input.GetConnectedJoypads())
             GD.Print($"  pad {pad}: name=\"{Godot.Input.GetJoyName(pad)}\" guid={Godot.Input.GetJoyGuid(pad)}");
@@ -275,6 +311,7 @@ public partial class GameRoot : Node3D
             {
                 GD.Print($"Player joined on pad {pad} ({Godot.Input.GetJoyName(pad)}).");
                 AddPlayer(pad, _players.Count);
+                if (!Campaign.SquadDevices.Contains(pad)) Campaign.SquadDevices.Add(pad);
                 _joinCooldown = 0.6f;
                 return;
             }
@@ -376,10 +413,23 @@ public partial class GameRoot : Node3D
         WaveDirector d = _director!;
         GD.Print($"[{GameClock.Seconds:F1}s] phase={phase} wave={d.WaveNumber}/{d.WaveCount} lives={d.Lives}");
         if (phase == WaveDirector.Phase.Intermission) SaveSystem.Save();
+        if (phase == WaveDirector.Phase.Intermission && d.WaveNumber == _secretWave && _secretCurtain is null)
+            SpawnSecretCurtain();
         // The win probe forces Rare grunts for its first wave only: enough to be
         // sure of drops, without turning every later wave into a wall.
         if (_outcomeProbe == "win" && phase == WaveDirector.Phase.Intermission && d.WaveNumber >= 2) d.ForceRank = null;
-        if (phase == WaveDirector.Phase.Victory) { CrowdCheer(6f, 20); BankLoot(); }
+        if (phase == WaveDirector.Phase.Victory)
+        {
+            CrowdCheer(6f, 20);
+            BankLoot();
+            if (_stage is StageDef cleared)
+            {
+                Campaign.MarkCleared(SaveSystem.Data.Campaign, cleared);
+                SaveSystem.Data.Campaign.At = cleared.Id;
+                SaveSystem.Save();
+                GD.Print($"Stage {cleared.Id} cleared.");
+            }
+        }
         if (phase == WaveDirector.Phase.Defeat) LoseLoot();
         if (phase is WaveDirector.Phase.Victory or WaveDirector.Phase.Defeat)
         {
@@ -390,6 +440,75 @@ public partial class GameRoot : Node3D
             foreach (PlayerFighter p in _players)
                 if (p.Record is { StatPoints: > 0 }) _tentDueAt = GameClock.Seconds + 2.0;
         }
+    }
+
+    private void GoToMap() => GetTree().ChangeSceneToFile(Campaign.MapScene);
+
+    // ------------------------------------------------------------ secret shop
+
+    /// <summary>Chance a stage has the secret shop somewhere in it.</summary>
+    private const float SecretShopChance = 0.07f;
+
+    /// <summary>A little velvet booth appears in the ring between waves. Walk into it to shop.</summary>
+    private void SpawnSecretCurtain()
+    {
+        const float px = 0.0105f;
+        var tex = GD.Load<Texture2D>("res://assets/arena/secret_curtain.png");
+        var node = new Node3D();
+        AddChild(node);
+        float x = (float)GD.RandRange(-3.5, 3.5);
+        node.GlobalPosition = new Vector3(x, 0f, -3.2f);
+        var sprite = new Sprite3D
+        {
+            Texture = tex, PixelSize = px, Position = new Vector3(0f, tex.GetHeight() * px * 0.5f, 0f),
+            TextureFilter = BaseMaterial3D.TextureFilterEnum.Nearest, AlphaCut = SpriteBase3D.AlphaCutMode.Discard,
+        };
+        if (LitSprite.For("res://assets/arena/secret_curtain.png") is ShaderMaterial lit)
+        {
+            LitSprite.Apply(lit, Colors.White, 0f, false);
+            sprite.MaterialOverride = lit;
+        }
+        node.AddChild(sprite);
+        node.AddChild(new OmniLight3D { LightColor = new Color(0.8f, 0.4f, 1f), LightEnergy = 3f, OmniRange = 3f, Position = new Vector3(0f, 0.8f, 0.6f) });
+        _secretCurtain = node;
+        PopText.Spawn(this, node.GlobalPosition + new Vector3(0f, 1.8f, 0f), "SECRET SHOP!?", new Color(0.85f, 0.55f, 1f), 1.2f, 1.2f);
+        ClownSquad.Audio.Sfx.Play("ding", 0.6f);
+        ClownSquad.Audio.Sfx.Play("kazoo_rise", 1.3f, -6f);
+        GD.Print("The secret shop has appeared.");
+        if (_outcomeProbe.Length > 0 && !DisplayServer.GetName().Contains("headless"))
+            GetTree().CreateTimer(0.8).Timeout += () =>
+                GetViewport().GetTexture().GetImage().SavePng("C:/Claude/ClownSquad/debug/secret_shop.png");
+    }
+
+    private void TickSecretCurtain()
+    {
+        if (_secretCurtain is null || !IsInstanceValid(_secretCurtain) || _shop is not null) return;
+        foreach (PlayerFighter p in _players)
+        {
+            if (p.IsDead) continue;
+            Vector3 d = p.GlobalPosition - _secretCurtain.GlobalPosition;
+            if (new Vector2(d.X, d.Z).Length() > 0.9f) continue;
+            OpenSecretShop();
+            return;
+        }
+    }
+
+    private void OpenSecretShop()
+    {
+        int level = Mathf.Max(_director?.LevelFloor ?? 1, _players[0].Record?.Level ?? 1) + 3;
+        // Better than any world shop: higher level, rarity pushed hard.
+        var shelf = ShopMenu.Stock(_director!.Seed ^ 0xb0057UL, level, 5, 4f);
+        var shoppers = new List<Shopper>();
+        foreach (PlayerFighter p in _players)
+            if (p.Record is CharacterRecord r && p.Source is LocalDeviceInput d)
+                shoppers.Add(new Shopper(r, d.Device, () => p.ApplyProgression(r)));
+        _shop = new ShopMenu("THE SECRET SHOP", shelf, shoppers);
+        _shop.Closed += () =>
+        {
+            if (_secretCurtain is not null && IsInstanceValid(_secretCurtain)) _secretCurtain.QueueFree();
+            ClownSquad.Audio.Sfx.Play("pop");
+        };
+        AddChild(_shop);
     }
 
     private void CrowdCheer(float seconds, int flashes)
@@ -425,6 +544,7 @@ public partial class GameRoot : Node3D
         }
 
         RollDrops(enemy, boss, rank, level);
+        PayGold(enemy, boss, rank, level);
 
         foreach (PlayerFighter p in _players)
         {
@@ -458,6 +578,12 @@ public partial class GameRoot : Node3D
     private void RollDrops(Fighter enemy, bool boss, EnemyRank rank, int level)
     {
         float boost = _players.Count > 0 && _players[0].Record is CharacterRecord host ? Leveling.LootBoost(host) : 0f;
+        if (_director?.IsBonus == true)
+        {
+            // Pinatas: lots of gold, and now and then a prize inside.
+            if (_lootRng.Randf() < 0.3f) SpawnDrop(Loot.Roll(_lootRng, level, 0.5f + boost), enemy.GlobalPosition);
+            return;
+        }
         (float chance, int count, float push) = boss ? (1f, 2, 1.5f) : rank switch
         {
             EnemyRank.Rare => (0.75f, 1, 0.6f),
@@ -494,6 +620,28 @@ public partial class GameRoot : Node3D
         ClownSquad.Audio.Sfx.Play("coin", 0.9f + 0.08f * (int)item.Rarity);
     }
 
+    /// <summary>Gold for a knockout, to whoever landed it, into the stage bag like loot.</summary>
+    private void PayGold(Fighter enemy, bool boss, EnemyRank rank, int level)
+    {
+        PlayerFighter? to = enemy.LastAttacker as PlayerFighter ?? (_players.Count > 0 ? _players[0] : null);
+        if (to is null || to.Hostile) return;
+        float amount = (3f + level * 1.2f) * Leveling.RankXp(rank) * (boss ? 10f : 1f) * _lootRng.RandfRange(0.8f, 1.2f);
+        if (_director?.IsBonus == true) amount *= 3f;
+        int gold = Mathf.Max(1, (int)Mathf.Round(amount));
+        _bagGold[to] = (_bagGold.TryGetValue(to, out int had) ? had : 0) + gold;
+        PopText.Spawn(this, enemy.GlobalPosition + new Vector3(0.4f, enemy.BodyHeight, 0f), $"+{gold} G",
+                      new Color(1f, 0.9f, 0.4f), 0.7f, 0.8f);
+        ClownSquad.Audio.Sfx.Play("coin", 1.3f, -8f);
+    }
+
+    public string BagText(PlayerFighter p)
+    {
+        int items = BagCount(p);
+        int gold = _bagGold.TryGetValue(p, out int g) ? g : 0;
+        if (items == 0 && gold == 0) return "";
+        return items > 0 ? $"LOOT {items}  {gold}G" : $"{gold}G";
+    }
+
     private List<ItemData> Bag(PlayerFighter p)
     {
         if (!_bags.TryGetValue(p, out List<ItemData>? bag)) _bags[p] = bag = new List<ItemData>();
@@ -528,6 +676,12 @@ public partial class GameRoot : Node3D
         foreach (PlayerFighter p in _players)
         {
             if (p.Record is not CharacterRecord r) continue;
+            if (_bagGold.TryGetValue(p, out int gold) && gold > 0)
+            {
+                r.Gold += gold;
+                GD.Print($"{r.Name} banked {gold} gold ({r.Gold} total).");
+            }
+            _bagGold[p] = 0;
             List<ItemData> bag = Bag(p);
             if (bag.Count == 0) continue;
             foreach (ItemData item in bag)
@@ -553,6 +707,7 @@ public partial class GameRoot : Node3D
         {
             int lost = BagCount(p);
             Bag(p).Clear();
+            _bagGold[p] = 0;
             if (lost == 0) continue;
             PopText.Spawn(this, p.GlobalPosition + new Vector3(0f, p.BodyHeight + 0.6f, 0f),
                           $"LOOT LOST x{lost}", new Color(0.7f, 0.7f, 0.75f), 1.0f, 1.0f);
@@ -594,7 +749,10 @@ public partial class GameRoot : Node3D
         bool fresh = pressed && !_restartHeld;
         _restartHeld = pressed;
         if (_tent is not null && (_tent.IsOpen || _tent.MsSinceClosed < 400 || _tentDueAt >= 0)) return;
-        if (fresh) GetTree().ReloadCurrentScene();
+        if (!fresh) return;
+        // A campaign stage returns to the map, won or lost; the free fight replays.
+        if (_stage is not null) GoToMap();
+        else GetTree().ReloadCurrentScene();
     }
 
     // Combo counter: consecutive hits by players, reset after a short lull.
@@ -637,7 +795,12 @@ public partial class GameRoot : Node3D
         _hud.Visible = false;
         _banner.Visible = false;
         _clownHud = new ClownSquad.UI.ClownHud(() => _players, () => _director,
-            () => _endedAt >= 0 && GameClock.Seconds - _endedAt > 1.5) { BagCount = BagCount };
+            () => _endedAt >= 0 && GameClock.Seconds - _endedAt > 1.5)
+        {
+            BagText = BagText,
+            StageLabel = _stage is StageDef s ? (s.Kind == StageKind.Boss ? $"{s.World}-BOSS  " : $"{s.Id}  ") : "",
+            ReplayText = _stage is not null ? "press ATTACK for the map" : "press ATTACK to play again",
+        };
         AddChild(_clownHud);
 
         _tent = new StatTent(() => _players);
@@ -712,6 +875,7 @@ public partial class GameRoot : Node3D
         if (_hud is null) return;   // probe modes that build no HUD
 
         PollForJoins((float)delta);
+        TickSecretCurtain();
         PollStatTent();
         PollForRestart();
         UpdateHud();
@@ -825,6 +989,33 @@ public partial class GameRoot : Node3D
         return dropped && banked && worn;
     }
 
+    /// <summary>
+    /// After a won campaign stage: it is saved as cleared, what it leads to is
+    /// open, gold was banked, a shop sells for the right price, and a forced
+    /// secret shop really appeared. Passes trivially for the free fight.
+    /// </summary>
+    private bool CheckCampaign()
+    {
+        if (_stage is not StageDef st) return true;
+        CampaignState c = SaveSystem.Data.Campaign;
+        CharacterRecord r = SaveSystem.Data.Characters[0];
+        bool cleared = c.Cleared.Contains(st.Id);
+        bool opened = true;
+        foreach (StageDef next in Campaign.Neighbours(st))
+            if (System.Array.IndexOf(next.Requires, st.Id) >= 0) opened &= Campaign.Unlocked(next, c);
+        bool paid = r.Gold > 0;
+
+        int before = r.Gold + 100000;
+        r.Gold = before;
+        var shelf = ShopMenu.Stock(42, st.EnemyLevel, 3, 1f);
+        (ItemData item, int price) = shelf[0];
+        bool bought = ShopMenu.TryBuy(r, shelf, 0, out _) && r.Gold == before - price && (r.Stash.Contains(item) || r.Equipped.Contains(item));
+
+        bool secret = Array.IndexOf(OS.GetCmdlineUserArgs(), "secret") < 0 || _secretCurtain is not null;
+        GD.Print($"  campaign: {st.Id} cleared={cleared} next open={opened} gold banked={paid} shop buy={bought} secret shop={secret}");
+        return cleared && opened && paid && bought && secret;
+    }
+
     private void TickOutcomeProbe()
     {
         WaveDirector d = _director!;
@@ -850,7 +1041,7 @@ public partial class GameRoot : Node3D
         GD.Print($"  sound banks loaded: {ClownSquad.Audio.Sfx.BankCount}; played: {string.Join(" ", heard)}");
         GD.Print($"  sound names with no file: {(ClownSquad.Audio.Sfx.Missing.Count == 0 ? "none" : string.Join(" ", ClownSquad.Audio.Sfx.Missing))}");
         ok &= ClownSquad.Audio.Sfx.Missing.Count == 0;
-        if (_outcomeProbe == "win") ok &= CheckProgression() & CheckLoot();
+        if (_outcomeProbe == "win") ok &= _director!.IsBonus ? CheckCampaign() : CheckProgression() & CheckLoot() & CheckCampaign();
         if (_outcomeProbe == "lose")
         {
             CharacterRecord r = _players[0].Record!;
