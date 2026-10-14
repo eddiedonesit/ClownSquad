@@ -102,6 +102,7 @@ public partial class GameRoot : Node3D
         if (Has("movetest")) { AddChild(new ClownSquad.Debug.MovesProbe()); return; }
 
         _aiProbe = Has("aitest");
+        PlayerFighter.HdSample = Has("hd");
         if (Has("wavetest")) _outcomeProbe = "win";
         if (Has("losetest")) _outcomeProbe = "lose";
 

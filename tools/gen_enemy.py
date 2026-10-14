@@ -135,46 +135,26 @@ with open(os.path.join("assets", "sprites", "boss_clown.frames.json"), "w") as f
 print("wrote {}  {}x{}  {} frames".format(out, W * len(FRAMES), H, len(FRAMES)))
 
 
-# ---------------------------------------------------------------- the gloves
-# Three frames, facing right: open (floating at rest), fist (punching), and up
-# (fingers spread, waving during the belly-flop hang). BossClown draws them as
-# separate sprites, so the frame order here is the Sprite3D frame index.
-FW = 24
+# ---------------------------------------------------------------- the fists
+# One frame: a closed fist in a white cartoon glove, facing right, used for
+# both hands. BossClown floats two of them beside the body.
+FW = 22
 
 
-def glove(kind):
+def fist():
     c = Canvas(FW, FW)
-    if kind == "open":
-        c.ellipse(5, 12, 3, 5, 4)                 # frilly cuff
-        c.ellipse(12, 12, 6, 6, 6)                # palm
-        for y in (8, 12, 16):
-            c.ellipse(18, y, 3, 1, 6)             # three fat cartoon fingers
-        c.ellipse(12, 5, 2, 3, 6)                 # thumb up top
-        c.rect(15, 10, 20, 10, 9)                 # creases between fingers
-        c.rect(15, 14, 20, 14, 9)
-        c.rect(8, 15, 11, 15, 9)                  # palm line
-    elif kind == "fist":
-        c.ellipse(4, 12, 3, 5, 4)
-        c.ellipse(12, 12, 7, 7, 6)
-        for y in (7, 11, 15):
-            c.ellipse(18, y, 2, 2, 6)             # knuckles, the punching face
-        c.rect(16, 9, 19, 9, 9)
-        c.rect(16, 13, 19, 13, 9)
-        c.ellipse(12, 16, 4, 2, 6)                # thumb wrapped under
-        c.rect(9, 14, 15, 14, 9)
-    else:  # up
-        c.ellipse(12, 19, 5, 3, 4)
-        c.ellipse(12, 13, 6, 5, 6)
-        for x, top in ((7, 6), (11, 4), (15, 4), (19, 7)):
-            c.ellipse(x, top, 1, 3, 6)            # fingers spread wide
-        c.rect(9, 9, 9, 11, 9)
-        c.rect(13, 8, 13, 11, 9)
-        c.rect(17, 9, 17, 11, 9)
+    c.ellipse(5, 11, 3, 4, 6)                 # glove cuff, rolled
+    c.rect(4, 8, 4, 14, 9)                    # the cuff seam
+    c.ellipse(12, 11, 7, 7, 6)                # the fist
+    for y in (6, 10, 14):
+        c.ellipse(17, y, 2, 2, 6)             # knuckles, the punching face
+    c.rect(15, 8, 18, 8, 9)                   # creases between the fingers
+    c.rect(15, 12, 18, 12, 9)
+    c.ellipse(11, 15, 4, 2, 6)                # thumb folded under
+    c.rect(8, 13, 14, 13, 9)
     return c
 
 
-gloves = [glove(k) for k in ("open", "fist", "up")]
 gout = os.path.join("assets", "sprites", "boss_fist.png")
-write_png(gout, FW * len(gloves), FW, pack_rows([shade(g) for g in gloves], FW, FW))
-print("wrote {}  {}x{}  3 frames".format(gout, FW * len(gloves), FW))
-print("clips: " + ", ".join("{}={}".format(k, len(v)) for k, v in clips.items()))
+write_png(gout, FW, FW, pack_rows([shade(fist())], FW, FW))
+print("wrote {}  {}x{}  1 frame".format(gout, FW, FW))

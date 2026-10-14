@@ -255,13 +255,12 @@ public partial class BossClown : PlayerFighter
     }
 
     // ---- floating fists ----------------------------------------------------
-    // Bertie has no arms. His gloves hover beside him, Rayman style, and a punch
-    // is a glove flung at whoever he is hitting and reeled back in. The swing's
+    // Bertie has no arms. Two matching white-gloved fists hover close beside him,
+    // Rayman style, and a punch is a fist flung at whoever he is hitting and
+    // reeled back in. The swing's
     // hitbox is unchanged; the glove is drawn to arrive as the hit lands.
 
     private const string FistSheet = "res://assets/sprites/boss_fist.png";
-    private enum Glove { Open = 0, Fist = 1, Up = 2 }
-
     private Sprite3D? _nearFist;
     private Sprite3D? _farFist;
     private float _fistClock;
@@ -273,8 +272,8 @@ public partial class BossClown : PlayerFighter
         _nearFist = MakeFist(sheet);
         _farFist = MakeFist(sheet);
         float f = Facing.X >= 0f ? 1f : -1f;
-        _nearFist.Position = new Vector3(f * 0.95f, 0.85f, 0.14f);
-        _farFist.Position = new Vector3(-f * 0.8f, 1.0f, -0.14f);
+        _nearFist.Position = new Vector3(f * 0.72f, 0.85f, 0.14f);
+        _farFist.Position = new Vector3(-f * 0.62f, 0.9f, -0.14f);
     }
 
     private Sprite3D MakeFist(Texture2D sheet)
@@ -282,8 +281,7 @@ public partial class BossClown : PlayerFighter
         var s = new Sprite3D
         {
             Texture = sheet,
-            Hframes = 3,
-            PixelSize = SpritePixelSize * 1.25f,   // cartoon-big gloves
+            PixelSize = SpritePixelSize * 0.85f,
             Billboard = BaseMaterial3D.BillboardModeEnum.FixedY,
             TextureFilter = BaseMaterial3D.TextureFilterEnum.Nearest,
             AlphaCut = SpriteBase3D.AlphaCutMode.Discard,
@@ -302,23 +300,21 @@ public partial class BossClown : PlayerFighter
         float bob = Mathf.Sin(_fistClock * 3.1f) * 0.07f;
         float bob2 = Mathf.Sin(_fistClock * 3.1f + 1.7f) * 0.07f;
 
-        // Resting: one glove out front at belly height, one trailing behind.
-        Vector3 near = new(f * 0.95f, 0.85f + bob, 0.14f);
-        Vector3 far = new(-f * 0.8f, 1.0f + bob2, -0.14f);
-        Glove nearG = Glove.Open, farG = Glove.Open;
+        // Resting: one fist just ahead of the belly, one just behind, at the same height.
+        Vector3 near = new(f * 0.72f, 0.85f + bob, 0.14f);
+        Vector3 far = new(-f * 0.62f, 0.9f + bob2, -0.14f);
         float rate = 12f;
 
         if (IsDead || Down)
         {
-            near = new Vector3(f * 1.0f, 0.16f, 0.2f);       // gloves flop to the floor
-            far = new Vector3(-f * 0.9f, 0.16f, -0.2f);
+            near = new Vector3(f * 0.8f, 0.14f, 0.2f);       // fists flop to the floor
+            far = new Vector3(-f * 0.7f, 0.14f, -0.2f);
             rate = 7f;
         }
         else if (Launched || Stunned || InHitAnim)
         {
-            near = new Vector3(f * 1.2f, 1.45f, 0.14f);      // flung wide by the hit
-            far = new Vector3(-f * 1.05f, 1.6f, -0.14f);
-            nearG = farG = Glove.Up;
+            near = new Vector3(f * 0.78f, 1.15f, 0.14f);     // jolted up by the hit
+            far = new Vector3(-f * 0.68f, 1.15f, -0.14f);
             rate = 20f;
         }
         else if (InSpecial)
@@ -327,35 +323,33 @@ public partial class BossClown : PlayerFighter
             switch (_flop)
             {
                 case Flop.Crouch:
-                    near = new Vector3(f * 0.9f, 0.4f, 0.14f);
-                    far = new Vector3(-f * 0.8f, 0.45f, -0.14f);
+                    near = new Vector3(f * 0.75f, 0.45f, 0.14f);
+                    far = new Vector3(-f * 0.65f, 0.45f, -0.14f);
                     break;
                 case Flop.Rise:
                 case Flop.Hang:
                     // Hands up, waving, for the whole hang: the flop is coming.
                     // Beside the head rather than over it: the leap tops out
                     // just under the screen edge, so overhead would be off screen.
-                    near = new Vector3(f * 1.15f, 1.85f + wave, 0.14f);
-                    far = new Vector3(-f * 1.05f, 1.95f - wave, -0.14f);
-                    nearG = farG = Glove.Up;
+                    near = new Vector3(f * 0.66f, 1.5f + wave, 0.14f);
+                    far = new Vector3(-f * 0.58f, 1.5f - wave, -0.14f);
                     rate = 16f;
                     break;
                 case Flop.Drop:
-                    near = new Vector3(f * 1.05f, 1.9f, 0.14f);
-                    far = new Vector3(-f * 0.95f, 2.0f, -0.14f);
-                    nearG = farG = Glove.Fist;
+                    near = new Vector3(f * 0.66f, 1.55f, 0.14f);
+                    far = new Vector3(-f * 0.58f, 1.55f, -0.14f);
                     rate = 30f;
                     break;
                 default:
-                    near = new Vector3(f * 1.35f, 0.3f, 0.2f);     // splayed on the landing
-                    far = new Vector3(-f * 1.25f, 0.35f, -0.2f);
+                    near = new Vector3(f * 1.0f, 0.3f, 0.2f);      // braced on the landing
+                    far = new Vector3(-f * 0.9f, 0.3f, -0.2f);
                     break;
             }
         }
         else if (TryGetSwing(out int index, out float t, out float startup, out float active, out float reach))
         {
             // Wind back, fling out to land with the hit, hold, reel back in.
-            Vector3 wind = new(f * 0.3f, 1.05f, 0.14f);
+            Vector3 wind = new(f * 0.35f, 0.95f, 0.14f);
             Vector3 aim = PunchAim(f, reach);
             float windEnd = startup * 0.45f;
             float ext = t < windEnd ? 0f
@@ -365,8 +359,8 @@ public partial class BossClown : PlayerFighter
             Vector3 punch = wind.Lerp(aim, Mathf.SmoothStep(0f, 1f, ext));
             rate = 45f;
             // Jab with the front glove, cross with the back one, both for the finisher.
-            if (index != 1) { near = punch; nearG = Glove.Fist; }
-            if (index >= 1) { far = punch + new Vector3(0f, index == 2 ? 0.3f : 0f, -0.1f); farG = Glove.Fist; }
+            if (index != 1) near = punch;
+            if (index >= 1) far = punch + new Vector3(0f, index == 2 ? 0.3f : 0f, -0.1f);
             if (t >= windEnd && _whooshedSwing != index)
             {
                 _whooshedSwing = index;
@@ -378,8 +372,6 @@ public partial class BossClown : PlayerFighter
         float k = 1f - Mathf.Exp(-rate * dt);
         _nearFist.Position = _nearFist.Position.Lerp(near, k);
         _farFist.Position = _farFist.Position.Lerp(far, k);
-        _nearFist.Frame = (int)nearG;
-        _farFist.Frame = (int)farG;
         _nearFist.FlipH = _farFist.FlipH = f < 0f;
 
         // Flash and blink with the body, the back glove a shade darker.
@@ -392,7 +384,7 @@ public partial class BossClown : PlayerFighter
     /// <summary>Where a thrown glove should land: on the nearest target ahead, within reach.</summary>
     private Vector3 PunchAim(float f, float reach)
     {
-        Vector3 best = new(f * reach, 1.05f, 0.14f);
+        Vector3 best = new(f * reach, 0.95f, 0.14f);
         float bestDist = reach * 1.3f;
         float band = DepthBand * ReachScale;
         foreach (Node n in GetTree().GetNodesInGroup(Group))
