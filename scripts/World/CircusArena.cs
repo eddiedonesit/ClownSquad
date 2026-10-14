@@ -4,29 +4,46 @@ using Godot;
 using ClownSquad.Visuals;
 
 /// <summary>
-/// The circus ring the fight happens in: the pixel-art floor and big-top wall
-/// from tools/gen_arena.py, props at the back, lamp light from the bulb string,
-/// two sweeping spotlights whose beams show in the haze, and confetti drifting
-/// down through them. The lights are what make the lit sprites look lit.
+/// The circus ring the fight happens in, built in depth layers the way Children
+/// of Morta and Sea of Stars build theirs. Back to front:
+///   the dark tent interior; the crowd, two tiers that bob, cheer at big
+///   moments and fire camera flashes; the ring barrier with its poles, bunting,
+///   bulbs and curtain; props; the fight on the sawdust floor; and dark rim-lit
+///   shapes at the bottom corners, right at the camera.
+/// Light ties it together: flickering bulb light, two sweeping follow-spots
+/// whose beams show in the haze, and confetti drifting down through them.
 ///
-/// Built in code so the layout stays next to the numbers it depends on, which
-/// must match tools/gen_arena.py (floor 28 x 18 centred on z = -3, wall at
-/// z = -7.8, 30 wide). Used with the HD art; "-- classic" keeps the old room.
+/// The layout must match tools/gen_arena.py (floor 28 x 18 centred on z = -3;
+/// back layers 30 wide at z = -8.6, -8.2, -7.8; foreground at z = 4.6). Used
+/// with the HD art; "-- classic" keeps the old room.
 /// </summary>
 public partial class CircusArena : Node3D
 {
     private const string Folder = "res://assets/arena/";
-    private const float WallZ = -7.8f;
+    private const float WallZ = -7.8f;          // the barrier
+    private const float CrowdZ = -8.2f;
+    private const float BackZ = -8.6f;
+    private const float ForegroundZ = 4.6f;     // just inside the bottom edge of the view
     private const float PropPixel = 0.01125f;       // the characters' density
 
     private readonly System.Collections.Generic.List<(OmniLight3D light, float baseEnergy, float seed)> _bulbs = new();
     private readonly System.Collections.Generic.List<(SpotLight3D spot, Vector3 target, float phase)> _spots = new();
     private double _t;
 
+    private StandardMaterial3D _crowdMat = null!;
+    private int _crowdFrame;
+    private double _crowdNext;
+    private double _cheerUntil;
+    private double _nextFlash = 1.0;
+    private int _flashesOwed;
+    private readonly RandomNumberGenerator _rng = new();
+
     public override void _Ready()
     {
+        _rng.Randomize();
         BuildFloor();
-        BuildWall();
+        BuildBackLayers();
+        BuildForeground();
         BuildProps();
         BuildBulbLight();
         BuildSpotlights();
@@ -50,22 +67,123 @@ public partial class CircusArena : Node3D
         });
     }
 
-    private void BuildWall()
+    private static StandardMaterial3D Flat(string texture, bool cutout = false) => new()
+    {
+        AlbedoTexture = Tex(texture),
+        TextureFilter = BaseMaterial3D.TextureFilterEnum.NearestWithMipmapsAnisotropic,
+        Transparency = cutout ? BaseMaterial3D.TransparencyEnum.AlphaScissor : BaseMaterial3D.TransparencyEnum.Disabled,
+        Roughness = 1f,
+    };
+
+    private void BuildBackLayers()
     {
         AddChild(new MeshInstance3D
         {
             Mesh = new QuadMesh { Size = new Vector2(30f, 3f) },
+            Position = new Vector3(0f, 1.5f, BackZ),
+            MaterialOverride = Flat("tent_back.png"),
+        });
+
+        // The crowd sheet holds three frames side by side; the UV offset picks one.
+        _crowdMat = Flat("crowd.png", cutout: true);
+        _crowdMat.Uv1Scale = new Vector3(1f / 3f, 1f, 1f);
+        AddChild(new MeshInstance3D
+        {
+            Mesh = new QuadMesh { Size = new Vector2(30f, 1.6f) },
+            Position = new Vector3(0f, 0.78f, CrowdZ),
+            MaterialOverride = _crowdMat,
+        });
+
+        StandardMaterial3D barrier = Flat("barrier.png", cutout: true);
+        barrier.EmissionEnabled = true;
+        barrier.EmissionTexture = Tex("barrier_emit.png");
+        barrier.EmissionEnergyMultiplier = 2.2f;
+        AddChild(new MeshInstance3D
+        {
+            Mesh = new QuadMesh { Size = new Vector2(30f, 3f) },
             Position = new Vector3(0f, 1.5f, WallZ),
+            MaterialOverride = barrier,
+        });
+    }
+
+    /// <summary>Rope posts, a popcorn bucket and a stool, right at the camera along the bottom corners.</summary>
+    private void BuildForeground()
+    {
+        // About ten units across: the screen is only ~9 wide this close to the camera,
+        // so the corner pieces sit half in and half out of frame.
+        const float px = 0.0105f;
+        Texture2D tex = Tex("foreground.png");
+        var s = new Sprite3D
+        {
+            Texture = tex,
+            PixelSize = px,
+            TextureFilter = BaseMaterial3D.TextureFilterEnum.Nearest,
+            AlphaCut = SpriteBase3D.AlphaCutMode.Discard,
+            CastShadow = GeometryInstance3D.ShadowCastingSetting.Off,
+            Position = new Vector3(0f, tex.GetHeight() * px * 0.5f, ForegroundZ),
+        };
+        if (LitSprite.For(Folder + "foreground.png") is ShaderMaterial lit)
+        {
+            // Mostly silhouette: a low floor of its own light, so lamps and hits rim it.
+            lit.SetShaderParameter("self_light", 0.18f);
+            LitSprite.Apply(lit, Colors.White, 0f, false);
+            s.MaterialOverride = lit;
+        }
+        AddChild(s);
+    }
+
+    /// <summary>
+    /// The crowd goes wild for a while: everyone who cheers jumps up with their
+    /// arms in the air, and the cameras go off.
+    /// </summary>
+    public void Cheer(float seconds, int flashes = 4)
+    {
+        _cheerUntil = System.Math.Max(_cheerUntil, _t + seconds);
+        _flashesOwed += flashes;
+        _crowdNext = _t;
+    }
+
+    private void TickCrowd()
+    {
+        bool cheering = _t < _cheerUntil;
+        if (_t >= _crowdNext)
+        {
+            // Settled, the crowd shifts about lazily; cheering, it bounces.
+            _crowdFrame = cheering ? (_crowdFrame == 2 ? 1 : 2) : (_crowdFrame == 0 ? 1 : 0);
+            _crowdNext = _t + (cheering ? 0.16 : _rng.RandfRange(0.45f, 0.9f));
+            _crowdMat.Uv1Offset = new Vector3(_crowdFrame / 3f, 0f, 0f);
+        }
+
+        if (_t >= _nextFlash || (_flashesOwed > 0 && _rng.Randf() < 0.25f))
+        {
+            if (_flashesOwed > 0) _flashesOwed--;
+            CameraFlash();
+            _nextFlash = _t + _rng.RandfRange(0.8f, 2.6f);
+        }
+    }
+
+    /// <summary>A pop of white from somewhere in the stands.</summary>
+    private void CameraFlash()
+    {
+        var flash = new MeshInstance3D
+        {
+            Mesh = new QuadMesh { Size = new Vector2(0.09f, 0.09f) },
             MaterialOverride = new StandardMaterial3D
             {
-                AlbedoTexture = Tex("wall.png"),
-                TextureFilter = BaseMaterial3D.TextureFilterEnum.NearestWithMipmapsAnisotropic,
+                ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded,
+                AlbedoColor = new Color(1f, 1f, 1f),
                 EmissionEnabled = true,
-                EmissionTexture = Tex("wall_emit.png"),
-                EmissionEnergyMultiplier = 2.2f,
-                Roughness = 1f,
+                Emission = new Color(1f, 0.97f, 0.9f),
+                EmissionEnergyMultiplier = 6f,
             },
-        });
+            Position = new Vector3(_rng.RandfRange(-11f, 11f), _rng.RandfRange(0.7f, 1.0f), CrowdZ + 0.05f),
+            CastShadow = GeometryInstance3D.ShadowCastingSetting.Off,
+        };
+        AddChild(flash);
+        Tween t = flash.CreateTween();
+        t.TweenProperty(flash, "scale", Vector3.One * 2.2f, 0.05f);
+        t.TweenProperty(flash, "scale", Vector3.One * 0.1f, 0.09f);
+        t.TweenCallback(Callable.From(flash.QueueFree));
     }
 
     private void BuildProps()
@@ -196,6 +314,7 @@ public partial class CircusArena : Node3D
     public override void _Process(double delta)
     {
         _t += delta;
+        TickCrowd();
         foreach ((OmniLight3D light, float baseEnergy, float seed) in _bulbs)
         {
             float flicker = 0.9f + 0.06f * Mathf.Sin((float)_t * 7.3f + seed) + 0.04f * Mathf.Sin((float)_t * 17.1f + seed * 2f);

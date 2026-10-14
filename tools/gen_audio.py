@@ -379,6 +379,28 @@ place(coin, bell(1976, 0.3), 0, 0.7)
 place(coin, bell(2637, 0.3), 0.06, 0.8)
 write("coin", coin)
 
+
+def crowd_cheer(sec=2.6, seed=5):
+    """The stands going wild: a swelling roar, a scatter of rising "yay!"
+    voices, and a patter of applause."""
+    rnd = random.Random(seed)
+    out = silence(sec)
+    roar = shape(filt(filt(noise(sec), "bp", 850, 0.6), "lp", 2600),
+                 lambda t: min(1.0, t / 0.3) * math.exp(-max(0.0, t - 0.6) / 0.9))
+    place(out, roar, 0, 0.75)
+    for _ in range(16):
+        f0, d = rnd.uniform(210, 540), rnd.uniform(0.25, 0.6)
+        v = osc(lambda t, f0=f0, d=d: f0 * (1.0 + 0.3 * min(1.0, t / d)), d, saw(12))
+        v = filt(v, "bp", rnd.uniform(650, 1150), 2.2)
+        place(out, shape(v, lambda t, d=d: math.sin(math.pi * min(1.0, t / d))), rnd.uniform(0.0, 0.7), 0.13)
+    for _ in range(46):
+        clap = shape(filt(noise(0.025), "bp", rnd.uniform(1100, 2600), 2.0), lambda t: math.exp(-t / 0.004))
+        place(out, clap, rnd.uniform(0.15, sec - 0.2), rnd.uniform(0.2, 0.4))
+    return out
+
+
+write("crowd_cheer", crowd_cheer())
+
 # --------------------------------------------------------------- music
 
 def march():

@@ -32,7 +32,7 @@ public partial class Sfx : Node
         ["clack"] = -4f, ["zip"] = -9f, ["whirr"] = -9f, ["kazoo_rise"] = -8f,
         ["fwee"] = -14f, ["ding"] = -8f, ["kaboom"] = 0f, ["wah_short"] = -6f,
         ["sad_trombone"] = -3f, ["fanfare"] = -4f, ["victory"] = -3f,
-        ["level_up"] = -3f, ["crit"] = -2f, ["blip"] = -14f, ["coin"] = -9f,
+        ["level_up"] = -3f, ["crit"] = -2f, ["blip"] = -14f, ["coin"] = -9f, ["crowd_cheer"] = -8f,
     };
 
     private readonly Dictionary<string, List<AudioStream>> _banks = new();

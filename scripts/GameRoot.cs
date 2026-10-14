@@ -48,6 +48,7 @@ public partial class GameRoot : Node3D
     private double _endedAt = -1;
 
     private StatTent? _tent;
+    private CircusArena? _circus;
     private bool _tentHeld;
     private double _tentDueAt = -1;
     private bool _restartHeld = true;
@@ -187,7 +188,8 @@ public partial class GameRoot : Node3D
         // The circus ring replaces the grey test room.
         foreach (string old in new[] { "Ground", "PropBack" })
             if (GetNodeOrNull<Node3D>(old) is Node3D n) n.Visible = false;
-        AddChild(new CircusArena());
+        _circus = new CircusArena();
+        AddChild(_circus);
     }
 
     public override void _ExitTree()
@@ -351,6 +353,7 @@ public partial class GameRoot : Node3D
         WaveDirector d = _director!;
         GD.Print($"[{GameClock.Seconds:F1}s] phase={phase} wave={d.WaveNumber}/{d.WaveCount} lives={d.Lives}");
         if (phase == WaveDirector.Phase.Intermission) SaveSystem.Save();
+        if (phase == WaveDirector.Phase.Victory) CrowdCheer(6f, 20);
         if (phase is WaveDirector.Phase.Victory or WaveDirector.Phase.Defeat)
         {
             _endedAt = GameClock.Seconds;
@@ -360,6 +363,13 @@ public partial class GameRoot : Node3D
             foreach (PlayerFighter p in _players)
                 if (p.Record is { StatPoints: > 0 }) _tentDueAt = GameClock.Seconds + 2.0;
         }
+    }
+
+    private void CrowdCheer(float seconds, int flashes)
+    {
+        if (_circus is null) return;
+        _circus.Cheer(seconds, flashes);
+        if (seconds >= 1.3f) ClownSquad.Audio.Sfx.Play("crowd_cheer", 1f, seconds >= 3f ? 0f : -5f);
     }
 
     // --------------------------------------------------------- progression
@@ -372,6 +382,7 @@ public partial class GameRoot : Node3D
     {
         bool boss = enemy is BossClown;
         int xp = boss ? BossXp : GruntXp;
+        CrowdCheer(boss ? 4f : 0.9f, boss ? 14 : 1);
         PopText.Spawn(this, enemy.GlobalPosition + new Vector3(0f, enemy.BodyHeight + 0.2f, 0f),
                       $"+{xp} XP", new Color(1f, 0.85f, 0.3f), boss ? 1.3f : 0.8f);
 
@@ -436,6 +447,8 @@ public partial class GameRoot : Node3D
         if (!byPlayer) return;
         _comboHits++;
         _comboExpires = GameClock.Seconds + ComboLull;
+        // The crowd loves a long combo.
+        if (_comboHits % 5 == 0) CrowdCheer(1.4f + _comboHits * 0.04f, 2 + _comboHits / 5);
     }
 
     // ----------------------------------------------------------------- hud

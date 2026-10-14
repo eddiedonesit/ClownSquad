@@ -13,7 +13,8 @@ as the same hand-pixeled world as the sprites standing on it.
 
 World layout (must match scripts/World/CircusArena.cs):
   floor: 28 x 18 units centred on (0, 0, -3); ring centred on (0, -1), radius 6.5
-  wall:  30 x 3 units standing at z = -7.8
+  back wall layers, 30 x 3 units each: tent_back z = -8.6, crowd z = -8.2,
+  barrier z = -7.8; foreground strip 10 x 1.6 units at z = 4.6
 
 Run: bash tools/refresh_sprites.sh
 """
@@ -188,38 +189,138 @@ def floor():
 
 
 # ---------------------------------------------------------------------- wall
+# The back of the ring is three layers, back to front, each its own quad in
+# the scene so lights and haze separate them:
+#   tent_back  the dark tent interior                      z = -8.6
+#   crowd      two tiers of audience, three frames         z = -8.2
+#   barrier    the ring barrier, poles, bunting, bulbs,    z = -7.8
+#              and the performers' curtain
+# Only about the bottom 1.2 units of any of them is on screen.
 
-CANVAS_RED = ramp((196, 46, 58))
-CANVAS_CREAM = ramp((238, 222, 192))
 VELVET = ramp((92, 36, 98))
 GOLD = ramp((238, 190, 72))
 POLE = ramp((150, 96, 58))
+PANEL = ramp((176, 40, 56))
 FLAGS = [ramp(c) for c in ((214, 56, 66), (246, 200, 84), (76, 146, 228), (96, 182, 96))]
 ROPE = (60, 40, 46)
 POLES = (-12.5, -7.5, -2.5, 2.5, 7.5, 12.5)
+CLEAR = (0, 0, 0, 0)
+BARRIER_H = 0.55
 
 
-def wall():
+def tent_back():
+    """Deep in the tent, past the crowd: dim canvas falling away into shadow."""
     W, H = int(30 / PX), int(3 / PX)
+    n = Noise(21, 40, 2)
+    deep = ramp((70, 30, 62))
     px = [[None] * W for _ in range(H)]
-    emit = [[(0, 0, 0, 255)] * W for _ in range(H)]
-    n = Noise(11, 30, 2)
+    for y in range(H):
+        for x in range(W):
+            wx = -15 + (x + 0.5) * PX
+            v = 0.32 + 0.12 * math.cos((wx / 0.9) * 2 * math.pi) + 0.08 * (n(x, y) - 0.5)
+            px[y][x] = deep[dither(v, x, y)]
+    write("tent_back.png", W, H, px)
 
-    def height(y):            # pixel row to height in world units (row 0 is the top)
+
+CROWD_W, CROWD_H = int(30 / PX), 64
+SKINS = [(250, 214, 186), (222, 170, 128), (176, 120, 84), (120, 78, 54)]
+HAIRS = [(60, 40, 30), (150, 90, 50), (230, 190, 100), (40, 30, 40), (200, 80, 60), (120, 120, 130)]
+CLOTHES = [(170, 60, 70), (60, 100, 170), (70, 140, 90), (190, 150, 60), (120, 70, 150), (90, 90, 100), (200, 110, 60)]
+
+
+def crowd():
+    """Two tiers of the audience, in three frames: settled, bobbing, cheering.
+    Pushed darker and duller than the ring, so it reads as further away."""
+    def dim(rgb):
+        return tuple(int(c * 0.72) for c in rgb)
+
+    mats, m_id = {}, [1]
+
+    def mat(rgb, **kw):
+        key = (rgb, tuple(sorted(kw.items())))
+        if key not in mats:
+            mats[key] = m_id[0]
+            m_id[0] += 1
+        return mats[key]
+
+    rnd = random.Random(31)
+    people = []
+    for row, (y_head, spacing, offset) in enumerate(((19, 20, 0), (33, 22, 11))):
+        x = offset + rnd.randint(0, 6)
+        while x < CROWD_W - 6:
+            people.append(dict(
+                x=x + rnd.uniform(-2, 2), y=y_head + rnd.uniform(-1, 1), row=row,
+                skin=mat(dim(rnd.choice(SKINS)), soft=True),
+                hair=mat(dim(rnd.choice(HAIRS))),
+                cloth=mat(dim(rnd.choice(CLOTHES))),
+                hat=rnd.random() < 0.22,
+                hat_col=mat(dim(rnd.choice(CLOTHES))),
+                cheers=rnd.random() < 0.65,
+                phase=rnd.randint(0, 1),
+            ))
+            x += spacing + rnd.randint(-3, 4)
+
+    def draw(frame):
+        c = HDCanvas(CROWD_W, CROWD_H)
+        for p in sorted(people, key=lambda q: q["row"]):
+            far = p["row"] == 0
+            bob = 0
+            if frame == 1 and p["phase"]: bob = -1
+            if frame == 2 and p["cheers"]: bob = -2
+            x, y = p["x"], p["y"] + bob
+            c.part(far=far)
+            c.ellipse(x, y + 12, 9, 8, p["cloth"])                     # shoulders
+            if frame == 2 and p["cheers"]:
+                for side in (-1, 1):                                     # arms up
+                    c.part(far=far)
+                    c.capsule(x + side * 6, y + 9, x + side * 9, y - 7, 2.2, 1.8, p["cloth"])
+                    c.part(far=far)
+                    c.ellipse(x + side * 9, y - 8, 2.4, 2.4, p["skin"])
+            c.part(far=far)
+            c.ellipse(x, y, 5.5, 6, p["skin"])                          # head
+            c.part(far=far)
+            if p["hat"]:
+                c.poly([(x - 6, y - 3), (x + 6, y - 3), (x, y - 13)], p["hat_col"])   # party hat
+            else:
+                c.ellipse(x, y - 3.5, 6, 3.5, p["hair"])
+        return c
+
+    material_table = {i: Material(rgb, **dict(kw)) for (rgb, kw), i in mats.items()}
+    frames = [shade(draw(f), material_table) for f in range(3)]
+    rows = to_rows(frames, CROWD_W, CROWD_H)
+    os.makedirs(OUT, exist_ok=True)
+    write_png(os.path.join(OUT, "crowd.png"), CROWD_W * 3, CROWD_H, rows)
+    print("wrote {}/crowd.png  {}x{}  3 frames".format(OUT, CROWD_W * 3, CROWD_H))
+
+
+def barrier():
+    """The ring barrier, the curtain, poles, bunting and bulbs. Transparent
+    elsewhere, so the crowd shows over the top of the barrier."""
+    W, H = int(30 / PX), int(3 / PX)
+    px = [[CLEAR] * W for _ in range(H)]
+    emit = [[(0, 0, 0, 255)] * W for _ in range(H)]
+    n = Noise(12, 30, 2)
+
+    def height(y):
         return (H - y - 0.5) * PX
 
-    stripe = 0.6
     for y in range(H):
         h = height(y)
         for x in range(W):
             wx = -15 + (x + 0.5) * PX
-            # canvas: alternating panels with a fold shadow at every seam
-            phase = (wx / stripe) % 1.0
-            pal = CANVAS_RED if int(math.floor(wx / stripe)) % 2 == 0 else CANVAS_CREAM
-            v = 0.55 + 0.16 * math.cos((phase - 0.35) * 2 * math.pi) + 0.1 * (n(x, y) - 0.5)
-            v -= 0.45 * max(0.0, 1.0 - h / 0.35)           # the canvas skirt darkens into the floor
-            px[y][x] = pal[dither(v, x, y)]
-
+            if h < BARRIER_H:
+                # Panels between gold posts, a gold rail on top, a star on each.
+                cell = (wx + 15) % 1.5
+                if h > BARRIER_H - 0.07:
+                    px[y][x] = GOLD[dither(0.8 if h > BARRIER_H - 0.035 else 0.4, x, y)]
+                elif cell < 0.06:
+                    px[y][x] = GOLD[dither(0.5, x, y)]
+                else:
+                    v = 0.55 + 0.1 * (n(x, y) - 0.5) - 0.4 * max(0.0, 1.0 - h / 0.18)
+                    px[y][x] = PANEL[dither(v, x, y)]
+                    sx, sy = cell - 0.78, h - 0.27
+                    if in_star(sx / 0.075, -sy / 0.075):
+                        px[y][x] = GOLD[dither(0.7, x, y)]
             # the performers' entrance: velvet curtains and a dark gap between
             if abs(wx) < 1.5 and h < 1.75:
                 if abs(wx) < 0.18:
@@ -227,47 +328,84 @@ def wall():
                 else:
                     fold = math.cos(wx * 14.0) * 0.5 + 0.5
                     px[y][x] = VELVET[dither(0.25 + 0.5 * fold - 0.35 * max(0.0, 1.0 - h / 0.4), x, y)]
-                if 1.55 < h < 1.75:                         # gold fringe along the top
+                if 1.55 < h < 1.75:
                     px[y][x] = GOLD[0] if (h < 1.6 and x % 3 == 0) else GOLD[dither(0.75 if (x // 3) % 2 else 0.45, x, y)]
 
-    # poles, each with a gold collar
     for pole_x in POLES:
         x0 = int((pole_x + 15) / PX)
         for y in range(H):
             for dx in range(-3, 4):
                 px[y][x0 + dx] = POLE[dither(0.85 - abs(dx + 1) * 0.18, x0 + dx, y)] if abs(dx) < 3 else POLE[0]
-        for y in range(H - int(1.7 / PX), H - int(1.55 / PX)):
+        for y in range(H - int(0.62 / PX), H - int(0.5 / PX)):
             for dx in range(-4, 5):
                 px[y][x0 + dx] = GOLD[dither(0.8 - abs(dx) * 0.1, x0 + dx, y)]
 
-    # bunting and bulbs sagging between the poles, low enough to be seen
     for a, b in zip(POLES, POLES[1:]):
         flag_i = 0
         steps = int((b - a) / PX)
         for i in range(steps + 1):
             t = i / steps
             wx = a + (b - a) * t
-            h = 1.45 - 0.32 * math.sin(math.pi * t)       # the sag
+            h = 1.2 - 0.22 * math.sin(math.pi * t)
             x, y = int((wx + 15) / PX), int(H - h / PX)
             for dy in (0, 1):
-                if 0 <= y + dy < H:
-                    px[y + dy][x] = ROPE
-            if i % 16 == 8:                                  # a pennant every 0.4 units
+                px[y + dy][x] = ROPE + (255,)
+            if i % 16 == 8:
                 pal = FLAGS[flag_i % len(FLAGS)]
                 flag_i += 1
                 for fy in range(1, 11):
                     half = int((10 - fy) * 0.55)
                     for fx in range(-half, half + 1):
-                        if 0 <= y + fy < H:
-                            px[y + fy][x + fx] = pal[0] if abs(fx) == half else pal[dither(0.75 - fx * 0.05, x + fx, y + fy)]
-            if i % 16 == 0 and 0 < i < steps:                # a bulb between each pair
+                        px[y + fy][x + fx] = pal[0] if abs(fx) == half else pal[dither(0.75 - fx * 0.05, x + fx, y + fy)]
+            if i % 16 == 0 and 0 < i < steps:
                 for by in range(1, 5):
                     for bx in range(-2, 3):
                         if bx * bx + (by - 2.5) ** 2 <= 5:
                             px[y + by][x + bx] = (255, 236, 160)
                             emit[y + by][x + bx] = (255, 210, 120, 255)
-    write("wall.png", W, H, px)
-    write("wall_emit.png", W, H, emit)
+    write("barrier.png", W, H, px)
+    write("barrier_emit.png", W, H, emit)
+
+
+# ---------------------------------------------------------------- foreground
+# Dark shapes right at the camera along the bottom corners, rim-lit by the
+# lamps: the layer that says the ring is a real place you are looking into.
+
+FG_MATS = {
+    1: Material((70, 34, 70)), 2: Material((96, 34, 46)), 3: Material((150, 110, 50), gloss=True),
+    4: Material((54, 38, 60)), 5: Material((120, 40, 50)), 6: Material((180, 170, 150)),
+}
+
+
+def foreground():
+    W, H = 960, 150
+    c = HDCanvas(W, H)
+    # brass-topped rope posts at both corners, the velvet rope sagging off-screen
+    for x0, out in ((150, -1), (W - 150, 1)):
+        c.part()
+        c.capsule(x0, H, x0, 40, 7, 6, 4)
+        c.part()
+        c.ellipse(x0, 36, 10, 10, 3)
+        c.part()
+        pts = [(x0 + out * t, 42 + 26 * math.sin(math.pi * min(1.0, t / 300.0) * 0.5)) for t in range(0, 320, 8)]
+        c.stroke(pts, 4, 2)
+    # a spilled popcorn bucket, bottom left
+    c.part()
+    c.poly([(20, H), (110, H), (100, 78), (30, 78)], 5)
+    c.recolor(lambda x, y, m: 6 if int(x / 14) % 2 == 0 else m)
+    for i in range(14):
+        c.part()
+        c.ellipse(30 + (i * 37) % 75, 72 - (i * 13) % 14, 6, 5, 6)
+    # the ringmaster's stool, bottom right
+    c.part()
+    c.ellipse(W - 70, 88, 52, 12, 1)
+    c.part()
+    c.poly([(W - 112, 92), (W - 28, 92), (W - 40, H), (W - 100, H)], 1)
+    c.recolor(lambda x, y, m: 3 if 104 < y < 110 else m)
+    rgba, nm = shade(c, FG_MATS, normals=True)
+    write_png(os.path.join(OUT, "foreground.png"), W, H, to_rows([rgba], W, H))
+    write_png(os.path.join(OUT, "foreground_n.png"), W, H, to_rows([nm], W, H))
+    print("wrote {}/foreground.png (+ normal map)".format(OUT))
 
 
 # --------------------------------------------------------------------- props
@@ -347,7 +485,10 @@ def write_prop(name, canvas):
 
 def main():
     floor()
-    wall()
+    tent_back()
+    crowd()
+    barrier()
+    foreground()
     write_prop("prop_tub", prop_tub())
     write_prop("prop_crates", prop_crates())
     write_prop("prop_cannon", prop_cannon())
