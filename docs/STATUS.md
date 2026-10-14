@@ -10,7 +10,7 @@ records what exists in the repository today.
 C:/Tools/Godot/4.7.2/Godot_v4.7.2-stable_mono_win64.exe --path C:/Claude/ClownSquad
 
 # automated checks (headless; prints clip/state/position assertions)
-C:/Tools/Godot/4.7.2/Godot_v4.7.2-stable_mono_win64_console.exe \n    --headless --path C:/Claude/ClownSquad -- animtest
+C:/Tools/Godot/4.7.2/Godot_v4.7.2-stable_mono_win64_console.exe --headless --path C:/Claude/ClownSquad -- animtest
 
 # regenerate art - ALWAYS use this, never gen_sprite.py alone
 bash tools/refresh_sprites.sh
