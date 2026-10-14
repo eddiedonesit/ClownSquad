@@ -40,7 +40,9 @@ public partial class PlayerFighter : Fighter
     // which is head height - centring the burst there made it bloom around the
     // clown rather than at the floor. The follow-through frame is the one that
     // actually meets the ground.
-    private const float MalletForward = 0.833f;
+    // 0.833 is the head centre, 1.035 its leading edge; sit just inside the
+    // front face so the blast reads as thrown off the striking surface.
+    private const float MalletForward = 0.975f;
     private const float MalletHeight = 0.203f;
 
     public IInputSource Source { get; set; } = null!;
