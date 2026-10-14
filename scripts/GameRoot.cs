@@ -376,6 +376,9 @@ public partial class GameRoot : Node3D
         WaveDirector d = _director!;
         GD.Print($"[{GameClock.Seconds:F1}s] phase={phase} wave={d.WaveNumber}/{d.WaveCount} lives={d.Lives}");
         if (phase == WaveDirector.Phase.Intermission) SaveSystem.Save();
+        // The win probe forces Rare grunts for its first wave only: enough to be
+        // sure of drops, without turning every later wave into a wall.
+        if (_outcomeProbe == "win" && phase == WaveDirector.Phase.Intermission && d.WaveNumber >= 2) d.ForceRank = null;
         if (phase == WaveDirector.Phase.Victory) { CrowdCheer(6f, 20); BankLoot(); }
         if (phase == WaveDirector.Phase.Defeat) LoseLoot();
         if (phase is WaveDirector.Phase.Victory or WaveDirector.Phase.Defeat)
@@ -427,6 +430,11 @@ public partial class GameRoot : Node3D
         {
             if (p.Record is not CharacterRecord r) continue;
             if (Leveling.Grant(r, (int)Mathf.Round(xp * Leveling.XpMultiplier(r))) == 0) continue;
+
+            // The probe's AI spends its points the way a player would, or the
+            // enemies, which scale with level, would outgrow it.
+            if (_outcomeProbe == "win")
+                while (r.StatPoints > 0) { r.StatPoints--; if (r.StatPoints % 2 == 0) r.Pow++; else r.Guts++; }
 
             // A level-up is a full heal: the classic reward for surviving.
             p.ApplyProgression(r);
@@ -781,7 +789,8 @@ public partial class GameRoot : Node3D
     {
         PlayerFighter p = _players[0];
         CharacterRecord r = p.Record!;
-        bool levelled = r.Level >= 2 && r.StatPoints >= Leveling.StatPointsPerLevel;
+        bool levelled = r.Level >= 2 && r.Pow + r.Guts + r.StatPoints == Leveling.StatPointsPerLevel * (r.Level - 1);
+        r.StatPoints++;   // one point back to spend below
 
         float before = p.MaxHealth;
         r.StatPoints--;
