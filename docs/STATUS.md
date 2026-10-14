@@ -12,11 +12,17 @@ C:/Tools/Godot/4.7.2/Godot_v4.7.2-stable_mono_win64.exe --path C:/Claude/ClownSq
 # automated checks (headless; prints clip/state/position assertions)
 C:/Tools/Godot/4.7.2/Godot_v4.7.2-stable_mono_win64_console.exe --headless --path C:/Claude/ClownSquad -- animtest
 
+# moves: screen walls, charge throw, spin, flip, launch and wall bounce (17 checks)
+C:/Tools/Godot/4.7.2/Godot_v4.7.2-stable_mono_win64_console.exe --headless --path C:/Claude/ClownSquad -- movetest
+
+# AI: boss closes distance, holds range, swings, slams
+C:/Tools/Godot/4.7.2/Godot_v4.7.2-stable_mono_win64_console.exe --headless --path C:/Claude/ClownSquad -- aitest
+
 # regenerate art - ALWAYS use this, never gen_sprite.py alone
 bash tools/refresh_sprites.sh
 ```
 
-Controls: **WASD** move, **J** attack, **Space** jump, **K/Shift** dodge.
+Controls: **WASD** move, **J** attack, **Space** jump, **K/Shift** dodge. Hold attack to charge.
 Gamepad: stick, **X** attack, **A** jump, **B/RB** dodge. Keyboard plays
 immediately; pads join by pressing a button.
 
@@ -25,10 +31,14 @@ immediately; pads join by pressing a button.
 | Area | State |
 | --- | --- |
 | Combat | 3-hit combo, hitstop, input buffering, knockback, hit flash and squash |
+| Hit reactions | Hitstun, launch and juggle with decaying lift, ground bounce, knockdown, get-up invulnerability, wall bounce (ADR 0005) |
+| Mallet moves | Hold attack 3s standing: boomerang throw. Hold attack + left/right: travelling spin. Attack in the air: front flip |
+| Arena | Screen edges are walls for players and enemies, derived from the camera frustum |
+| Feel helpers | Lane assist, dodge-cancel from recovery, hit sparks, combo counter, attack tokens |
 | Dodge | Ground slide with i-frames 0.05-0.26s of a 0.35s roll |
 | Jump | Gravity 26, jump speed 8.5, apex ~1.4 units, airtime ~0.65s |
 | Input | Per-device polling, press-to-join local co-op, keyboard + N pads |
-| Sprites | Profile only, 16 frames: idle 2, walk 4, attack 4, hit 1, dodge 3, jump 2 |
+| Sprites | Profile only, 42 frames incl. charge, spin, throw, 8-frame flip and an empty-handed set; plus the spinning mallet |
 | Weapon | Cylinder mallet, carried in every pose, swing arc 165/120/45/0 degrees |
 | Effects | Ground impact burst and camera shake, scaled by combo step |
 | Enemy AI | `BrawlerAi` as an IInputSource: closes distance, holds swing range, attacks on cooldown |
@@ -49,8 +59,10 @@ no death handling beyond health reaching zero, and no win or lose state.
 - **No floor collider.** The arena is a flat plane and ground contact is a clamp
   at y=0 in `Fighter`. Platforms or uneven terrain need real collision shapes.
 - **No colliders on props either**, so fighters walk through the boxes.
-- **Hits resolve by arc query**, not physics hitboxes. Fine for cones, wrong for
-  any attack needing another shape.
+- **Hits resolve by box and radius queries**, not physics hitboxes.
+- **A floored fighter has no art**; it is the hit pose squashed flat.
+- **Shell commands over about 8 KB fail** in this environment with a misleading
+  quote error. Write large files with the file tool, not a heredoc.
 - **Dodge i-frames and the slide pose are not aligned.** Invulnerability runs
   0.05-0.26s; the extended slide frame holds 0.08-0.25s. Close, not matched.
 
