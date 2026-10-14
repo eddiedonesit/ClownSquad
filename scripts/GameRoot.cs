@@ -50,6 +50,24 @@ public partial class GameRoot : Node3D
 
     private StatTent? _tent;
     private StageDef? _stage;
+
+    // ---- scrolling stages ----
+    private bool _scrolling;
+    private StageScenery? _scenery;
+    private Node3D? _rig;              // carries the camera (and its lamps) along the stage
+    private float _camX;
+    private const float EncounterSpacing = 15f;
+
+    // ---- the results screen and pause ----
+    private int _kos;
+    private int _bestCombo;
+    private int _goldEarned;
+    private int _itemsFound;
+    private PauseMenu? _pause;
+    private bool _pauseHeld = true;
+    private bool _retryHeld = true;
+    private Control? _results;
+    private const float FirstEncounter = 9f;
     private readonly Dictionary<PlayerFighter, int> _bagGold = new();
     private int _secretWave = -1;
     private Node3D? _secretCurtain;
@@ -104,6 +122,8 @@ public partial class GameRoot : Node3D
         int stageArg = Array.IndexOf(args, "stage");
         if (stageArg >= 0 && stageArg + 1 < args.Length) _stage = Campaign.Get(args[stageArg + 1]);
         Campaign.Pending = null;
+        // Fights on the map are walked through left to right; bonus stages stay in the ring.
+        _scrolling = _stage is StageDef sc && Campaign.IsFight(sc) && sc.Kind != StageKind.Bonus;
         if (!probe && !Has("sandbox") && !Has("fight") && _stage is null)
         {
             CallDeferred(MethodName.GoToMap);
@@ -120,6 +140,7 @@ public partial class GameRoot : Node3D
         // screen edge.
         if (GetNodeOrNull<Camera3D>("Camera3D") is Camera3D cam)
         {
+            if (_scrolling) MountStageCamera(cam);
             _arenaCamera = cam;
             _arenaCameraRest = cam.GlobalTransform;
             RebuildArena();
@@ -161,6 +182,7 @@ public partial class GameRoot : Node3D
             var roll = new RandomNumberGenerator { Seed = _director.Seed ^ 0x5ec2e7UL };
             if (st.Kind != StageKind.Bonus && st.Waves.Length > 1 && (roll.Randf() < SecretShopChance || Has("secret")))
                 _secretWave = roll.RandiRange(2, st.Waves.Length);
+            if (_scrolling) ConfigureEncounters(st);
             GD.Print($"Stage {st.Id}: {st.Waves.Length} wave(s), enemy level floor {st.EnemyLevel}, rank boost {st.RankBoost:F2}" +
                      (_secretWave > 0 ? $", secret shop before wave {_secretWave}" : ""));
         }
@@ -237,15 +259,37 @@ public partial class GameRoot : Node3D
         void Lamp(Vector3 at, Color color, float energy)
         {
             var lamp = new OmniLight3D { LightColor = color, LightEnergy = energy, OmniRange = 11f, OmniAttenuation = 1.2f, LightVolumetricFogEnergy = 0f };
-            AddChild(lamp);
+            // On a scrolling stage the rim lamps travel with the camera.
+            (_rig ?? (Node)this).AddChild(lamp);
             lamp.GlobalPosition = at;
         }
         Lamp(new Vector3(-6.5f, 3.2f, 0.5f), new Color(1f, 0.55f, 0.45f), 3.4f);   // warm, stage left
         Lamp(new Vector3(6.5f, 3.2f, 0.5f), new Color(0.45f, 0.7f, 1f), 3.0f);     // cool, stage right
 
-        // The circus ring replaces the grey test room.
         foreach (string old in new[] { "Ground", "PropBack" })
             if (GetNodeOrNull<Node3D>(old) is Node3D n) n.Visible = false;
+        if (_scrolling && _stage is StageDef st)
+        {
+            // A long walk through the world's own scenery.
+            float length = FirstEncounter + EncounterSpacing * st.Waves.Length + 14f;
+            _scenery = new StageScenery(st.World, length, (ulong)GD.Hash(st.Id));
+            AddChild(_scenery);
+            var theme = _scenery.Theme;
+            if (GetNodeOrNull<WorldEnvironment>("WorldEnvironment")?.Environment is Godot.Environment senv)
+            {
+                senv.BackgroundColor = theme.sky;
+                senv.AmbientLightEnergy = theme.ambient;
+                senv.AmbientLightColor = theme.sky.Lerp(Colors.White, 0.5f);
+                senv.VolumetricFogDensity = 0.006f;
+            }
+            if (GetNodeOrNull<DirectionalLight3D>("DirectionalLight3D") is DirectionalLight3D ssun)
+            {
+                ssun.LightColor = theme.sun;
+                ssun.LightEnergy = theme.sunEnergy;
+            }
+            return;
+        }
+        // The circus ring replaces the grey test room.
         _circus = new CircusArena();
         AddChild(_circus);
     }
@@ -272,6 +316,11 @@ public partial class GameRoot : Node3D
                 (float)ProjectSettings.GetSetting("display/window/size/viewport_height", 648));
         }
         Arena.Current = new Arena(_arenaCameraRest, _arenaCamera.Fov, view.X / Mathf.Max(view.Y, 1f));
+        if (_scrolling)
+        {
+            Arena.Current.Band = (StageScenery.BandFar, StageScenery.BandNear);
+            Arena.Current.CameraX = _camX;
+        }
     }
 
     // ------------------------------------------------------------- players
@@ -353,6 +402,7 @@ public partial class GameRoot : Node3D
     private void OnPlayerDied(Fighter f)
     {
         Vector3 home = f is PlayerFighter p && _homes.TryGetValue(p, out Vector3 h) ? h : Vector3.Zero;
+        if (_scrolling) home = new Vector3(_camX - 2f, 0f, home.Z);
 
         if (_director is null) { ScheduleRespawn(f, home, 1.5); return; }
         if (_director.TryUseLife()) { ScheduleRespawn(f, home, 2.0); return; }
@@ -434,6 +484,9 @@ public partial class GameRoot : Node3D
         if (phase is WaveDirector.Phase.Victory or WaveDirector.Phase.Defeat)
         {
             _endedAt = GameClock.Seconds;
+            bool windowed = !DisplayServer.GetName().Contains("headless");
+            if (_stage is not null && (_outcomeProbe.Length == 0 || windowed))
+                GetTree().CreateTimer(1.2).Timeout += () => ShowResults(phase == WaveDirector.Phase.Victory);
             // Win or lose, XP is kept (ADR 0006). Anyone with points to spend
             // is shown the Stat Tent once the ending has had a moment.
             SaveSystem.Save();
@@ -443,6 +496,65 @@ public partial class GameRoot : Node3D
     }
 
     private void GoToMap() => GetTree().ChangeSceneToFile(Campaign.MapScene);
+
+    // ------------------------------------------------------- scrolling stage
+
+    /// <summary>
+    /// The stage camera: lower and flatter than the ring's, so the scenery and
+    /// sky behind the walkway are in view, Castle Crashers style. It rides a rig
+    /// that slides along x; shake still moves the camera within the rig.
+    /// </summary>
+    private void MountStageCamera(Camera3D cam)
+    {
+        _rig = new Node3D { Name = "CameraRig" };
+        AddChild(_rig);
+        RemoveChild(cam);
+        _rig.AddChild(cam);
+        // Framed so the walkway fills the lower two thirds and the scenery the rest.
+        cam.Position = new Vector3(0f, 3.8f, 9.6f);
+        cam.RotationDegrees = new Vector3(-17f, 0f, 0f);
+        cam.Fov = 35f;
+    }
+
+    /// <summary>Spread the stage's groups along the road, put the exit past the last, and fill in crates.</summary>
+    private void ConfigureEncounters(StageDef st)
+    {
+        var at = new float[st.Waves.Length];
+        for (int i = 0; i < at.Length; i++) at[i] = FirstEncounter + EncounterSpacing * i;
+        _director!.EncounterX = at;
+        _director.ExitX = at[^1] + 12f;
+        _director.LeadX = () =>
+        {
+            float lead = float.MinValue;
+            foreach (PlayerFighter p in _players) if (!p.IsDead) lead = Mathf.Max(lead, p.GlobalPosition.X);
+            return lead == float.MinValue ? _camX : lead;
+        };
+        CallDeferred(MethodName.PlaceStageObjects);
+    }
+
+    private void PlaceStageObjects()
+    {
+        if (_scenery is null || _director?.EncounterX is not float[] at) return;
+        _scenery.PlaceCrates(this, at, _director.ExitX);
+        _scenery.PlaceExit(_director.ExitX);
+    }
+
+    /// <summary>
+    /// The camera follows the furthest player right and never backs up, the
+    /// rule of the genre; while a group is being fought it holds at that group.
+    /// </summary>
+    private void FollowCamera(float dt)
+    {
+        if (_director is null || _rig is null) return;
+        float lead = _director.LeadX();
+        float target = Mathf.Max(_camX, lead - 1.0f);
+        if (_director.CameraLock is float hold) target = hold;
+        target = Mathf.Min(target, _director.ExitX + 1f);
+        _camX = Mathf.MoveToward(_camX, target, 9f * dt);
+        _rig.Position = new Vector3(_camX, 0f, 0f);
+        if (Arena.Current is Arena arena) arena.CameraX = _camX;
+        _scenery?.Follow(_camX);
+    }
 
     // ------------------------------------------------------------ secret shop
 
@@ -456,7 +568,7 @@ public partial class GameRoot : Node3D
         var tex = GD.Load<Texture2D>("res://assets/arena/secret_curtain.png");
         var node = new Node3D();
         AddChild(node);
-        float x = (float)GD.RandRange(-3.5, 3.5);
+        float x = _scrolling ? _camX + (float)GD.RandRange(1.5, 4.5) : (float)GD.RandRange(-3.5, 3.5);
         node.GlobalPosition = new Vector3(x, 0f, -3.2f);
         var sprite = new Sprite3D
         {
@@ -526,6 +638,7 @@ public partial class GameRoot : Node3D
     /// </summary>
     private void OnEnemyDefeated(Fighter enemy)
     {
+        _kos++;
         bool boss = enemy is BossClown;
         var foe = enemy as PlayerFighter;
         int level = foe?.EnemyLevel ?? 1;
@@ -614,7 +727,7 @@ public partial class GameRoot : Node3D
         _drops.Remove(drop);
         ItemData item = drop.Item;
         // Swept items were already counted into a bag at the stage clear.
-        if (!_swept.Contains(item.Id)) Bag(p).Add(item);
+        if (!_swept.Contains(item.Id)) { Bag(p).Add(item); _itemsFound++; }
         PopText.Spawn(this, p.GlobalPosition + new Vector3(0f, p.BodyHeight + 0.25f, 0f), item.Name,
                       Loot.RarityColor(item.Rarity), 0.7f, 0.9f);
         ClownSquad.Audio.Sfx.Play("coin", 0.9f + 0.08f * (int)item.Rarity);
@@ -628,6 +741,7 @@ public partial class GameRoot : Node3D
         float amount = (3f + level * 1.2f) * Leveling.RankXp(rank) * (boss ? 10f : 1f) * _lootRng.RandfRange(0.8f, 1.2f);
         if (_director?.IsBonus == true) amount *= 3f;
         int gold = Mathf.Max(1, (int)Mathf.Round(amount));
+        _goldEarned += gold;
         _bagGold[to] = (_bagGold.TryGetValue(to, out int had) ? had : 0) + gold;
         PopText.Spawn(this, enemy.GlobalPosition + new Vector3(0.4f, enemy.BodyHeight, 0f), $"+{gold} G",
                       new Color(1f, 0.9f, 0.4f), 0.7f, 0.8f);
@@ -669,6 +783,7 @@ public partial class GameRoot : Node3D
             }
             if (nearest is null) continue;
             Bag(nearest).Add(drop.Item);
+            _itemsFound++;
             _swept.Add(drop.Item.Id);
             drop.SendTo(nearest);
         }
@@ -755,6 +870,100 @@ public partial class GameRoot : Node3D
         else GetTree().ReloadCurrentScene();
     }
 
+    /// <summary>After a campaign stage, DODGE (K / B) plays it again from the start.</summary>
+    private void PollForRetry()
+    {
+        if (_stage is null || _endedAt < 0 || GameClock.Seconds - _endedAt < 1.5 || _outcomeProbe.Length > 0) return;
+        if (_tent is not null && (_tent.IsOpen || _tent.MsSinceClosed < 400 || _tentDueAt >= 0)) return;
+        bool held = Godot.Input.IsKeyPressed(Key.K);
+        foreach (int pad in Godot.Input.GetConnectedJoypads()) held |= Godot.Input.IsJoyButtonPressed(pad, JoyButton.B);
+        bool fresh = held && !_retryHeld;
+        _retryHeld = held;
+        if (fresh) Retry();
+    }
+
+    private void Retry()
+    {
+        SaveSystem.Save();
+        Campaign.Pending = _stage;
+        GetTree().ReloadCurrentScene();
+    }
+
+    /// <summary>Esc or Start pauses: resume, the Stat Tent, retry, or the map.</summary>
+    private void PollPause()
+    {
+        if (_pause is not null || _shop is not null || (_tent?.IsOpen ?? false) || _outcomeProbe.Length > 0) return;
+        var devices = new List<int>();
+        foreach (PlayerFighter p in _players) if (p.Source is LocalDeviceInput d) devices.Add(d.Device);
+        bool held = PauseMenu.PauseHeld(devices);
+        bool fresh = held && !_pauseHeld;
+        _pauseHeld = held;
+        if (!fresh) return;
+        _pause = new PauseMenu(_stage is not null, devices, choice =>
+        {
+            _pause = null;
+            _pauseHeld = true;
+            switch (choice)
+            {
+                case PauseMenu.Choice.Stats: _tent?.Open(); break;
+                case PauseMenu.Choice.Retry: Retry(); break;
+                case PauseMenu.Choice.Map: SaveSystem.Save(); GoToMap(); break;
+            }
+        });
+        AddChild(_pause);
+    }
+
+    /// <summary>The stage's report card, with what was won (or lost) and what to do next.</summary>
+    private void ShowResults(bool won)
+    {
+        if (_results is not null || !IsInsideTree()) return;
+        double secs = GameClock.Seconds;
+        var layer = new CanvasLayer { Layer = 8 };
+        AddChild(layer);
+        var panel = new PanelContainer();
+        panel.SetAnchorsPreset(Control.LayoutPreset.Center);
+        panel.Position = new Vector2(-210, -40);
+        panel.CustomMinimumSize = new Vector2(420, 0);
+        panel.AddThemeStyleboxOverride("panel", new StyleBoxFlat
+        {
+            BgColor = new Color(0.2f, 0.12f, 0.3f, 0.93f), BorderColor = won ? new Color(1f, 0.85f, 0.3f) : new Color(0.6f, 0.6f, 0.7f),
+            BorderWidthLeft = 4, BorderWidthRight = 4, BorderWidthTop = 4, BorderWidthBottom = 4,
+            CornerRadiusTopLeft = 14, CornerRadiusTopRight = 14, CornerRadiusBottomLeft = 14, CornerRadiusBottomRight = 14,
+            ContentMarginLeft = 22, ContentMarginRight = 22, ContentMarginTop = 14, ContentMarginBottom = 16,
+        });
+        layer.AddChild(panel);
+        var box = new VBoxContainer();
+        box.AddThemeConstantOverride("separation", 4);
+        panel.AddChild(box);
+        LabelSettings S(int size, Color c) => new()
+        {
+            Font = UiFont.Display, FontSize = size, FontColor = c, OutlineSize = 5, OutlineColor = new Color(0.08f, 0.04f, 0.1f),
+        };
+        void Row(string a, string b)
+        {
+            var h = new HBoxContainer();
+            h.AddChild(new Label { Text = a, LabelSettings = S(18, new Color(0.85f, 0.8f, 0.95f)), SizeFlagsHorizontal = Control.SizeFlags.ExpandFill });
+            h.AddChild(new Label { Text = b, LabelSettings = S(18, Colors.White) });
+            box.AddChild(h);
+        }
+        Row("TIME", $"{(int)secs / 60}:{(int)secs % 60:00}");
+        Row("KNOCKOUTS", _kos.ToString());
+        Row("BEST COMBO", $"{_bestCombo} HITS");
+        Row(won ? "GOLD BANKED" : "GOLD LOST", $"{_goldEarned} G");
+        Row(won ? "LOOT BANKED" : "LOOT LOST", _itemsFound.ToString());
+        box.AddChild(new Label
+        {
+            Text = won ? "ATTACK  back to the map      DODGE  play again" : "ATTACK  back to the map      DODGE  try again",
+            HorizontalAlignment = HorizontalAlignment.Center, LabelSettings = S(14, new Color(1f, 0.85f, 0.3f)),
+        });
+        _results = panel;
+        panel.Scale = new Vector2(0.6f, 0.6f);
+        panel.PivotOffset = new Vector2(210, 80);
+        CreateTween().TweenProperty(panel, "scale", Vector2.One, 0.3f).SetTrans(Tween.TransitionType.Back).SetEase(Tween.EaseType.Out);
+        if (_outcomeProbe.Length > 0)
+            GetTree().CreateTimer(0.5).Timeout += () => GetViewport().GetTexture().GetImage().SavePng("C:/Claude/ClownSquad/debug/results.png");
+    }
+
     // Combo counter: consecutive hits by players, reset after a short lull.
     private const double ComboLull = 1.6;
     private int _comboHits;
@@ -768,6 +977,7 @@ public partial class GameRoot : Node3D
         // Big hits lean the camera in: finishers and crits, harder for the biggest.
         if (amount >= 20f) CameraShake.RequestPunch(this, Mathf.Min(1f, amount / 45f));
         _comboHits++;
+        _bestCombo = Mathf.Max(_bestCombo, _comboHits);
         _comboExpires = GameClock.Seconds + ComboLull;
         // The crowd loves a long combo.
         if (_comboHits % 5 == 0) CrowdCheer(1.4f + _comboHits * 0.04f, 2 + _comboHits / 5);
@@ -799,7 +1009,7 @@ public partial class GameRoot : Node3D
         {
             BagText = BagText,
             StageLabel = _stage is StageDef s ? (s.Kind == StageKind.Boss ? $"{s.World}-BOSS  " : $"{s.Id}  ") : "",
-            ReplayText = _stage is not null ? "press ATTACK for the map" : "press ATTACK to play again",
+            ReplayText = _stage is not null ? "" : "press ATTACK to play again",
         };
         AddChild(_clownHud);
 
@@ -865,6 +1075,7 @@ public partial class GameRoot : Node3D
     public override void _PhysicsProcess(double delta)
     {
         GameClock.Advance(delta);
+        if (_scrolling) FollowCamera((float)delta);
         TickRespawns();
         if (_outcomeProbe.Length > 0) TickOutcomeProbe();
     }
@@ -875,6 +1086,8 @@ public partial class GameRoot : Node3D
         if (_hud is null) return;   // probe modes that build no HUD
 
         PollForJoins((float)delta);
+        PollPause();
+        PollForRetry();
         TickSecretCurtain();
         PollStatTent();
         PollForRestart();
@@ -934,11 +1147,14 @@ public partial class GameRoot : Node3D
         {
             // A loss must cost the bag: start the losing run already carrying an item.
             Bag(_players[0]).Add(Loot.Roll(_lootRng, 1, 0f));
+            // On a scrolling stage nothing comes to a player who stands still,
+            // so the idle player starts where the first group waits.
+            if (_scrolling) { _camX = FirstEncounter; _players[0].GlobalPosition = new Vector3(FirstEncounter, 0f, 0f); }
             return;
         }
 
         PlayerFighter p = _players[0];
-        p.Source = new BrawlerAi(p, attackRange: 1.7f, backoffRange: 0.8f, attackCooldownMs: 350);
+        p.Source = new BrawlerAi(p, attackRange: 1.7f, backoffRange: 0.8f, attackCooldownMs: 350) { AdvanceWhenIdle = true };
         p.ExtraDamageMultiplier = 2.5f;
         // Every grunt ranked Rare, so the run is certain to drop loot and to
         // exercise the ranked-enemy path.

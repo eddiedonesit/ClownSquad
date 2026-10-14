@@ -41,6 +41,24 @@ public partial class WaveDirector : Node
     public float BonusLeft { get; private set; }
     public bool IsBonus => BonusSeconds > 0f;
 
+    // ---- scrolling stages ----
+    // The squad walks right; each wave waits, unseen, at a point along the
+    // stage. Reaching it locks the camera there until the group is beaten,
+    // then the way on opens again. After the last group, the exit ends it.
+
+    /// <summary>Camera positions of the encounters, one per wave. Null for the fixed ring.</summary>
+    public float[]? EncounterX { get; set; }
+    public float ExitX { get; set; }
+    /// <summary>How far right the squad has got: the furthest living player.</summary>
+    public Func<float> LeadX { get; set; } = () => 0f;
+    /// <summary>While a group is being fought, the camera holds here.</summary>
+    public float? CameraLock { get; private set; }
+    /// <summary>Between groups: nothing to fight, so the HUD points the way on.</summary>
+    public bool ShowGo { get; private set; }
+    public bool IsScrolling => EncounterX is not null;
+    /// <summary>Encounters beaten so far, for the results screen.</summary>
+    public int EncountersCleared { get; private set; }
+
     private const float Intermission = 2.2f;
 
     private static readonly string[] GruntNames =
@@ -95,6 +113,9 @@ public partial class WaveDirector : Node
     public string Banner => Current switch
     {
         Phase.Intermission when IsBonus => "PINATA PARTY!",
+        Phase.Intermission when IsScrolling => "",
+        Phase.Fighting when IsScrolling => "",
+        Phase.Victory when IsScrolling => "STAGE CLEAR!",
         Phase.Intermission => WaveNumber == WaveCount ? "FINAL WAVE" : $"WAVE {WaveNumber}",
         Phase.Victory when IsBonus => "PARTY'S OVER!",
         Phase.Victory => "YOU WIN!",
@@ -120,6 +141,7 @@ public partial class WaveDirector : Node
         float dt = (float)delta;
 
         if (IsBonus) { TickBonus(dt); return; }
+        if (IsScrolling) { TickScrolling(dt); return; }
 
         if (Current == Phase.Intermission)
         {
@@ -150,6 +172,50 @@ public partial class WaveDirector : Node
             _timer = Intermission;
             Set(Phase.Intermission);
         }
+    }
+
+    private void TickScrolling(float dt)
+    {
+        if (Current == Phase.Intermission)
+        {
+            int i = WaveNumber - 1;
+            float lead = LeadX();
+            if (i < Waves.Length)
+            {
+                ShowGo = true;
+                if (lead < EncounterX![i] - 2.5f) return;
+                // Walked into the next group: hold the camera here and bring them on.
+                WaveDef wave = Waves[i];
+                _gruntsToSpawn = wave.Grunts;
+                _bossToSpawn = wave.Boss;
+                _spawnTimer = 0.35f;
+                CameraLock = EncounterX[i];
+                ShowGo = false;
+                Set(Phase.Fighting);
+            }
+            else
+            {
+                ShowGo = true;
+                if (lead >= ExitX) { ShowGo = false; Set(Phase.Victory); }
+            }
+            return;
+        }
+        if (Current != Phase.Fighting) return;
+
+        if (_gruntsToSpawn > 0 || _bossToSpawn)
+        {
+            _spawnTimer -= dt;
+            if (_spawnTimer > 0f) return;
+            _spawnTimer = SpawnInterval;
+            if (_bossToSpawn) { _bossToSpawn = false; Spawn(boss: true); }
+            else { _gruntsToSpawn--; Spawn(boss: false); }
+            return;
+        }
+        if (EnemiesAlive > 0) return;
+        CameraLock = null;
+        EncountersCleared++;
+        WaveNumber++;
+        Set(Phase.Intermission);
     }
 
     /// <summary>
@@ -215,7 +281,8 @@ public partial class WaveDirector : Node
         {
             (float far, float near) = arena.DepthRange(enemy.BodyHeight);
             float z = _rng.RandfRange(far + 0.4f, near - 0.6f);
-            float x = _side * (arena.HalfWidthAt(z, enemy.BodyHeight) - enemy.BodyHalfWidth);
+            float cx = CameraLock ?? arena.CameraX;
+            float x = cx + _side * (arena.HalfWidthAt(z, enemy.BodyHeight) - enemy.BodyHalfWidth);
             at = new Vector3(x, 0f, z);
         }
         _side = -_side;

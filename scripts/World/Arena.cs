@@ -28,6 +28,20 @@ public sealed class Arena
     private readonly float _nearZ;
     private readonly Dictionary<int, float> _farZByHeight = new();
 
+    /// <summary>
+    /// Where the camera is along the stage. A scrolling stage moves the camera
+    /// sideways only, which slides the whole visible box with it; nothing else
+    /// about the frustum changes, so the walls are the rest walls offset by this.
+    /// </summary>
+    public float CameraX { get; set; }
+
+    /// <summary>
+    /// An optional walkway: the depth band fighters may use, intersected with
+    /// what the camera sees. Scrolling stages use it, since their low camera can
+    /// see far further back than anyone should walk.
+    /// </summary>
+    public (float Far, float Near)? Band { get; set; }
+
     /// <summary>Capture the camera as it stands. Later shake does not move the walls.</summary>
     public Arena(Transform3D cameraRest, float fovDegrees, float aspect)
     {
@@ -37,6 +51,7 @@ public sealed class Arena
         _up = t.Basis.Y;
         _tanV = Mathf.Tan(Mathf.DegToRad(fovDegrees) * 0.5f);
         _tanH = _tanV * aspect;
+        CameraX = _eye.X;
 
         // Nearest depth at which feet on the ground are still on screen.
         _nearZ = Bisect(z => InView(new Vector3(_eye.X, 0f, z)), 0f, 40f);
@@ -46,7 +61,10 @@ public sealed class Arena
     public float MaxVisibleHeight(float z) => Bisect(h => InView(new Vector3(_eye.X, h, z)), 0f, 30f);
 
     /// <summary>Depth range a body of the given height may occupy: far (negative) to near.</summary>
-    public (float Far, float Near) DepthRange(float height) => (FarZ(height), _nearZ);
+    public (float Far, float Near) DepthRange(float height) => (FarLimit(height), NearLimit);
+
+    private float NearLimit => Band is (float, float) b ? Mathf.Min(_nearZ, b.Near) : _nearZ;
+    private float FarLimit(float height) => Band is (float, float) b ? Mathf.Max(FarZ(height), b.Far) : FarZ(height);
 
     private bool InView(Vector3 p)
     {
@@ -92,12 +110,12 @@ public sealed class Arena
     public Vector3 Clamp(Vector3 pos, float height, float halfWidth, out int wall)
     {
         float top = height + Mathf.Max(pos.Y, 0f);
-        float z = Mathf.Clamp(pos.Z, FarZ(top), _nearZ);
+        float z = Mathf.Clamp(pos.Z, FarLimit(top), NearLimit);
         float limit = HalfWidthAt(z, top) - halfWidth;
         float x = pos.X;
         wall = 0;
-        if (x > _eye.X + limit) { x = _eye.X + limit; wall = 1; }
-        else if (x < _eye.X - limit) { x = _eye.X - limit; wall = -1; }
+        if (x > CameraX + limit) { x = CameraX + limit; wall = 1; }
+        else if (x < CameraX - limit) { x = CameraX - limit; wall = -1; }
         return new Vector3(x, pos.Y, z);
     }
 }

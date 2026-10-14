@@ -52,7 +52,7 @@ public partial class StatTent : CanvasLayer
 
     public override void _Ready()
     {
-        _font = new SystemFont { FontNames = new[] { "Comic Sans MS", "Segoe UI Black", "Arial Black" }, FontWeight = 800 };
+        _font = UiFont.Display;
 
         _root = new Control { Visible = false };
         _root.SetAnchorsPreset(Control.LayoutPreset.FullRect);

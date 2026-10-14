@@ -70,7 +70,7 @@ public partial class ShopMenu : CanvasLayer
 
     public override void _Ready()
     {
-        _font = new SystemFont { FontNames = new[] { "Comic Sans MS", "Segoe UI Black", "Arial Black" }, FontWeight = 800 };
+        _font = UiFont.Display;
         var root = new Control();
         root.SetAnchorsPreset(Control.LayoutPreset.FullRect);
         AddChild(root);

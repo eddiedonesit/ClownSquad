@@ -65,6 +65,7 @@ public partial class ClownHud : CanvasLayer
     private string _bannerShown = "";
 
     private Label _hint = null!;
+    private Label _go = null!;
     private double _clock;
     private bool _f1Down;
 
@@ -86,13 +87,7 @@ public partial class ClownHud : CanvasLayer
 
     public override void _Ready()
     {
-        _font = new SystemFont
-        {
-            // Rounded and goofy where available, chunky everywhere else. A
-            // licensed display font is the upgrade path; see STATUS.
-            FontNames = new[] { "Comic Sans MS", "Segoe UI Black", "Arial Black" },
-            FontWeight = 800,
-        };
+        _font = UiFont.Display;
 
         for (int i = 0; i < 4; i++) _panels.Add(BuildPlayerPanel(i));
         BuildTarget();
@@ -101,6 +96,11 @@ public partial class ClownHud : CanvasLayer
         BuildCombo();
         BuildBanner();
         BuildHint();
+        // The classic "keep walking" arrow, shown between groups on a scrolling stage.
+        _go = new Label { Text = "GO >>", LabelSettings = Style(52, new Color(1f, 0.85f, 0.3f), 10), Visible = false };
+        _go.SetAnchorsPreset(Control.LayoutPreset.CenterRight);
+        _go.Position = new Vector2(-250, -40);
+        AddChild(_go);
 
         Fighter.HitLanded += OnHit;
     }
@@ -410,8 +410,12 @@ public partial class ClownHud : CanvasLayer
         _ticket.Visible = d is not null;
         if (d is not null)
         {
+            // A scrolling stage keeps its groups secret: just the stage's name.
             _ticketText.Text = d.IsBonus ? $"PARTY  {Mathf.CeilToInt(d.BonusLeft)}s"
+                             : d.IsScrolling ? $"STAGE {StageLabel.Trim()}"
                              : $"{StageLabel}WAVE {d.WaveNumber}/{d.WaveCount}";
+            bool go = d.IsScrolling && d.ShowGo && d.Current == WaveDirector.Phase.Intermission;
+            _go.Visible = go && ((int)(_clock * 2.5) % 2 == 0);
             _balloons.Count = d.Lives;
         }
 

@@ -13,7 +13,7 @@ public static class PopText
 
     public static void Spawn(Node parent, Vector3 at, string text, Color color, float size = 1f, float rise = 0.9f)
     {
-        _font ??= new SystemFont { FontNames = new[] { "Comic Sans MS", "Segoe UI Black", "Arial Black" }, FontWeight = 800 };
+        _font ??= ClownSquad.UI.UiFont.Display;
         var label = new Label3D
         {
             Text = text,

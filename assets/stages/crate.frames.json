@@ -1,0 +1,17 @@
+{
+  "frame_width": 90,
+  "frame_height": 90,
+  "baseline": 87,
+  "count": 1,
+  "clips": {
+    "idle": [
+      0
+    ],
+    "hit": [
+      0
+    ],
+    "down": [
+      0
+    ]
+  }
+}

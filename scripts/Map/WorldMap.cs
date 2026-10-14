@@ -56,7 +56,7 @@ public partial class WorldMap : Node2D
         _state = SaveSystem.Data.Campaign;
         _at = Campaign.Get(_state.At) ?? Campaign.Get("1-1")!;
         _world = _at.World;
-        _font = new SystemFont { FontNames = new[] { "Comic Sans MS", "Segoe UI Black", "Arial Black" }, FontWeight = 800 };
+        _font = UiFont.Display;
         _icons = GD.Load<Texture2D>(Icons);
 
         _background = new TextureRect

@@ -54,10 +54,16 @@ public sealed class BrawlerAi : IInputSource
 
     public string Describe() => "AI";
 
+    /// <summary>Walk right when there is no one to fight. For AI driving a player through a stage.</summary>
+    public bool AdvanceWhenIdle { get; set; }
+
     public InputCommand Poll()
     {
         Fighter? target = FindTarget();
-        if (target is null || _self.IsDead) return InputCommand.None;
+        if (_self.IsDead) return InputCommand.None;
+        // With nothing to fight, a player-side AI walks on, the way a player
+        // heads right through a scrolling stage to find the next group.
+        if (target is null) return AdvanceWhenIdle ? new InputCommand(new Vector2(1f, 0f), false, false, false, false, false) : InputCommand.None;
 
         Vector3 delta = target.GlobalPosition - _self.GlobalPosition;
         delta.Y = 0f;
