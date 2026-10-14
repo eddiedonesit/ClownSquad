@@ -194,5 +194,14 @@ public partial class Fighter : CharacterBody3D
         Grounded = false;
     }
 
+    /// <summary>Restore to full and place at a position. Used for respawns.</summary>
+    public void Revive(Vector3 at)
+    {
+        Health = MaxHealth;
+        Velocity = Vector3.Zero;
+        GlobalPosition = at;
+        PlayClip("idle", restart: true);
+    }
+
     public void Heal(float amount) => Health = Mathf.Min(MaxHealth, Health + amount);
 }

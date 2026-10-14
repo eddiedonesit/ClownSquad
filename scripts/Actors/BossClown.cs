@@ -22,6 +22,9 @@ public partial class BossClown : PlayerFighter
 
     public override bool Hostile => true;
 
+    // Its arms and belly cover far more ground than the player's mallet.
+    protected override float ReachScale => 1.45f;
+
     // Belly slam phases, in seconds.
     private const float WindUp = 0.55f;
     private const float Lunge = 0.28f;

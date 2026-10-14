@@ -16,13 +16,14 @@ public sealed class BrawlerAi : IInputSource
     private readonly ulong _attackCooldownMs;
     private readonly ulong _specialCooldownMs;
     private readonly float _specialRange;
+    private readonly float _depthTolerance;
 
     private ulong _nextAttackMs;
     private ulong _nextSpecialMs;
 
     public BrawlerAi(Fighter self, float attackRange = 1.8f, float backoffRange = 1.1f,
                      ulong attackCooldownMs = 800, ulong specialCooldownMs = 0,
-                     float specialRange = 5.5f)
+                     float specialRange = 5.5f, float depthTolerance = 0.55f)
     {
         _self = self;
         _attackRange = attackRange;
@@ -30,6 +31,7 @@ public sealed class BrawlerAi : IInputSource
         _attackCooldownMs = attackCooldownMs;
         _specialCooldownMs = specialCooldownMs;
         _specialRange = specialRange;
+        _depthTolerance = depthTolerance;
         // Stagger the first special so it is not thrown the instant combat opens.
         _nextSpecialMs = Time.GetTicksMsec() + specialCooldownMs / 2;
     }
@@ -59,9 +61,17 @@ public sealed class BrawlerAi : IInputSource
             return new InputCommand(Vector2.Zero, false, false, false, true);
         }
 
+        float depthOffset = Mathf.Abs(delta.Z);
+
         if (dist > _attackRange)
         {
             move = new Vector2(dir.X, dir.Z);
+        }
+        else if (depthOffset > _depthTolerance)
+        {
+            // In range but off the lane: step along depth only. Swinging from
+            // here would whiff, which reads as the enemy being broken.
+            move = new Vector2(0f, Mathf.Sign(delta.Z));
         }
         else if (dist < _backoffRange)
         {

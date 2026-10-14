@@ -54,6 +54,7 @@ public partial class PlayerFighter : Fighter
     private float _phaseTime;
     private float _sinceCombo = 99f;
     private bool _bufferedAttack;
+    private bool _bufferedSpecial;
     private float _dodgeTime;
     private Vector3 _dodgeDir;
     private readonly HashSet<Fighter> _hitThisSwing = new();
@@ -75,6 +76,17 @@ public partial class PlayerFighter : Fighter
 
     protected float SpecialTime { get; private set; }
 
+    /// <summary>
+    /// Multiplies melee reach. A fighter twice the size swings twice as far;
+    /// without this a big enemy whiffs at distances it visually covers.
+    /// </summary>
+    protected virtual float ReachScale => 1f;
+
+    /// <summary>How far off the attacker's depth lane a target can be and still
+    /// be hit. Too tight and combat feels finicky; too loose and depth stops
+    /// mattering.</summary>
+    protected virtual float DepthBand => 0.85f;
+
     protected override void Tick(float dt)
     {
         InputCommand cmd = Source?.Poll() ?? InputCommand.None;
@@ -82,6 +94,9 @@ public partial class PlayerFighter : Fighter
         if (_sinceCombo > ComboWindow) _comboIndex = 0;
 
         if (cmd.AttackPressed) _bufferedAttack = true;
+        // Buffered like attacks: a special pressed mid-swing would otherwise be
+        // dropped, while the requester has already spent its cooldown on it.
+        if (cmd.SpecialPressed) _bufferedSpecial = true;
 
         switch (_state)
         {
@@ -101,19 +116,23 @@ public partial class PlayerFighter : Fighter
         if (Mathf.Abs(move.X) > 0.1f)
             Facing = new Vector3(Mathf.Sign(move.X), 0f, 0f);
 
+        // Specials outrank a buffered attack. Checked the other way round, a
+        // fast attack cadence starves the special: there is nearly always an
+        // attack queued, so the signature move never fires.
+        if (_bufferedSpecial && HasSpecial && Grounded)
+        {
+            _bufferedSpecial = false;
+            _bufferedAttack = false;
+            _state = State.Special;
+            SpecialTime = 0f;
+            OnSpecialStart();
+            return;
+        }
+
         if (_bufferedAttack)
         {
             _bufferedAttack = false;
             StartAttack();
-            return;
-        }
-
-        if (cmd.SpecialPressed && HasSpecial && Grounded)
-        {
-            _state = State.Special;
-            SpecialTime = 0f;
-            _bufferedAttack = false;
-            OnSpecialStart();
             return;
         }
 
@@ -239,12 +258,19 @@ public partial class PlayerFighter : Fighter
 
             Vector3 to = other.GlobalPosition - GlobalPosition;
             to.Y = 0f;
-            float dist = to.Length();
-            if (dist > step.Range || dist < 0.01f) continue;
-            if (Mathf.RadToDeg(Facing.AngleTo(to / dist)) > step.HalfArcDegrees) continue;
+
+            // A forward box, not a cone. Facing is locked to the X axis, so a
+            // cone around it misses anyone offset in depth even when they look
+            // adjacent on screen. Brawlers want depth lanes: line up, then hit.
+            float forward = to.Dot(Facing);
+            float lateral = (to - Facing * forward).Length();
+            if (forward <= 0f || forward > step.Range * ReachScale) continue;
+            if (lateral > DepthBand * ReachScale) continue;
 
             _hitThisSwing.Add(other);
-            other.TakeDamage(new DamageInfo(step.Damage, to / dist, step.Knockback, step.Hitstop, this));
+            // Knock straight along the attacker's facing rather than toward the
+            // target, so hits shove down the lane instead of scattering sideways.
+            other.TakeDamage(new DamageInfo(step.Damage, Facing, step.Knockback, step.Hitstop, this));
             ApplyHitstop(step.Hitstop);
         }
     }

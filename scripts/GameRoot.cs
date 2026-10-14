@@ -20,6 +20,10 @@ public partial class GameRoot : Node3D
     private Label? _hud;
     private bool _aiProbe;
 
+    /// <summary>Fighters waiting to respawn, with the time left and where to go.</summary>
+    private readonly List<(Fighter fighter, Vector3 at, double at_time)> _pendingRespawns = new();
+    private double _clock;
+
     public override void _Ready()
     {
         _aiProbe = System.Array.IndexOf(OS.GetCmdlineUserArgs(), "aitest") >= 0;
@@ -99,7 +103,9 @@ public partial class GameRoot : Node3D
             PlayerIndex = index,
         };
         AddChild(p);
-        p.GlobalPosition = new Vector3(-1.5f + index * 3f, 0f, 2f);
+        Vector3 home = new(-1.5f + index * 3f, 0f, 2f);
+        p.GlobalPosition = home;
+        p.Died += f => ScheduleRespawn(f, home, 1.5);
         _players.Add(p);
     }
 
@@ -121,8 +127,36 @@ public partial class GameRoot : Node3D
                                     specialCooldownMs: 5000, specialRange: 6.0f);
         AddChild(boss);
         boss.GlobalPosition = at;
+        boss.Died += f => ScheduleRespawn(f, at, 3.0);
         _bosses.Add(boss);
         GD.Print("Boss clown spawned, driven by BrawlerAi.");
+    }
+
+    /// <summary>
+    /// Death is a respawn in the test room. Without it a downed fighter stops
+    /// being a valid AI target, and enemies stand idle forever with nothing to
+    /// chase - which looks exactly like the AI having broken.
+    /// </summary>
+    private void ScheduleRespawn(Fighter f, Vector3 at, double delay)
+    {
+        GD.Print($"{f.Name} down; respawning in {delay:F1}s.");
+        _pendingRespawns.Add((f, at, _clock + delay));
+    }
+
+    private void TickRespawns(double delta)
+    {
+        _clock += delta;
+        for (int i = _pendingRespawns.Count - 1; i >= 0; i--)
+        {
+            (Fighter f, Vector3 at, double due) = _pendingRespawns[i];
+            if (_clock < due) continue;
+            _pendingRespawns.RemoveAt(i);
+            if (GodotObject.IsInstanceValid(f))
+            {
+                f.Revive(at);
+                GD.Print($"{f.Name} respawned.");
+            }
+        }
     }
 
     private void BuildHud()
@@ -165,7 +199,7 @@ public partial class GameRoot : Node3D
             img.SavePng($"C:/Claude/ClownSquad/debug/ai_{_aiProbeTick}.png");
         }
 
-        if (++_aiProbeTick > 10)
+        if (++_aiProbeTick > 26)
         {
             GD.Print("=== AI PROBE DONE ===");
             GetTree().Quit();
@@ -174,6 +208,7 @@ public partial class GameRoot : Node3D
 
     public override void _Process(double delta)
     {
+        TickRespawns(delta);
         if (_aiProbe) { TickAiProbe((float)delta); return; }
         if (_hud is null) return;   // probe mode builds no HUD
 
