@@ -1,6 +1,6 @@
 # Status — what is actually built
 
-Updated 2026-10-14. The [GDD](design/GDD.md) describes the intended game; this
+Updated 2026-10-15. The [GDD](design/GDD.md) describes the intended game; this
 records what exists in the repository today.
 
 ## Running it
@@ -20,6 +20,12 @@ C:/Tools/Godot/4.7.2/Godot_v4.7.2-stable_mono_win64_console.exe --headless --pat
 # the game opens on the world map; run one stage directly with  -- stage 2-3  (or  -- fight  for the old free fight)
 # campaign checks: add  stage 1-1  to wavetest (bonus: stage 1-*; secret shop: stage 1-3 secret)
 
+# the whole regression suite in parallel, one line per run (add --balance for the bot-vs-boss runs)
+bash tools/run_probes.sh
+
+# every weapon's combo and charge move against two dummies (add  skills all  for full trees)
+C:/Tools/Godot/4.7.2/Godot_v4.7.2-stable_mono_win64_console.exe --headless --path C:/Claude/ClownSquad -- weapontest
+
 # moves: screen walls, charge throw, spin, flip, launch and wall bounce (17 checks)
 C:/Tools/Godot/4.7.2/Godot_v4.7.2-stable_mono_win64_console.exe --headless --path C:/Claude/ClownSquad -- movetest
 
@@ -34,7 +40,11 @@ bash tools/refresh_sprites.sh
 #   -- stageshot stage 3-1    a stage's 3D scenery, twice along the road
 #   -- mapshot mapall mapat 6-3   the world map on any island, all of them lit
 #   -- castshot / castshot bosses the new enemies or bosses lined up, idle and mid-move
+#   -- skillshot weapon pie level 10 stage 1-1   the skill menu for a weapon
+#   -- demo stage 1-B level 4 [weapon X]   the smart bot plays a stage at normal speed (record with --write-movie)
 # probes at a level: add  level 20  to wavetest (e.g. -- wavetest stage 7-B level 21)
+# probes with real damage (no 2x bot bonus): add  fair ;  with a weapon: add  weapon popgun  (and  skills all )
+# boss rush probe:  -- wavetest bossrush
 ```
 
 In PowerShell, launch with the call operator: `& "C:/Tools/Godot/4.7.2/Godot_v4.7.2-stable_mono_win64.exe" --path C:/Claude/ClownSquad`.
@@ -60,7 +70,7 @@ immediately; pads join by pressing a button.
 | Death | Killing blow lifts the body; it lies in a floored pose, blinks and is removed |
 | Enemy AI | Turn-taking by attack token, waiting ring, crowd spacing, depth line-up; timed on game time |
 | Saving | One JSON save in the Godot user folder (`user://clownsquad_save.json`), written atomically; an unreadable save is set aside, never overwritten. Saved on every kill, wave clear, stage end, Stat Tent close and quit. Tests use a separate throwaway save |
-| Levelling | XP from every enemy to every player (grunt 15, boss 150); curve 120 x level^1.35 to a cap of 50 (tripled from 40 on 2026-10-14); each level gives 3 stat points, 1 banked skill point, and a full heal. Failing a stage keeps XP |
+| Levelling | XP from every enemy to every player (grunt 15, boss 150); curve 120 x level^1.35 to a cap of 50 (tripled from 40 on 2026-10-14); each level gives 3 stat points, 1 skill point, and a full heal. Failing a stage keeps XP |
 | Stats | POW +4% damage, GUTS +8 max health, ZIP +2% speed (cap +40%), LUCK +1.5% crit chance (base 3%, cap 50%, crits x1.75). Spent in the Stat Tent: one card per player on their own controller, game paused, undo until closed; opens on Tab / Back and after a stage |
 | Art | HD sprites by default: squad (44 frames, every clip), grunts, thrown mallet, Bertie and his fists at double resolution (player 96x128), with 5-tone hue-shifted ramps, form shading, cast shadows between parts and coloured outlines (tools/pixelart_hd.py, gen_sprite_hd.py, gen_enemy_hd.py). The original sheets and generators are kept; `-- classic` plays with them |
 | Lighting | The Children of Morta / Sea of Stars recipe: crisp pixel sprites, smooth real lights on top. Every HD sheet has a generated normal map (from the same surface the baked shading used, with outward rim normals on the outline); a sprite shader lights them. Key light from the upper left, warm and cool circus lamps for coloured rims, a light flash on every hit, soft contact shadows under every fighter, a colour grade for saturation |
@@ -94,14 +104,20 @@ immediately; pads join by pressing a button.
 | Bosses | One per world: 1 Bellyflop Bertie, 2 Bobo the Balancer (on a 3D beach ball: pin volleys, ball roll, bounces), 3 Madame Stripes and Rajah the tiger (whip, commanded pounce and roar, flaming hoop), 4 the Jalopy (clown car: rams, unloads passengers, honk, backfire), 5 Stretch (stretching lane punch, grab-and-reel, spring leaps), 6 the Flying Fratelli (two acrobats on 3D trapezes taking turns to dive), 7 Pyro Pete (fire breath cone, torches, ring of fire), 8 the Totem Tots (a tower of five that topples, throws a tot, and congas; one quits every fifth of its health), 9 Iron Ivan (barbell slam with a lane shockwave, grab-and-throw, dumbbells, flex), 10 the Ringmaster (carriage charges and whip, then on foot: hat bombs, doves, spotlights, calling in acts). Phases at 2/3 and 1/3 health, comic title card on arrival, telegraphs for every big move |
 | Specials | `HasSpecial` / `OnSpecialStart` / `TickSpecialMove` hooks; boss belly slam with a radial shockwave |
 | Factions | `Fighter.Hostile` gates attacks, so there is no friendly fire |
-| Tooling | Procedural sprite/effect/enemy generators, animation probe, AI probe, variant renderer |
+| Weapons | Eight, each with its own art on all four clowns, combo, sounds and charge move (scripts/Progression/Weapons.cs, ADR 0009): Squeaky Mallet (boomerang throw), Big Bertha hammer (ground-pound quake), Rubber Chicken (long squawking throw), Cream Pie (lobbed splat that blinds), Juggling Pins (fan of pins), Slapstick (stunning slaps, CLAP), Pop Gun (fires corks; piercing big cork), Balloon Sword (longest reach; fencer's lunge). Changed only on the map, between stages |
+| Skill trees | One per weapon: three columns of three, learned top to bottom, a node costs its tier in skill points; points are shared, learned skills belong to the weapon. Pause > SKILLS anywhere; unlearning and weapon swaps only from the map's SKILLS & WEAPONS. Save version 5 |
+| Settings | Title, fight pause and map pause: music, sound, screen shake, fullscreen, difficulty (Easy 0.8x enemy health / 0.6x damage / +2 lives; Hard 1.25x / 1.35x / -1 life). user://settings.cfg |
+| Boss intros | Each boss arrives with a drumroll, a swinging spotlight, a crowd "ooh", its own signature sound and the comic title card; it cannot be hit for the 2.6 s intro. Crowd gasps at each phase change and laughs when a player goes down |
+| Act cards | The first time each enemy kind appears, a NEW ACT! card shows its portrait, name and how to beat it |
+| Boss rush | Title > BOSS RUSH: all ten bosses back to back as level-30 clowns on a save of its own, half a heal between, against the clock; best time kept |
+| Bestiary | Title > BESTIARY: every act met in any save slot, with portrait and tip; bosses show whether they are beaten; unmet ones are silhouettes |
+| Tooling | Procedural sprite/effect/enemy generators, animation probe, AI probe, variant renderer, the smart test bot (reads telegraphs, hazards and shots; dodges and jumps rings), weapon probe, `tools/run_probes.sh` |
 
 ## Not built
 
-Everything else in the GDD: rarity tiers, monster capture, classes, skill trees,
-item generation and affixes, levelling, shops, story, online co-op. The fight is
-one fixed arena with one fixed wave list; there are no levels, scrolling or
-pickups, and no sound.
+From the GDD: online co-op (status and plan in [REVIEW-2026-10-15](REVIEW-2026-10-15.md) §4),
+monster capture, classes, story. Also not yet: Steam integration (achievements,
+cloud saves), controller rebinding, localisation.
 
 ## Known simplifications
 
@@ -136,8 +152,10 @@ run-based or level-based structure, and max player count.
 
 - The ECC plugin (and its GateGuard edit gate) was disabled on 2026-10-14 in the
   user's Claude Code settings.
-- Balance: a fresh level-1 AI loses `wavetest stage 9-3` (enemies ~level 21).
-  That is expected of an unlevelled squad, but there is no probe yet that
-  plays a late stage with a squad of a fitting level.
+- Balance needs human playtesting: the smart bot wins 7-B about half the time and
+  reaches boss 7 of 10 in the boss rush; the eight weapons are tuned by probe only.
+- The code review of 2026-10-15 ([REVIEW-2026-10-15](REVIEW-2026-10-15.md)) lists
+  the open risks, highest first: no git remote and the repo synced by Google
+  Drive; GameRoot doing too many jobs; global state crossing scenes.
 - The soundtrack is synthesised. A composer or licensed recordings would be
   the step up for release; the song structure and loop points carry over.
