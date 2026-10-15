@@ -36,15 +36,17 @@ public partial class CameraShake : Node
     /// <summary>Find the active shaker and request a shake. Safe if absent.</summary>
     public static void Request(Node from, float amplitude, float duration)
     {
-        if (from.GetTree()?.GetFirstNodeInGroup(Group) is CameraShake s)
-            s.Shake(amplitude, duration);
+        float k = ClownSquad.Progression.GameSettings.Shake;
+        if (k > 0f && from.GetTree()?.GetFirstNodeInGroup(Group) is CameraShake s)
+            s.Shake(amplitude * k, duration);
     }
 
     /// <summary>Lean the camera in for a big hit; strength about 0.5 for a finisher, 1 for a knockout.</summary>
     public static void RequestPunch(Node from, float strength)
     {
-        if (from.GetTree()?.GetFirstNodeInGroup(Group) is CameraShake s)
-            s._punch = Mathf.Max(s._punch, Mathf.Clamp(strength, 0f, 1.5f));
+        float k = ClownSquad.Progression.GameSettings.Shake;
+        if (k > 0f && from.GetTree()?.GetFirstNodeInGroup(Group) is CameraShake s)
+            s._punch = Mathf.Max(s._punch, Mathf.Clamp(strength * k, 0f, 1.5f));
     }
 
     public void Shake(float amplitude, float duration)

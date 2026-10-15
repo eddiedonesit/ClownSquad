@@ -109,6 +109,7 @@ public partial class WaveDirector : Node
         _normalTimeScale = Engine.TimeScale;
         _timer = Intermission;
         BonusLeft = BonusSeconds;
+        Lives = Mathf.Max(0, 3 + GameSettings.Scale.lives);
     }
 
     public string Banner => Current switch
@@ -319,6 +320,7 @@ public partial class WaveDirector : Node
         _world.AddChild(enemy);
         int level = Mathf.Max(LevelFloor, HostLevel());
         enemy.ApplyEnemyRank(level, rank);
+        ApplyDifficulty(enemy);
         if (enemy.Rank != EnemyRank.Common)
             GD.Print($"{enemy.DisplayName} appears (level {enemy.EnemyLevel}).");
 
@@ -348,9 +350,18 @@ public partial class WaveDirector : Node
         if (enemy.DisplayName.Length == 0) enemy.DisplayName = EnemyCatalog.NameFor(enemy.Name, _rng, GruntNames);
         _world.AddChild(enemy);
         enemy.ApplyEnemyRank(Mathf.Max(LevelFloor, HostLevel()), EnemyRank.Common);
+        ApplyDifficulty(enemy);
         enemy.GlobalPosition = at;
         enemy.Died += OnEnemyDied;
         EnemiesAlive++;
+    }
+
+    /// <summary>Easy and Hard scale each enemy as it arrives (GameSettings).</summary>
+    private static void ApplyDifficulty(PlayerFighter enemy)
+    {
+        (float health, float damage, _) = GameSettings.Scale;
+        if (health != 1f) enemy.ScaleHealth(health);
+        enemy.DamageMultiplier *= damage;
     }
 
     /// <summary>Send an enemy away without a fight (no XP): a tiger whose trainer has fallen.</summary>

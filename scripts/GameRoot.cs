@@ -103,9 +103,11 @@ public partial class GameRoot : Node3D
         ClownSquad.Visuals.ArtStyle.Classic = Has("classic");
 
         // Tests run against a throwaway save, so they never read or touch a real one.
-        bool probe = Has("animtest") || Has("movetest") || Has("aitest") || Has("wavetest") || Has("losetest") || Has("tentshot") || Has("castshot");
+        bool probe = Has("animtest") || Has("movetest") || Has("aitest") || Has("wavetest") || Has("losetest") || Has("tentshot") || Has("castshot") || Has("demo");
         if (probe)
         {
+            // Tests compare runs, so they always play on Normal.
+            GameSettings.ForceNormal = true;
             SaveSystem.Path = "user://probe_save.json";
             SaveSystem.DeleteForTests();
         }
@@ -205,6 +207,39 @@ public partial class GameRoot : Node3D
         if (_outcomeProbe.Length > 0) StartOutcomeProbe();
         if (Has("tentshot")) StartTentShot();
         if (Has("stageshot")) StartStageShot();
+        if (Has("demo")) StartDemo();
+    }
+
+    /// <summary>
+    /// "-- demo stage 1-B level 4": the smart bot plays the stage at normal
+    /// speed for a recording (with Godot's --write-movie), on a throwaway save;
+    /// it quits a few seconds after the stage is won or lost.
+    /// </summary>
+    private void StartDemo()
+    {
+        PlayerFighter p = _players[0];
+        p.Source = new SmartBot(p);
+        p.ExtraDamageMultiplier = 1.4f;
+        ApplyProbeLevel(p);
+        _director!.PhaseChanged += phase =>
+        {
+            if (phase is WaveDirector.Phase.Victory or WaveDirector.Phase.Defeat)
+                GetTree().CreateTimer(6.0, true, false, true).Timeout += () => GetTree().Quit();
+        };
+    }
+
+    /// <summary>"level N" on the command line: raise the player's record to that level, points spent evenly.</summary>
+    private static void ApplyProbeLevel(PlayerFighter p)
+    {
+        string[] args = OS.GetCmdlineUserArgs();
+        int at = Array.IndexOf(args, "level");
+        if (at < 0 || at + 1 >= args.Length || !int.TryParse(args[at + 1], out int want) || p.Record is not CharacterRecord rec) return;
+        while (rec.Level < want && Leveling.XpToNext(rec.Level) > 0) Leveling.Grant(rec, Leveling.XpToNext(rec.Level));
+        bool pow = true;
+        while (rec.StatPoints > 0) { if (pow) rec.Pow++; else rec.Guts++; rec.StatPoints--; pow = !pow; }
+        p.ApplyProgression(rec);
+        p.Heal(p.MaxHealth);
+        GD.Print($"Squad at level {rec.Level}: POW {rec.Pow}, GUTS {rec.Guts}, {p.MaxHealth:F0} hp.");
     }
 
     /// <summary>"-- stageshot stage 3-1": two stills of a stage's scenery, then quit. Needs a window.</summary>
@@ -950,7 +985,7 @@ public partial class GameRoot : Node3D
         bool fresh = held && !_pauseHeld;
         _pauseHeld = held;
         if (!fresh) return;
-        var items = new List<(PauseMenu.Choice, string)> { (PauseMenu.Choice.Resume, "RESUME"), (PauseMenu.Choice.Stats, "STAT TENT"), (PauseMenu.Choice.Inventory, "INVENTORY") };
+        var items = new List<(PauseMenu.Choice, string)> { (PauseMenu.Choice.Resume, "RESUME"), (PauseMenu.Choice.Stats, "STAT TENT"), (PauseMenu.Choice.Inventory, "INVENTORY"), (PauseMenu.Choice.Settings, "SETTINGS") };
         if (_stage is not null) items.Add((PauseMenu.Choice.Retry, "RETRY STAGE"));
         items.Add((PauseMenu.Choice.Map, "BACK TO THE MAP"));
         _pause = new PauseMenu(items, devices, choice =>
@@ -961,6 +996,12 @@ public partial class GameRoot : Node3D
             {
                 case PauseMenu.Choice.Stats: _tent?.Open(); break;
                 case PauseMenu.Choice.Inventory: AddChild(new InventoryMenu(Seats())); break;
+                case PauseMenu.Choice.Settings:
+                    GetTree().Paused = true;
+                    var settings = new SettingsMenu(devices);
+                    settings.Closed += () => { GetTree().Paused = false; _pauseHeld = true; };
+                    AddChild(settings);
+                    break;
                 case PauseMenu.Choice.Retry: Retry(); break;
                 case PauseMenu.Choice.Map: SaveSystem.Save(); GoToMap(); break;
             }
@@ -1237,17 +1278,7 @@ public partial class GameRoot : Node3D
 
         // "-- level 20": play the probe as a squad of a fitting level, points
         // spent evenly on POW and GUTS, so late worlds and bosses can be tested.
-        string[] args = OS.GetCmdlineUserArgs();
-        int at = Array.IndexOf(args, "level");
-        if (at >= 0 && at + 1 < args.Length && int.TryParse(args[at + 1], out int want) && p.Record is CharacterRecord rec)
-        {
-            while (rec.Level < want && Leveling.XpToNext(rec.Level) > 0) Leveling.Grant(rec, Leveling.XpToNext(rec.Level));
-            bool pow = true;
-            while (rec.StatPoints > 0) { if (pow) rec.Pow++; else rec.Guts++; rec.StatPoints--; pow = !pow; }
-            p.ApplyProgression(rec);
-            p.Heal(p.MaxHealth);
-            GD.Print($"Probe squad at level {rec.Level}: POW {rec.Pow}, GUTS {rec.Guts}, {p.MaxHealth:F0} hp.");
-        }
+        ApplyProbeLevel(p);
         // Every grunt ranked Rare, so the run is certain to drop loot and to
         // exercise the ranked-enemy path.
         _director!.ForceRank = EnemyRank.Rare;

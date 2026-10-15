@@ -53,14 +53,17 @@ public partial class Sfx : Node
         ProcessMode = ProcessModeEnum.Always;
         _rng.Randomize();
         LoadBanks();
+        // Volumes live on their own buses, set from the player's settings.
+        ClownSquad.Progression.GameSettings.Load();
+        ClownSquad.Progression.GameSettings.EnsureBuses();
 
         for (int i = 0; i < Voices; i++)
         {
-            var v = new AudioStreamPlayer();
+            var v = new AudioStreamPlayer { Bus = ClownSquad.Progression.GameSettings.SfxBus };
             AddChild(v);
             _voices.Add(v);
         }
-        _music = new AudioStreamPlayer { VolumeDb = -13f };
+        _music = new AudioStreamPlayer { VolumeDb = -13f, Bus = ClownSquad.Progression.GameSettings.MusicBus };
         AddChild(_music);
     }
 
