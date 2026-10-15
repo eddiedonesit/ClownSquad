@@ -195,6 +195,8 @@ public partial class NetSession : Node
         _members.Add(MemberFor(from, rec));
         GD.Print($"Net: {rec.Name} (level {rec.Level}) joined as peer {from}.");
         Status = $"{rec.Name} joined.";
+        ClownSquad.Services.Achievements.Award("together");
+        ClownSquad.Services.Platform.SetPresence($"Hosting an online game ({_members.Count} players)");
         SendRoster();
     }
 
@@ -206,6 +208,8 @@ public partial class NetSession : Node
         _members.Clear();
         if (list is not null) _members.AddRange(list);
         Status = $"In the lobby: {_members.Count} player(s). The host starts the game.";
+        if (_members.Count >= 2) ClownSquad.Services.Achievements.Award("together");
+        ClownSquad.Services.Platform.SetPresence("In an online lobby");
         Changed?.Invoke();
     }
 

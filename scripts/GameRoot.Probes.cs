@@ -381,6 +381,8 @@ public partial class GameRoot
             GD.Print($"  player blinked while lying dead: {_sawDeadBlink}");
             ok &= _sawDeadBlink;
         }
+        if (ClownSquad.Services.Platform.CountInTests && ClownSquad.Services.Platform.Current is ClownSquad.Services.OfflinePlatform off)
+            GD.Print($"  achievements earned: {string.Join(" ", off.Unlocked)}; kos {off.GetStat("kos")}, stages {off.GetStat("stages")}, bosses {off.GetStat("bosses")}");
         GD.Print($"=== WAVE PROBE {(ok ? "PASS" : "FAIL")}: got {got}, expected {_outcomeProbe}; " +
                  $"wave {d.WaveNumber}/{d.WaveCount}, lives {d.Lives}, {GameClock.Seconds:F0}s of game time ===");
         _outcomeProbe = "";

@@ -65,6 +65,8 @@ public partial class TitleScreen : Node3D
 
         Engine.TimeScale = 1.0;
         GetTree().Paused = false;
+        ClownSquad.Services.PlatformPump.Ensure(GetTree());
+        ClownSquad.Services.Platform.SetPresence("At the big top's front door");
         ArtStyle.Classic = Array.IndexOf(args, "classic") >= 0;
         if (Sfx.Instance is null) AddChild(new Sfx());
         BuildStage();
@@ -105,6 +107,7 @@ public partial class TitleScreen : Node3D
 
     private BestiaryMenu? _bestiary;
     private OnlineMenu? _online;
+    private AchievementsMenu? _achievements;
 
     /// <summary>Online play, as P1's character from the most recent save (a fresh PIP if there is none).</summary>
     private void OpenOnline()
@@ -118,6 +121,15 @@ public partial class TitleScreen : Node3D
         _online = new OnlineMenu(devices, me);
         _online.Closed += () => { _online = null; foreach (MapPad p in _pads) p.Swallow(); };
         AddChild(_online);
+    }
+
+    private void OpenAchievements()
+    {
+        var devices = new List<int> { LocalDeviceInput.Keyboard };
+        devices.AddRange(Godot.Input.GetConnectedJoypads());
+        _achievements = new AchievementsMenu(devices);
+        _achievements.Closed += () => { _achievements = null; foreach (MapPad p in _pads) p.Swallow(); };
+        AddChild(_achievements);
     }
 
     private void OpenBestiary()
@@ -155,8 +167,9 @@ public partial class TitleScreen : Node3D
         };
         GetTree().CreateTimer(6.25).Timeout += () => { Shot("bestiary"); _bestiary?.QueueFree(); _bestiary = null; OpenOnline(); };
         GetTree().CreateTimer(6.4).Timeout += () => { Shot("online"); _online?.HostForShot(); };
-        GetTree().CreateTimer(6.6).Timeout += () => { Shot("online_lobby"); ClownSquad.Net.NetSession.Instance?.Leave(quiet: true); _online?.QueueFree(); _online = null; };
-        GetTree().CreateTimer(6.75).Timeout += () =>
+        GetTree().CreateTimer(6.6).Timeout += () => { Shot("online_lobby"); ClownSquad.Net.NetSession.Instance?.Leave(quiet: true); _online?.QueueFree(); _online = null; OpenAchievements(); };
+        GetTree().CreateTimer(6.7).Timeout += () => { Shot("achievements"); _achievements?.QueueFree(); _achievements = null; };
+        GetTree().CreateTimer(6.85).Timeout += () =>
         {
             Shot("title");
             _newGame = false;
@@ -311,6 +324,7 @@ public partial class TitleScreen : Node3D
             GetTree().ChangeSceneToFile(Campaign.FightScene);
         }));
         _main.Add(("BESTIARY", OpenBestiary));
+        _main.Add(("ACHIEVEMENTS", OpenAchievements));
         _main.Add(("SETTINGS", OpenSettings));
         _main.Add(("QUIT", () => GetTree().Quit()));
         _mainCursor = Mathf.Clamp(_mainCursor, 0, _main.Count - 1);
@@ -498,7 +512,7 @@ public partial class TitleScreen : Node3D
         _logo.Rotation = Mathf.Sin((float)_clock * 1.6f) * 0.025f;
         _logo.Scale = Vector2.One * (1f + 0.025f * Mathf.Sin((float)_clock * 3.1f));
         foreach (DirectionalSprite s in _standees) s.Tick((float)delta);
-        if (_starting || _intro is not null || _settings is not null || _bestiary is not null || _online is not null) return;
+        if (_starting || _intro is not null || _settings is not null || _bestiary is not null || _online is not null || _achievements is not null) return;
         _menuBacking.Visible = _mode != Mode.Squad;
 
         if (_mode == Mode.Squad) { TickSquad(); return; }

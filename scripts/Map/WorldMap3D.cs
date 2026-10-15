@@ -64,6 +64,8 @@ public partial class WorldMap3D : Node3D
         if (Sfx.Instance is null) AddChild(new Sfx());
         // The map is the campaign, whatever route led here (Session).
         Session.BeginCampaign();
+        ClownSquad.Services.PlatformPump.Ensure(GetTree());
+        ClownSquad.Services.Platform.SetPresence("Choosing a stage on the world map");
         SaveSystem.Load();
         _state = SaveSystem.Data.Campaign;
         string[] cli = OS.GetCmdlineUserArgs();

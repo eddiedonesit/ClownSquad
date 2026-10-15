@@ -345,6 +345,7 @@ public static class Weapons
         if (!CanLearn(r, s, out _)) return false;
         r.SkillPoints -= s.Cost;
         Learned(r, r.Weapon).Add(s.Id);
+        if (Learned(r, r.Weapon).Count >= Get(r.Weapon).Tree.Length) ClownSquad.Services.Achievements.Award("full_tree");
         return true;
     }
 

@@ -114,6 +114,7 @@ immediately; pads join by pressing a button.
 | Practice ring | Title > PRACTICE RING: your clowns (a copy of the last save; nothing kept) with three dummies; change weapon on the spot, switch the whole tree on and off, call in grunts, damage meter |
 | Controls | Settings > CONTROLS: rebind every action on keyboard and gamepad (user://controls.cfg); taken keys swap; d-pad moves |
 | Online | Title > ONLINE: host (UDP 7777) or join by IP, lobby with everyone's clown, level and weapon; guests bring their own character. Playing stages online is phase 2 (ADR 0010) |
+| Steam-ready | Platform layer (`IPlatform`, offline today), 34 achievements wired with an in-game list, stats, boss-rush leaderboard, rich presence, overlay pause; Steamworks checklist and the remaining SDK step in [STEAM.md](STEAM.md) |
 | Session | One place for cross-scene mode and save path (Campaign, BossRush, Practice, Test); command-line test flags only in debug builds |
 | Tooling | Procedural sprite/effect/enemy generators, animation probe, AI probe, variant renderer, the smart test bot (reads telegraphs, hazards and shots; dodges and jumps rings), weapon probe, `tools/run_probes.sh` |
 

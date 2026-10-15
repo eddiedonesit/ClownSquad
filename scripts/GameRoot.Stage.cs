@@ -9,6 +9,7 @@ using ClownSquad.Combat;
 using ClownSquad.Input;
 using ClownSquad.Map;
 using ClownSquad.Progression;
+using ClownSquad.Services;
 using ClownSquad.UI;
 using ClownSquad.Visuals;
 using ClownSquad.World;
@@ -42,6 +43,7 @@ public partial class GameRoot
         }
         if (phase == WaveDirector.Phase.Victory)
         {
+            OnWonForAchievements();
             CrowdCheer(6f, 20);
             BankLoot();
             if (_stage is StageDef cleared)
@@ -188,6 +190,7 @@ public partial class GameRoot
 
     private void OpenSecretShop()
     {
+        Achievements.Award("secret_shop");
         int level = Mathf.Max(_director?.LevelFloor ?? 1, _players[0].Record?.Level ?? 1) + 3;
         // Better than any world shop: higher level, rarity pushed hard.
         var shelf = ShopMenu.Stock(_director!.Seed ^ 0xb0057UL, level, 5, 4f);

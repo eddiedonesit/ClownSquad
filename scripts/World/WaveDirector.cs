@@ -355,6 +355,8 @@ public partial class WaveDirector : Node
         List<string> seen = SaveSystem.Data.Campaign.Seen;
         if (seen.Contains(kind)) return;
         seen.Add(kind);
+        if (System.Array.TrueForAll(new[] { "juggler", "unicyclist", "balloonist", "balloondog", "mime", "stiltwalker", "weightlifter" }, seen.Contains))
+            ClownSquad.Services.Achievements.Award("all_acts");
         // Bosses and their partners have their own entrance; everyone else gets a card.
         if (kind is not ("grunt" or "tiger") && enemy is not IBoss) ClownSquad.UI.ActCard.Show(_world, kind);
     }

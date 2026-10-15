@@ -9,6 +9,7 @@ using ClownSquad.Combat;
 using ClownSquad.Input;
 using ClownSquad.Map;
 using ClownSquad.Progression;
+using ClownSquad.Services;
 using ClownSquad.UI;
 using ClownSquad.Visuals;
 using ClownSquad.World;
@@ -46,6 +47,7 @@ public partial class GameRoot
             if (heal > 0f) killer.Heal(heal);
         }
 
+        ClownSquad.Services.Platform.AddStat("kos");
         RollDrops(enemy, boss, rank, level);
         PayGold(enemy, boss, rank, level);
 
@@ -65,6 +67,9 @@ public partial class GameRoot
             Fx.Pop(this, p.GlobalPosition + new Vector3(0f, p.BodyHeight + 0.35f, 0f),
                           "LEVEL UP!", new Color(0.5f, 0.9f, 1f), 1.2f, 1.3f);
             Fx.Sound("level_up");
+            if (r.Level >= 10) Achievements.Award("level_10");
+            if (r.Level >= 25) Achievements.Award("level_25");
+            if (r.Level >= 50) Achievements.Award("level_50");
             GD.Print($"{r.Name} reached level {r.Level} ({r.StatPoints} stat point(s) to spend).");
         }
         SaveSystem.Save();
@@ -118,6 +123,7 @@ public partial class GameRoot
         ItemData item = drop.Item;
         // Swept items were already counted into a bag at the stage clear.
         if (!_swept.Contains(item.Id)) { Bag(p).Add(item); _itemsFound++; }
+        if (item.Rarity == ItemRarity.Legendary) Achievements.Award("legendary");
         Fx.Pop(this, p.GlobalPosition + new Vector3(0f, p.BodyHeight + 0.25f, 0f), item.Name,
                       Loot.RarityColor(item.Rarity), 0.7f, 0.9f);
         Fx.Sound("coin", 0.9f + 0.08f * (int)item.Rarity);

@@ -136,6 +136,9 @@ public partial class GameRoot : Node3D
             return;
         }
 
+        ClownSquad.Services.PlatformPump.Ensure(GetTree());
+        ClownSquad.Services.Platform.SetPresence(_rush ? "Taking on the boss rush" : _practice ? "Warming up in the practice ring"
+            : _stage is StageDef here ? (here.Kind == StageKind.Boss ? $"Facing the boss of world {here.World}" : $"Fighting through stage {here.Id}") : "In the ring");
         GameClock.Reset();
         AttackTokens.Reset();
         ClownSquad.Net.NetRegistry.Reset();
@@ -245,6 +248,12 @@ public partial class GameRoot : Node3D
         _director.Begin(this);
 
         if (_outcomeProbe.Length > 0) StartOutcomeProbe();
+        if (Has("achievements"))
+        {
+            // "-- wavetest stage 1-B achievements": earn for real, but into a scratch file.
+            ClownSquad.Services.Platform.Current = new ClownSquad.Services.OfflinePlatform("user://platform_test.cfg", fresh: true);
+            ClownSquad.Services.Platform.CountInTests = true;
+        }
         if (Has("tentshot")) StartTentShot();
         if (Has("skillshot")) StartSkillShot();
         if (Has("stageshot")) StartStageShot();

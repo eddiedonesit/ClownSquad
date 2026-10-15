@@ -9,6 +9,7 @@ using ClownSquad.Combat;
 using ClownSquad.Input;
 using ClownSquad.Map;
 using ClownSquad.Progression;
+using ClownSquad.Services;
 using ClownSquad.UI;
 using ClownSquad.Visuals;
 using ClownSquad.World;
@@ -205,12 +206,15 @@ public partial class GameRoot
 
     private void OnHitLanded(Fighter? attacker, Fighter victim, float amount)
     {
+        if (!victim.Hostile && amount > 0f) _anyoneHurt = true;
         // Wall bounces arrive with no attacker and extend whatever is running.
         bool byPlayer = attacker is null ? victim.Hostile && _comboHits > 0 : !attacker.Hostile;
         if (!byPlayer) return;
         // Big hits lean the camera in: finishers and crits, harder for the biggest.
         if (amount >= 20f) CameraShake.RequestPunch(this, Mathf.Min(1f, amount / 45f));
         _comboHits++;
+        if (_comboHits == 25) Achievements.Award("combo_25");
+        if (_comboHits == 50) Achievements.Award("combo_50");
         _bestCombo = Mathf.Max(_bestCombo, _comboHits);
         _comboExpires = GameClock.Seconds + ComboLull;
         // The crowd loves a long combo.
