@@ -45,3 +45,6 @@ assets/audio/music_*.wav
 # C# build output
 *.sln
 .vs/
+
+# Google Drive sync scratch, never part of the project.
+.tmp.driveupload/

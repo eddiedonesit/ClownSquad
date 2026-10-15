@@ -40,6 +40,8 @@ public partial class Sfx : Node
     };
 
     private readonly Dictionary<string, List<AudioStream>> _banks = new();
+    // Songs are 20 MB apiece: only their paths are kept, and one is loaded when it plays.
+    private readonly Dictionary<string, string> _songs = new();
     private readonly Dictionary<string, ulong> _lastPlayed = new();
     private readonly List<AudioStreamPlayer> _voices = new();
     private readonly RandomNumberGenerator _rng = new();
@@ -88,6 +90,7 @@ public partial class Sfx : Node
             if (!file.EndsWith(".wav")) continue;
 
             string name = file[..^4];
+            if (name.StartsWith("music_")) { _songs[name] = $"{Folder}/{file}"; continue; }
             int us = name.LastIndexOf('_');
             if (us > 0 && int.TryParse(name[(us + 1)..], out _)) name = name[..us];   // bonk_2 -> bonk
 
@@ -137,17 +140,18 @@ public partial class Sfx : Node
     public static void PlayMusic(string bank)
     {
         if (Instance is not Sfx s) return;
-        if (!s._banks.ContainsKey(bank)) bank = "music_march";
-        if (!s._banks.TryGetValue(bank, out List<AudioStream>? streams)) return;
+        if (!s._songs.ContainsKey(bank)) bank = "music_march";
+        if (!s._songs.TryGetValue(bank, out string? path)) return;
         if (s._music.Playing && s._musicBank == bank) return;
-        if (streams[0] is AudioStreamWav wav)
+        if (GD.Load<AudioStream>(path) is not AudioStream song) return;
+        if (song is AudioStreamWav wav)
         {
             wav.LoopMode = AudioStreamWav.LoopModeEnum.Forward;
             wav.LoopBegin = LoopStart(bank);
             wav.LoopEnd = (int)(wav.GetLength() * wav.MixRate);
         }
         s._musicBank = bank;
-        s._music.Stream = streams[0];
+        s._music.Stream = song;
         s._music.VolumeDb = MusicDb;
         s._music.Play();
     }
