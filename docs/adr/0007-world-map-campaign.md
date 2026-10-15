@@ -75,3 +75,16 @@ Version 1 and 2 files load unchanged, starting at 1-1 with no gold.
   A stage's waves become groups waiting along the road: reaching one locks the
   camera until it is beaten; there is no wave count on screen. Bonus stages
   keep the ring. Stage scenery comes from tools/gen_stage.py, one set per world.
+- **Stages and map are fully 3D** (later the same day): the painted panoramas
+  and sprite props gave way to a procedural 3D kit (scripts/World/Kit3D.cs)
+  shared by the stages and the map, so a world's island looks like its stages.
+  The pixel-art walkway, ground textures and characters stay pixel art: the
+  HD-2D mix of crisp sprites in a lit, depth-of-field 3D diorama. To see the
+  horizon the stage camera sits lower and tilts up (y 3.3, z 10.4, -9.5 deg,
+  fov 33); the arena bounds follow the camera, so nothing else changed.
+  `-- classic` keeps the painted scenery and the old framing.
+- **A song per world** (tools/gen_music.py): each world's stages play its own
+  song, bosses and bonus stages have theirs, the map and title too.
+- **Slower progression**: XP per level tripled (120 x level^1.35) and stage
+  level floors rise 2.5 a world rather than 5, so the curve and the campaign
+  stay in step.

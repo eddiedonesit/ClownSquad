@@ -245,6 +245,7 @@ public static class Kit3D
             case "bigtree": BigTree(n, a, rng); break;
             case "lighthouse": Lighthouse(n, ctx); break;
             case "cloud": Cloud(n, rng); break;
+            case "boat": Boat(n, a, b); break;
             default: Put(n, Box(1f, 1f, 1f), Paint(Wood), new Vector3(0f, 0.5f, 0f)); break;
         }
         return n;
@@ -745,6 +746,15 @@ public static class Kit3D
         n.AddChild(beam);
         Put(beam, Cyl(2.5f, 0.5f, 22f, 12), Glow(new Color(1f, 0.95f, 0.75f), 0.04f, 1f), new Vector3(11f, 0f, 0f), new Vector3(0f, 0f, 90f));
         ctx.Spinners.Add((beam, Vector3.Up, 0.5f));
+    }
+
+    private static void Boat(Node3D n, Color sail, Color trim)
+    {
+        Put(n, Ball(0.9f, -1f, 12, half: true), Paint(Wood, 0.7f), new Vector3(0f, 0.05f, 0f), new Vector3(180f, 0f, 0f), new Vector3(1.6f, 0.55f, 0.6f));
+        Put(n, Box(2.6f, 0.08f, 0.9f), Paint(Cream, 0.6f), new Vector3(0f, 0.06f, 0f));
+        Put(n, Cyl(0.04f, 0.05f, 2.4f, 6), Paint(DarkWood), new Vector3(0f, 1.25f, 0f));
+        Put(n, Prism(1.4f, 1.9f, 0.04f), Stripes(sail, trim, 3), new Vector3(0.62f, 1.35f, 0f));
+        Put(n, Prism(0.4f, 0.25f, 0.03f), Paint(Red), new Vector3(0.2f, 2.55f, 0f), new Vector3(0f, 0f, -90f));
     }
 
     private static void Cloud(Node3D n, RandomNumberGenerator rng)

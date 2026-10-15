@@ -73,6 +73,7 @@ public partial class WorldMap3D : Node3D
 
         BuildWorldLook();
         BuildSea();
+        BuildSky3D();
         for (int w = 1; w <= Campaign.Worlds; w++) BuildIsland(w);
         BuildAvatar();
         BuildLabels();
@@ -271,7 +272,7 @@ public partial class WorldMap3D : Node3D
             Roughness = 1f,
             AlbedoColor = reached ? Colors.White : new Color(0.38f, 0.36f, 0.45f),
         };
-        return new MeshInstance3D { Mesh = st.Commit(), MaterialOverride = mat, Position = Origin(w) };
+        return new MeshInstance3D { Name = "Terrain", Mesh = st.Commit(), MaterialOverride = mat, Position = Origin(w) };
     }
 
     /// <summary>The world's stage props, standing in the spots tools/gen_map.py left for scenery.</summary>
@@ -281,6 +282,7 @@ public partial class WorldMap3D : Node3D
         if (f is null) return;
         var spots = Json.ParseString(f.GetAsText()).AsGodotArray();
         var rng = new RandomNumberGenerator { Seed = (ulong)(w * 977) };
+        if (!ArtStyle.Classic) { Dress3D(island, w, reached, spots); return; }
         foreach (Variant v in spots)
         {
             var pair = v.AsGodotArray();
@@ -300,6 +302,213 @@ public partial class WorldMap3D : Node3D
                 Modulate = reached ? Colors.White : new Color(0.4f, 0.38f, 0.5f),
             };
             island.AddChild(s);
+        }
+    }
+
+    // ------------------------------------------------------ 3D dressing
+
+    private const float PropScale = 0.32f;           // stage-sized models, shrunk to the map's scale
+    private readonly List<(Node3D node, Vector3 axis, float speed)> _spinners = new();
+    private readonly List<(Node3D node, Vector3 home, float phase)> _boats = new();
+    private readonly List<Node3D> _clouds = new();
+
+    /// <summary>
+    /// An island dressed like its stages: the same 3D props, one or two of the
+    /// world's landmarks standing where there is most room, and grass, flowers,
+    /// stones or snow scattered everywhere the roads are not.
+    /// </summary>
+    private void Dress3D(Node3D island, int w, bool reached, Godot.Collections.Array spots)
+    {
+        var kit = StageScenery.MapKit(w);
+        var ctx = new Kit3D.Ctx { LightsOn = false };
+        ctx.Rng.Seed = (ulong)(w * 977);
+        var props = new Node3D { Name = "Props" };
+        island.AddChild(props);
+
+        // How far a map pixel is from the nearest node or road, so nothing grows on them.
+        var nodes = new List<Vector2>();
+        var roads = new List<(Vector2 a, Vector2 b)>();
+        foreach (StageDef s in Campaign.InWorld(w))
+        {
+            nodes.Add(s.MapPos);
+            foreach (string req in s.Requires)
+                if (Campaign.Get(req) is StageDef from && from.World == w) roads.Add((from.MapPos, s.MapPos));
+        }
+        float Clear(Vector2 p)
+        {
+            float best = float.MaxValue;
+            foreach (Vector2 n in nodes) best = Mathf.Min(best, p.DistanceTo(n) - 6f);
+            foreach ((Vector2 a, Vector2 b) in roads)
+            {
+                Vector2 ab = b - a;
+                float t = Mathf.Clamp((p - a).Dot(ab) / Mathf.Max(1f, ab.LengthSquared()), 0f, 1f);
+                best = Mathf.Min(best, p.DistanceTo(a + ab * t));
+            }
+            return best;
+        }
+
+        var free = new List<Vector2>();
+        foreach (Variant v in spots)
+        {
+            var pair = v.AsGodotArray();
+            var p = new Vector2((float)pair[0], (float)pair[1]);
+            if (Clear(p) > 13f && Height(w, p) > 0.05f) free.Add(p);
+        }
+
+        // The landmarks first, in the roomiest spots.
+        free.Sort((a, b) => Clear(b).CompareTo(Clear(a)));
+        int heroes = 0;
+        foreach (string far in kit.far)
+        {
+            if (far is "hill" or "dune" || heroes >= 2 || free.Count == 0) continue;
+            Vector2 p = free[0];
+            free.RemoveAt(0);
+            free.RemoveAll(q => q.DistanceTo(p) < 40f);
+            Color a = far is "mountain" or "spire" or "stalagmite" or "mesa" ? kit.farTint.Lerp(kit.a, 0.2f) : kit.a;
+            Node3D hero = Kit3D.Make(far, ctx, a, kit.b);
+            hero.Position = Place(w, p) - Origin(w) + new Vector3(0f, -0.05f, 0f);
+            hero.Scale = Vector3.One * (far is "mountain" ? 0.3f : far is "spotlight" ? 0.3f : 0.24f);
+            hero.RotationDegrees = new Vector3(0f, ctx.Rng.RandfRange(-30f, 30f), 0f);
+            props.AddChild(hero);
+            heroes++;
+        }
+        foreach (Vector2 p in free)
+        {
+            string kind = kit.props[ctx.Rng.RandiRange(0, kit.props.Length - 1)];
+            if (kind == "spotlight") kind = "lamp";      // its beam would wash over the nodes at map scale
+            Node3D m = Kit3D.Make(kind, ctx, kit.a, kit.b);
+            m.Position = Place(w, p) - Origin(w) + new Vector3(0f, -0.02f, 0f);
+            m.Scale = Vector3.One * PropScale * ctx.Rng.RandfRange(0.85f, 1.15f);
+            m.RotationDegrees = new Vector3(0f, ctx.Rng.RandfRange(-40f, 40f), 0f);
+            props.AddChild(m);
+        }
+        props.Position = Origin(w);
+
+        Cover(island, w, kit.ground, kit.dressing, Clear, ctx.Rng);
+
+        if (reached) _spinners.AddRange(ctx.Spinners);
+        else Silhouette(island);
+    }
+
+    /// <summary>Ground cover: thousands of tufts and flowers, or stones, snow, crystals, in a couple of draws.</summary>
+    private void Cover(Node3D island, int w, Color ground, string dressing, System.Func<Vector2, float> clear, RandomNumberGenerator rng)
+    {
+        bool grass = dressing is "meadow" or "forest" or "dirt";
+        var tufts = new List<Transform3D>();
+        var tuftCol = new List<Color>();
+        var bits = new List<Transform3D>();
+        var bitCol = new List<Color>();
+        Color[] flowers = { new(1f, 0.9f, 0.3f), new(1f, 0.45f, 0.55f), new(0.95f, 0.95f, 1f), new(0.6f, 0.55f, 1f) };
+        int tries = grass ? 4200 : dressing == "snow" ? 500 : 1300;
+        for (int i = 0; i < tries; i++)
+        {
+            var p = new Vector2(rng.RandfRange(10f, 566f), rng.RandfRange(10f, 314f));
+            float h = Height(w, p);
+            if (h < 0.06f || clear(p) < 7f) continue;
+            Vector3 at = Place(w, p);
+            float yaw = rng.RandfRange(0f, Mathf.Tau);
+            if (grass)
+            {
+                float s = rng.RandfRange(0.28f, 0.5f);
+                tufts.Add(new Transform3D(new Basis(Vector3.Up, yaw).Scaled(Vector3.One * s), at + new Vector3(0f, 0.04f, 0f)));
+                tuftCol.Add(ground.Lightened(rng.RandfRange(-0.12f, 0.14f)));
+                if (rng.Randf() < (dressing == "meadow" ? 0.18f : 0.07f))
+                {
+                    bits.Add(new Transform3D(Basis.Identity.Scaled(Vector3.One * 0.6f), at + new Vector3(0f, 0.1f, 0f)));
+                    bitCol.Add(flowers[rng.RandiRange(0, flowers.Length - 1)]);
+                }
+            }
+            else
+            {
+                float s = rng.RandfRange(0.3f, 0.7f) * (dressing == "snow" ? 0.45f : 1f);
+                bits.Add(new Transform3D(new Basis(Vector3.Up, yaw).Scaled(new Vector3(s, s * (dressing == "snow" ? 0.35f : 0.6f), s)), at));
+                bitCol.Add(dressing switch
+                {
+                    "snow" => new Color(0.95f, 0.97f, 1f),
+                    "crystal" => new Color(0.7f, 0.75f, 1f),
+                    "beach" => new[] { new Color(1f, 0.85f, 0.9f), new Color(0.98f, 0.95f, 0.85f), new Color(0.8f, 0.9f, 1f) }[rng.RandiRange(0, 2)],
+                    "carpet" => new[] { Kit3D.Gold, new Color(1f, 0.4f, 0.4f), new Color(0.5f, 0.7f, 1f) }[rng.RandiRange(0, 2)],
+                    _ => ground.Darkened(rng.RandfRange(0.05f, 0.3f)),
+                });
+            }
+        }
+        if (tufts.Count > 0) Kit3D.Many(island, Kit3D.Prism(0.12f, 0.26f, 0.05f), Kit3D.Paint(Colors.White, 0.9f), tufts, tuftCol);
+        if (bits.Count > 0)
+        {
+            Mesh bit = dressing switch
+            {
+                "crystal" => Kit3D.Cyl(0f, 0.08f, 0.3f, 6),
+                "snow" => Kit3D.Ball(0.3f, -1f, 8),
+                _ => Kit3D.Ball(grass ? 0.05f : 0.12f, -1f, 6),
+            };
+            Kit3D.Many(island, bit, Kit3D.Paint(Colors.White, 0.8f, 0f, dressing == "crystal" ? 1.2f : 0f), bits, bitCol);
+        }
+    }
+
+    /// <summary>An island not yet reached: its scenery as dark shapes in the haze.</summary>
+    private static void Silhouette(Node node)
+    {
+        StandardMaterial3D dark = Kit3D.Paint(new Color(0.3f, 0.28f, 0.38f), 1f);
+        foreach (Node c in node.GetChildren())
+        {
+            if (c is GeometryInstance3D g && c is not Label3D && c.Name != "Terrain") g.MaterialOverride = dark;
+            if (c is OmniLight3D l) l.Visible = false;
+            if (c is GpuParticles3D) continue;
+            Silhouette(c);
+        }
+    }
+
+    /// <summary>Sailboats round the islands and clouds drifting between them.</summary>
+    private void BuildSky3D()
+    {
+        if (ArtStyle.Classic) return;
+        var ctx = new Kit3D.Ctx { LightsOn = false };
+        ctx.Rng.Seed = 4242;
+        Color[] sails = { Kit3D.Red, Kit3D.Blue, Kit3D.Gold, Kit3D.Purple };
+        for (int w = 1; w <= Campaign.Worlds; w++)
+        {
+            for (int i = 0; i < 3; i++)
+            {
+                float side = i % 2 == 0 ? 1f : -1f;
+                var home = Origin(w) + new Vector3(ctx.Rng.RandfRange(-13f, 13f), -0.02f, side * ctx.Rng.RandfRange(10f, 13.5f));
+                if (i == 2) home = Origin(w) + new Vector3(Spacing * 0.5f, -0.02f, ctx.Rng.RandfRange(-8f, 8f));
+                Node3D boat = Kit3D.Make("boat", ctx, sails[(w + i) % sails.Length], Kit3D.Cream);
+                boat.Scale = Vector3.One * 0.42f;
+                boat.Position = home;
+                boat.RotationDegrees = new Vector3(0f, ctx.Rng.RandfRange(0f, 360f), 0f);
+                AddChild(boat);
+                _boats.Add((boat, home, ctx.Rng.Randf() * 10f));
+            }
+        }
+        for (int i = 0; i < 26; i++)
+        {
+            Node3D cloud = Kit3D.Make("cloud", ctx, Colors.White, Colors.White);
+            cloud.Scale = Vector3.One * ctx.Rng.RandfRange(0.45f, 0.8f);
+            float x = ctx.Rng.RandfRange(-30f, Spacing * Campaign.Worlds + 10f);
+            float z = ctx.Rng.Randf() < 0.6f ? ctx.Rng.RandfRange(-22f, -12f) : ctx.Rng.RandfRange(-8f, 4f);
+            // Clouds over the open sea between islands, or off the far shore; never over a road.
+            if (z > -12f) x = Mathf.Round(x / Spacing) * Spacing + Spacing * 0.5f;
+            cloud.Position = new Vector3(x, ctx.Rng.RandfRange(3.5f, 5.5f), z);
+            AddChild(cloud);
+            _clouds.Add(cloud);
+        }
+    }
+
+    private void AnimateSky3D(float dt)
+    {
+        foreach ((Node3D node, Vector3 axis, float speed) in _spinners)
+            if (IsInstanceValid(node)) node.Rotate(axis, speed * dt);
+        float t = (float)_clock;
+        foreach ((Node3D boat, Vector3 home, float phase) in _boats)
+        {
+            boat.Position = home + new Vector3(Mathf.Sin(t * 0.2f + phase) * 0.8f, Mathf.Sin(t * 1.6f + phase) * 0.05f, 0f);
+            boat.Rotation = new Vector3(Mathf.Sin(t * 1.3f + phase) * 0.06f, boat.Rotation.Y, Mathf.Sin(t * 1.1f + phase * 2f) * 0.08f);
+        }
+        foreach (Node3D c in _clouds)
+        {
+            Vector3 p = c.Position + new Vector3(0.25f * dt, 0f, 0f);
+            if (p.X > Spacing * Campaign.Worlds + 12f) p.X = -32f;
+            c.Position = p;
         }
     }
 
@@ -466,6 +675,7 @@ public partial class WorldMap3D : Node3D
         float dt = (float)delta;
         _clock += delta;
         foreach (Node3D l in _landmarks) if (IsInstanceValid(l)) MapLandmarks.Animate(l, _clock);
+        AnimateSky3D(dt);
         foreach ((Node3D node, float phase) in _bobbers)
             if (IsInstanceValid(node))
             {

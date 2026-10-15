@@ -358,6 +358,13 @@ public partial class StageScenery : Node3D
             Kit3D.Red, Kit3D.Gold, new(0.3f, 0.18f, 0.4f), new(0.63f, 0.16f, 0.24f), "lights", new(0.95f, 0.8f, 0.4f), "carpet"),
     };
 
+    /// <summary>A world's 3D kit, for dressing its island on the world map the way its stages look.</summary>
+    public static (string[] props, string[] far, Color a, Color b, Color ground, Color farTint, string dressing) MapKit(int world)
+    {
+        Look l = Looks[Mathf.Clamp(world, 1, 10) - 1];
+        return (l.Props, l.Far, l.A, l.B, l.Ground, l.FarTint, l.Dressing);
+    }
+
     private void Build3D()
     {
         Look l = Looks[_world - 1];
