@@ -267,6 +267,9 @@ public partial class WaveDirector : Node
     /// <summary>The world being fought in: picks the boss act. Set by whoever runs the stage.</summary>
     public int World { get; set; } = 1;
 
+    /// <summary>A boss rush: wave N is world N's boss.</summary>
+    public bool BossRushMode { get; set; }
+
     /// <summary>The enemy mix: kinds and weights (EnemyCatalog). Grunts only when unset.</summary>
     public (string kind, int weight)[] Pool { get; set; } = { ("grunt", 1) };
 
@@ -290,7 +293,9 @@ public partial class WaveDirector : Node
         if (boss)
         {
             // A boss act: the boss and any partner, in from opposite sides.
-            foreach (PlayerFighter b in EnemyCatalog.Boss(World))
+            // A boss rush takes each wave's boss from the next world in turn.
+            int world = BossRushMode ? Mathf.Clamp(WaveNumber, 1, 10) : World;
+            foreach (PlayerFighter b in EnemyCatalog.Boss(world))
             {
                 b.Name = b is BossClown ? "BossClown" : b.GetType().Name;
                 b.Source = b is BossClown

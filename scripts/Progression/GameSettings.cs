@@ -25,6 +25,8 @@ public static class GameSettings
     public static float Shake { get; set; } = 1f;
     public static bool Fullscreen { get; set; }
     public static Difficulty Difficulty { get; set; } = Difficulty.Normal;
+    /// <summary>The best boss rush time in seconds on this machine (0 = never finished).</summary>
+    public static double BossRushBest { get; set; }
 
     /// <summary>Set by the test runs: difficulty reads as Normal whatever is saved.</summary>
     public static bool ForceNormal { get; set; }
@@ -60,6 +62,7 @@ public static class GameSettings
             Shake = (float)cfg.GetValue("video", "shake", Shake);
             Fullscreen = (bool)cfg.GetValue("video", "fullscreen", Fullscreen);
             Difficulty = (Difficulty)(int)cfg.GetValue("game", "difficulty", (int)Difficulty);
+            BossRushBest = (double)cfg.GetValue("records", "boss_rush", BossRushBest);
         }
         Apply();
     }
@@ -72,6 +75,7 @@ public static class GameSettings
         cfg.SetValue("video", "shake", Shake);
         cfg.SetValue("video", "fullscreen", Fullscreen);
         cfg.SetValue("game", "difficulty", (int)Difficulty);
+        cfg.SetValue("records", "boss_rush", BossRushBest);
         cfg.Save(FilePath);
     }
 

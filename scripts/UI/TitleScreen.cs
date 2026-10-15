@@ -102,6 +102,17 @@ public partial class TitleScreen : Node3D
     private ComicIntro? _intro;
     private SettingsMenu? _settings;
 
+    private BestiaryMenu? _bestiary;
+
+    private void OpenBestiary()
+    {
+        var devices = new List<int> { LocalDeviceInput.Keyboard };
+        devices.AddRange(Godot.Input.GetConnectedJoypads());
+        _bestiary = new BestiaryMenu(devices);
+        _bestiary.Closed += () => { _bestiary = null; foreach (MapPad p in _pads) p.Swallow(); };
+        AddChild(_bestiary);
+    }
+
     private void OpenSettings()
     {
         var devices = new List<int> { LocalDeviceInput.Keyboard };
@@ -119,7 +130,8 @@ public partial class TitleScreen : Node3D
         GetTree().CreateTimer(1.75).Timeout += () => Shot("intro_panels");
         GetTree().CreateTimer(2.75).Timeout += () => Shot("intro_logo");
         GetTree().CreateTimer(5.6).Timeout += () => OpenSettings();
-        GetTree().CreateTimer(6.0).Timeout += () => { Shot("settings"); _settings?.QueueFree(); _settings = null; };
+        GetTree().CreateTimer(6.0).Timeout += () => { Shot("settings"); _settings?.QueueFree(); _settings = null; OpenBestiary(); };
+        GetTree().CreateTimer(6.15).Timeout += () => { Shot("bestiary"); _bestiary?.QueueFree(); _bestiary = null; };
         GetTree().CreateTimer(6.2).Timeout += () =>
         {
             Shot("title");
@@ -264,6 +276,8 @@ public partial class TitleScreen : Node3D
         if (recent > 0) _main.Add(("CONTINUE", () => { SaveSystem.ActiveSlot = recent; _newGame = false; EnterSquad(); }));
         _main.Add(("NEW GAME", () => { _newGame = true; ShowSlots(); }));
         if (recent > 0) _main.Add(("LOAD GAME", () => { _newGame = false; ShowSlots(); }));
+        _main.Add(("BOSS RUSH", () => { _starting = true; Sfx.Play("drumroll"); BossRush.Start(GetTree()); }));
+        _main.Add(("BESTIARY", OpenBestiary));
         _main.Add(("SETTINGS", OpenSettings));
         _main.Add(("QUIT", () => GetTree().Quit()));
         _mainCursor = Mathf.Clamp(_mainCursor, 0, _main.Count - 1);
@@ -451,7 +465,7 @@ public partial class TitleScreen : Node3D
         _logo.Rotation = Mathf.Sin((float)_clock * 1.6f) * 0.025f;
         _logo.Scale = Vector2.One * (1f + 0.025f * Mathf.Sin((float)_clock * 3.1f));
         foreach (DirectionalSprite s in _standees) s.Tick((float)delta);
-        if (_starting || _intro is not null || _settings is not null) return;
+        if (_starting || _intro is not null || _settings is not null || _bestiary is not null) return;
         _menuBacking.Visible = _mode != Mode.Squad;
 
         if (_mode == Mode.Squad) { TickSquad(); return; }

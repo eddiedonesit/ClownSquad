@@ -67,6 +67,9 @@ public partial class GameRoot : Node3D
     private bool _pauseHeld = true;
     private bool _retryHeld = true;
     private Control? _results;
+    private bool _rush;
+    private double _rushTime;
+    private bool _rushRecord;
     private const float FirstEncounter = 9f;
     private readonly Dictionary<PlayerFighter, int> _bagGold = new();
     private int _secretWave = -1;
@@ -104,11 +107,19 @@ public partial class GameRoot : Node3D
 
         // Tests run against a throwaway save, so they never read or touch a real one.
         bool probe = Has("animtest") || Has("movetest") || Has("aitest") || Has("wavetest") || Has("losetest") || Has("tentshot") || Has("castshot") || Has("demo");
+        if (Has("bossrush")) BossRush.Active = true;
+        _rush = BossRush.Active;
         if (probe)
         {
             // Tests compare runs, so they always play on Normal.
             GameSettings.ForceNormal = true;
             SaveSystem.Path = "user://probe_save.json";
+            SaveSystem.DeleteForTests();
+        }
+        else if (_rush)
+        {
+            // A boss rush plays fresh level-30 clowns on a save of its own.
+            SaveSystem.Path = "user://bossrush_save.json";
             SaveSystem.DeleteForTests();
         }
         else
@@ -126,7 +137,7 @@ public partial class GameRoot : Node3D
         Campaign.Pending = null;
         // Fights on the map are walked through left to right; bonus stages stay in the ring.
         _scrolling = _stage is StageDef sc && Campaign.IsFight(sc) && sc.Kind != StageKind.Bonus;
-        if (!probe && !Has("sandbox") && !Has("fight") && _stage is null)
+        if (!probe && !_rush && !Has("sandbox") && !Has("fight") && _stage is null)
         {
             CallDeferred(MethodName.GoToMap);
             return;
@@ -162,6 +173,7 @@ public partial class GameRoot : Node3D
         if (Has("losetest")) _outcomeProbe = "lose";
 
         SpawnPlayers();
+        if (_rush) foreach (PlayerFighter rp in _players) ApplyLevel(rp, BossRush.Level);
         BuildHud();
         ClownSquad.Audio.Sfx.PlayMusic(_stage switch
         {
@@ -196,6 +208,14 @@ public partial class GameRoot : Node3D
             if (_scrolling) ConfigureEncounters(st);
             GD.Print($"Stage {st.Id}: {st.Waves.Length} wave(s), enemy level floor {st.EnemyLevel}, rank boost {st.RankBoost:F2}" +
                      (_secretWave > 0 ? $", secret shop before wave {_secretWave}" : ""));
+        }
+        if (_rush)
+        {
+            var waves = new WaveDef[BossRush.Bosses];
+            for (int i = 0; i < waves.Length; i++) waves[i] = new WaveDef(0, true);
+            _director.Waves = waves;
+            _director.BossRushMode = true;
+            _director.LevelFloor = BossRush.Level;
         }
         // "-- fight bossnow world 7": straight to a world's boss act in the ring, for checking bosses.
         if (_stage is null && Has("bossnow"))
@@ -249,7 +269,14 @@ public partial class GameRoot : Node3D
     {
         string[] args = OS.GetCmdlineUserArgs();
         int at = Array.IndexOf(args, "level");
-        if (at < 0 || at + 1 >= args.Length || !int.TryParse(args[at + 1], out int want) || p.Record is not CharacterRecord rec) return;
+        if (at < 0 || at + 1 >= args.Length || !int.TryParse(args[at + 1], out int want)) return;
+        ApplyLevel(p, want);
+    }
+
+    /// <summary>Raise a player's record to a level, points spent evenly on POW and GUTS.</summary>
+    private static void ApplyLevel(PlayerFighter p, int want)
+    {
+        if (p.Record is not CharacterRecord rec) return;
         while (rec.Level < want && Leveling.XpToNext(rec.Level) > 0) Leveling.Grant(rec, Leveling.XpToNext(rec.Level));
         bool pow = true;
         while (rec.StatPoints > 0) { if (pow) rec.Pow++; else rec.Guts++; rec.StatPoints--; pow = !pow; }
@@ -552,6 +579,15 @@ public partial class GameRoot : Node3D
         // The win probe forces Rare grunts for its first wave only: enough to be
         // sure of drops, without turning every later wave into a wall.
         if (_outcomeProbe == "win" && phase == WaveDirector.Phase.Intermission && d.WaveNumber >= 2) d.ForceRank = null;
+        // A boss rush: a breather and half a heal between bosses.
+        if (_rush && phase == WaveDirector.Phase.Intermission && d.WaveNumber >= 2)
+            foreach (PlayerFighter p in _players) if (!p.IsDead) p.Heal(p.MaxHealth * 0.5f);
+        if (_rush && phase == WaveDirector.Phase.Victory)
+        {
+            _rushTime = GameClock.Seconds;
+            _rushRecord = GameSettings.BossRushBest <= 0 || _rushTime < GameSettings.BossRushBest;
+            if (_rushRecord && _outcomeProbe.Length == 0) { GameSettings.BossRushBest = _rushTime; GameSettings.Save(); }
+        }
         if (phase == WaveDirector.Phase.Victory)
         {
             CrowdCheer(6f, 20);
@@ -569,7 +605,7 @@ public partial class GameRoot : Node3D
         {
             _endedAt = GameClock.Seconds;
             bool windowed = !DisplayServer.GetName().Contains("headless");
-            if (_stage is not null && (_outcomeProbe.Length == 0 || windowed))
+            if ((_stage is not null || _rush) && (_outcomeProbe.Length == 0 || windowed))
                 GetTree().CreateTimer(1.2).Timeout += () => ShowResults(phase == WaveDirector.Phase.Victory);
             // Win or lose, XP is kept (ADR 0006). Anyone with points to spend
             // is shown the Stat Tent once the ending has had a moment.
@@ -959,15 +995,17 @@ public partial class GameRoot : Node3D
         _restartHeld = pressed;
         if (_tent is not null && (_tent.IsOpen || _tent.MsSinceClosed < 400 || _tentDueAt >= 0)) return;
         if (!fresh) return;
-        // A campaign stage returns to the map, won or lost; the free fight replays.
-        if (_stage is not null) GoToMap();
+        // A campaign stage returns to the map, won or lost; a boss rush to the
+        // title; the free fight replays.
+        if (_rush) BossRush.Leave(GetTree());
+        else if (_stage is not null) GoToMap();
         else GetTree().ReloadCurrentScene();
     }
 
     /// <summary>After a campaign stage, DODGE (K / B) plays it again from the start.</summary>
     private void PollForRetry()
     {
-        if (_stage is null || _endedAt < 0 || GameClock.Seconds - _endedAt < 1.5 || _outcomeProbe.Length > 0) return;
+        if ((_stage is null && !_rush) || _endedAt < 0 || GameClock.Seconds - _endedAt < 1.5 || _outcomeProbe.Length > 0) return;
         if (_tent is not null && (_tent.IsOpen || _tent.MsSinceClosed < 400 || _tentDueAt >= 0)) return;
         bool held = Godot.Input.IsKeyPressed(Key.K);
         foreach (int pad in Godot.Input.GetConnectedJoypads()) held |= Godot.Input.IsJoyButtonPressed(pad, JoyButton.B);
@@ -1060,6 +1098,24 @@ public partial class GameRoot : Node3D
             h.AddChild(new Label { Text = b, LabelSettings = S(18, Colors.White) });
             box.AddChild(h);
         }
+        if (_rush)
+        {
+            Row("BOSSES BEATEN", $"{(won ? BossRush.Bosses : Mathf.Max(0, (_director?.WaveNumber ?? 1) - 1))} / {BossRush.Bosses}");
+            Row("RUSH TIME", won ? BossRush.Clock(_rushTime) : "-");
+            Row("BEST TIME", GameSettings.BossRushBest > 0 ? BossRush.Clock(GameSettings.BossRushBest) : "-");
+            if (won && _rushRecord)
+                box.AddChild(new Label { Text = "NEW RECORD!", HorizontalAlignment = HorizontalAlignment.Center, LabelSettings = S(22, new Color(1f, 0.85f, 0.3f)) });
+            box.AddChild(new Label
+            {
+                Text = "ATTACK  back to the title      DODGE  run it again",
+                HorizontalAlignment = HorizontalAlignment.Center, LabelSettings = S(14, new Color(1f, 0.85f, 0.3f)),
+            });
+            _results = panel;
+            panel.Scale = new Vector2(0.6f, 0.6f);
+            panel.PivotOffset = new Vector2(210, 80);
+            CreateTween().TweenProperty(panel, "scale", Vector2.One, 0.3f).SetTrans(Tween.TransitionType.Back).SetEase(Tween.EaseType.Out);
+            return;
+        }
         Row("TIME", $"{(int)secs / 60}:{(int)secs % 60:00}");
         Row("KNOCKOUTS", _kos.ToString());
         Row("BEST COMBO", $"{_bestCombo} HITS");
@@ -1124,7 +1180,7 @@ public partial class GameRoot : Node3D
             () => _endedAt >= 0 && GameClock.Seconds - _endedAt > 1.5)
         {
             BagText = BagText,
-            StageLabel = _stage is StageDef s ? (s.Kind == StageKind.Boss ? $"{s.World}-BOSS  " : $"{s.Id}  ") : "",
+            StageLabel = _rush ? "BOSS RUSH  " : _stage is StageDef s ? (s.Kind == StageKind.Boss ? $"{s.World}-BOSS  " : $"{s.Id}  ") : "",
             ReplayText = _stage is not null ? "" : "press ATTACK to play again",
         };
         AddChild(_clownHud);
@@ -1406,7 +1462,8 @@ public partial class GameRoot : Node3D
         GD.Print($"  sound banks loaded: {ClownSquad.Audio.Sfx.BankCount}; played: {string.Join(" ", heard)}");
         GD.Print($"  sound names with no file: {(ClownSquad.Audio.Sfx.Missing.Count == 0 ? "none" : string.Join(" ", ClownSquad.Audio.Sfx.Missing))}");
         ok &= ClownSquad.Audio.Sfx.Missing.Count == 0;
-        if (_outcomeProbe == "win") ok &= _director!.IsBonus ? CheckCampaign() : CheckProgression() & CheckLoot() & CheckCampaign();
+        // A boss rush is judged by the result alone: no campaign, no progression to check.
+        if (_outcomeProbe == "win" && !_rush) ok &= _director!.IsBonus ? CheckCampaign() : CheckProgression() & CheckLoot() & CheckCampaign();
         if (_outcomeProbe == "lose")
         {
             CharacterRecord r = _players[0].Record!;

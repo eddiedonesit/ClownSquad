@@ -38,7 +38,8 @@ public static class Portraits
             for (int x = 0; x < info.FrameWidth; x += 2)
                 if (img.GetPixel(ox + x, y).A > 0.5f) { x0 = Math.Min(x0, x); x1 = Math.Max(x1, x); y0 = Math.Min(y0, y); y1 = Math.Max(y1, y); }
         float side = Math.Min(x1 - x0, (y1 - y0) * 0.45f);
-        r = new Rect2(ox + (x0 + x1) * 0.5f - side * 0.5f, y0, side, side);
+        // A little below the very top, so a tall hat does not crowd out the face.
+        r = new Rect2(ox + (x0 + x1) * 0.5f - side * 0.5f, y0 + side * 0.22f, side, side);
         // A long figure (a tiger, a car) faces right: its face is at the front end, not the middle.
         if (x1 - x0 > (y1 - y0) * 1.3f)
         {
