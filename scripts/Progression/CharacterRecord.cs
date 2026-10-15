@@ -22,8 +22,13 @@ public sealed class CharacterRecord
     public long TotalXp { get; set; }
     /// <summary>Unspent stat points.</summary>
     public int StatPoints { get; set; }
-    /// <summary>Banked for the skill trees, which do not exist yet (GDD 5).</summary>
+    /// <summary>Unspent skill points, shared by every weapon's tree (GDD 5).</summary>
     public int SkillPoints { get; set; }
+
+    /// <summary>The weapon in hand. Changed only between stages, on the world map.</summary>
+    public WeaponKind Weapon { get; set; } = WeaponKind.Mallet;
+    /// <summary>Learned skill ids, per weapon (keyed by the weapon's name).</summary>
+    public Dictionary<string, List<string>> Skills { get; set; } = new();
 
     public int Pow { get; set; }
     public int Guts { get; set; }
@@ -127,7 +132,7 @@ public static class Leveling
 
     // Each stat is points and gear together; caps apply to the total.
     public static float MaxHealth(CharacterRecord r) =>
-        100f + HealthPerGuts * r.Guts + HealthPerLevel * (r.Level - 1) + r.Gear(AffixKind.Health);
+        (100f + HealthPerGuts * r.Guts + HealthPerLevel * (r.Level - 1) + r.Gear(AffixKind.Health)) * Weapons.Perks(r).MaxHealth;
 
     public static float DamageMultiplier(CharacterRecord r) => 1f + DamagePerPow * r.Pow + r.Gear(AffixKind.Damage) / 100f;
 
@@ -135,9 +140,9 @@ public static class Leveling
         1f + Math.Min(SpeedPerZip * r.Zip + r.Gear(AffixKind.Speed) / 100f, MaxSpeedBonus);
 
     public static float CritChance(CharacterRecord r) =>
-        Math.Min(BaseCrit + CritPerLuck * r.Luck + r.Gear(AffixKind.Crit) / 100f, MaxCrit);
+        Math.Min(BaseCrit + CritPerLuck * r.Luck + r.Gear(AffixKind.Crit) / 100f + Weapons.Perks(r).Crit, MaxCrit);
 
-    public static float CritMultiplier(CharacterRecord r) => BaseCritMultiplier + r.Gear(AffixKind.CritDamage) / 100f;
+    public static float CritMultiplier(CharacterRecord r) => BaseCritMultiplier + r.Gear(AffixKind.CritDamage) / 100f + Weapons.Perks(r).CritDamage;
 
     public static float XpMultiplier(CharacterRecord r) => 1f + r.Gear(AffixKind.XpGain) / 100f;
 
@@ -149,7 +154,7 @@ public static class Leveling
     public static float LaunchMultiplier(CharacterRecord r) => 1f + r.Gear(AffixKind.Bouncy) / 100f;
 
     /// <summary>How far drop rarity leans toward the good end: LUCK and FORTUNE items.</summary>
-    public static float LootBoost(CharacterRecord r) => r.Luck * 0.03f + r.Gear(AffixKind.Lucky) / 100f;
+    public static float LootBoost(CharacterRecord r) => r.Luck * 0.03f + r.Gear(AffixKind.Lucky) / 100f + Weapons.Perks(r).Loot;
 
     // ---- enemies (GDD 3 and 7): scaled to the host's level, then by rank ----
 

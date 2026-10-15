@@ -29,6 +29,7 @@ BASELINE = TOP_PAD + BODY_H
 
 SUIT, DIAMOND, RED, YELLOW, WHITE, SKIN, HAIR, NOSE = 1, 2, 3, 4, 5, 6, 7, 8
 INK, EYE, LIP, BLUSH, MAKEUP, SOLE, WOOD, METAL, BELT, GOLD = 9, 10, 11, 12, 13, 14, 15, 16, 17, 18
+IRON, CHICK, BEAK, COMB, DARKWOOD = 19, 20, 21, 22, 23
 
 MATS = {
     SUIT: Material((70, 108, 210)),
@@ -49,6 +50,11 @@ MATS = {
     METAL: Material((196, 202, 216), gloss=True),
     BELT: Material((84, 44, 104)),
     GOLD: Material((252, 204, 72), gloss=True),
+    IRON: Material((70, 66, 84), gloss=True),
+    CHICK: Material((250, 214, 70), soft=True),
+    BEAK: Material((240, 140, 40)),
+    COMB: Material((220, 40, 50)),
+    DARKWOOD: Material((110, 64, 40)),
 }
 
 # ------------------------------------------------------------------- parts
@@ -131,6 +137,111 @@ def mallet_handle(c, hx, hy, angle, length):
     c.capsule(hx, hy, hx + math.cos(r) * length, hy - math.sin(r) * length, 2.6, 2.6, WOOD)
 
 
+# ----------------------------------------------------------------- weapons
+# The squad's three weapons share every pose; only what is in the hand
+# changes. WEAPON is set per sheet before the frames are drawn.
+
+WEAPON = "mallet"
+
+
+def hammer_head(c, hx, hy, angle, length):
+    """BIG BERTHA: a dark iron barrel, bigger than the mallet's, banded in brass."""
+    r = math.radians(angle)
+    mx, my = hx + math.cos(r) * (length - 2), hy - math.sin(r) * (length - 2)
+    ax, ay = math.cos(r + math.pi / 2), -math.sin(r + math.pi / 2)
+    nx, ny = math.cos(r), -math.sin(r)
+    head_len, head_rad = 50, 19
+    half = head_len / 2
+    if my + ay * half > my - ay * half:
+        ax, ay = -ax, -ay
+    e0 = (mx - ax * half, my - ay * half)
+    e1 = (mx + ax * half, my + ay * half)
+    axis = math.atan2(ay, ax)
+    cap = head_rad * 0.42
+    c.part()
+    c.poly([(e0[0] + nx * head_rad, e0[1] + ny * head_rad), (e1[0] + nx * head_rad, e1[1] + ny * head_rad),
+            (e1[0] - nx * head_rad, e1[1] - ny * head_rad), (e0[0] - nx * head_rad, e0[1] - ny * head_rad)], IRON)
+    c.ellipse_rot(e0[0], e0[1], cap, head_rad, axis, IRON)
+
+    def bands(x, y, m):
+        u = (x - e0[0]) * ax + (y - e0[1]) * ay
+        v = (x - e0[0]) * nx + (y - e0[1]) * ny
+        bulge = cap * math.sqrt(max(0.0, 1.0 - (v / head_rad) ** 2))
+        for at in (head_len * 0.12, head_len * 0.5, head_len * 0.88):
+            if abs(u - (at + bulge)) < 3.0:
+                return GOLD
+        return m
+    c.recolor(bands)
+    c.part()
+    c.ellipse_rot(e1[0], e1[1], cap, head_rad, axis, METAL)
+    c.recolor(lambda x, y, m: IRON if ((x - e1[0]) * ax + (y - e1[1]) * ay) ** 2 / (cap * 0.5) ** 2
+              + ((x - e1[0]) * nx + (y - e1[1]) * ny) ** 2 / (head_rad * 0.45) ** 2 <= 1.0 else m)
+
+
+def hammer_handle(c, hx, hy, angle, length):
+    r = math.radians(angle)
+    c.part()
+    c.capsule(hx, hy, hx + math.cos(r) * (length - 2), hy - math.sin(r) * (length - 2), 3.4, 3.4, DARKWOOD)
+    c.recolor(lambda x, y, m: GOLD if abs(((x - hx) * math.cos(r) - (y - hy) * math.sin(r)) - 4) < 1.5 else m)
+
+
+def chicken_body(c, hx, hy, angle, length):
+    """The RUBBER CHICKEN, held by the feet: a long floppy yellow body, a head with
+    a red comb and an orange beak, little wings."""
+    r = math.radians(angle)
+    ux, uy = math.cos(r), -math.sin(r)
+    # a plump body, a thin rubbery neck, a big head
+    bx, by = hx + ux * length * 0.55, hy + uy * length * 0.55
+    c.part()
+    c.ellipse_rot(bx, by, length * 0.36, 12, math.atan2(uy, ux), CHICK)
+    px, py = -uy, ux                      # across the body, toward the top of the screen
+    if py > 0:
+        px, py = -px, -py
+    c.part()
+    c.ellipse_rot(bx + px * 6, by + py * 6, 9, 5, math.atan2(uy, ux), CHICK)          # a wing on top
+    nx0, ny0 = bx + ux * length * 0.3, by + uy * length * 0.3
+    hcx, hcy = hx + ux * (length + 8), hy + uy * (length + 8)
+    c.part()
+    c.capsule(nx0, ny0, hcx - ux * 6, hcy - uy * 6, 4.5, 3.5, CHICK)
+    c.part()
+    c.ellipse(hcx, hcy, 9, 9, CHICK)
+    # comb on top of the head, beak sticking out ahead
+    c.part()
+    for k in (-4, 0, 4):
+        c.ellipse(hcx + px * 9 + ux * k, hcy + py * 9 + uy * k, 3.6, 3.6, COMB)
+    c.part()
+    c.poly([(hcx + ux * 6 - px * 3, hcy + uy * 6 - py * 3), (hcx + ux * 16, hcy + uy * 16),
+            (hcx + ux * 6 + px * 3, hcy + uy * 6 + py * 3)], BEAK)
+    c.part(line=False)
+    c.ellipse(hcx + ux * 2 + px * 3, hcy + uy * 2 + py * 3, 1.8, 1.8, INK)
+
+
+def chicken_legs(c, hx, hy, angle, length):
+    r = math.radians(angle)
+    ux, uy = math.cos(r), -math.sin(r)
+    for side in (-1.5, 1.5):
+        c.part()
+        c.capsule(hx - uy * side, hy + ux * side, hx + ux * length * 0.3 - uy * side, hy + uy * length * 0.3 + ux * side, 1.4, 1.4, BEAK)
+
+
+def weapon_head(c, hx, hy, angle, length):
+    if WEAPON == "hammer":
+        hammer_head(c, hx, hy, angle, length)
+    elif WEAPON == "chicken":
+        chicken_body(c, hx, hy, angle, length)
+    else:
+        mallet_head(c, hx, hy, angle, length)
+
+
+def weapon_handle(c, hx, hy, angle, length):
+    if WEAPON == "hammer":
+        hammer_handle(c, hx, hy, angle, length)
+    elif WEAPON == "chicken":
+        chicken_legs(c, hx, hy, angle, length)
+    else:
+        mallet_handle(c, hx, hy, angle, length)
+
+
 # -------------------------------------------------------------------- pose
 
 CARRY = (143, 29)          # resting back over the shoulder (original units)
@@ -170,7 +281,7 @@ def draw(p):
     behind = m is not None and m[0] >= 100   # swung back over the shoulder
 
     if behind:
-        mallet_head(c, gx, gy, m[0], m[1])
+        weapon_head(c, gx, gy, m[0], m[1])
 
     # hair, behind everything above the shoulders
     for x, y, r in ((36, hy - 10, 6), (31, hy - 3, 7.5), (27, hy + 5, 7), (30, hy + 13, 6.5)):
@@ -265,10 +376,10 @@ def draw(p):
     c.recolor(sleeve)
     frill(c, sx + (ex - sx) * 0.92, sy + (ey - sy) * 0.92, 5.5, False)
     if m is not None:
-        mallet_handle(c, gx, gy, m[0], m[1])
+        weapon_handle(c, gx, gy, m[0], m[1])
     fist(c, gx, gy, False)
     if m is not None and not behind:
-        mallet_head(c, gx, gy, m[0], m[1])
+        weapon_head(c, gx, gy, m[0], m[1])
     return c
 
 
@@ -336,9 +447,9 @@ def player_frames():
 
     # spin: mallet straight out; the engine mirrors these rapidly into a whirl
     add("spin", draw(old(body_dy=2, lean=2, near_leg=4, far_leg=-4,
-                         near_arm=10, far_arm=-8, arm_lift=10, mallet=(6, 28))))
+                         near_arm=10, far_arm=-8, arm_lift=10, mallet=(6, 22 if WEAPON == "chicken" else 28))))
     add("spin", draw(old(body_dy=3, lean=3, near_leg=-3, far_leg=4,
-                         near_arm=10, far_arm=-8, arm_lift=9, mallet=(-6, 28))))
+                         near_arm=10, far_arm=-8, arm_lift=9, mallet=(-6, 22 if WEAPON == "chicken" else 28))))
 
     # throw: wind up, then released with the arm thrown forward and the hand empty
     add("throw", draw(old(lean=-5, body_dy=2, near_leg=-4, far_leg=5,
@@ -386,8 +497,8 @@ def mallet_frames():
     """The thrown mallet alone at eight rotations, in a 120px square."""
     MS = 120
     loose = HDCanvas(W, H, DRAW_X, DRAW_Y)
-    mallet_handle(loose, 24, 64, 0, 44)
-    mallet_head(loose, 24, 64, 0, 44)
+    weapon_handle(loose, 24, 64, 0, 44)
+    weapon_head(loose, 24, 64, 0, 44)
     cx, cy = 52 + DRAW_X, 64 + DRAW_Y
     out = []
     for step in range(8):
@@ -435,20 +546,44 @@ SQUAD = {
 }
 
 
-def main():
+# Each clown with each weapon. The mallet sheets keep their original names;
+# the others carry the weapon: pip_hammer_hd.png, pip_chicken_hd.png.
+WEAPONS = ("mallet", "hammer", "chicken")
+
+
+def sheet_name(clown, weapon):
+    return clown + ("_hd" if weapon == "mallet" else "_" + weapon + "_hd")
+
+
+def spin_name(weapon):
+    return weapon + "_spin_hd"
+
+
+def render_weapon(weapon):
+    global WEAPON
+    WEAPON = weapon
     frames = player_frames()
-    write_sheet("pip_hd", frames, MATS)
+    write_sheet(sheet_name("pip", weapon), frames, MATS)
     for name, mats in SQUAD.items():
-        write_sheet(name + "_hd", frames, mats)
-    write_sheet("grunt_hd", grunt_frames(), GRUNT_MATS)
+        write_sheet(sheet_name(name, weapon), frames, mats)
     spin, ms = mallet_frames()
-    out = os.path.join("assets", "sprites", "mallet_spin_hd.png")
+    out = os.path.join("assets", "sprites", spin_name(weapon) + ".png")
     write_png(out, ms * len(spin), ms, to_rows([p for p, _ in spin], ms, ms))
     write_png(out.replace(".png", "_n.png"), ms * len(spin), ms, to_rows([n for _, n in spin], ms, ms))
-    with open(os.path.join("assets", "sprites", "mallet_spin_hd.frames.json"), "w") as f:
+    with open(out.replace(".png", ".frames.json"), "w") as f:
         json.dump({"frame_width": ms, "frame_height": ms, "count": len(spin),
                    "clips": {"mallet_spin": list(range(len(spin)))}}, f, indent=2)
     print("wrote {}  {} frames".format(out, len(spin)))
+    return weapon
+
+
+def main():
+    from multiprocessing import Pool
+    weapons = [w for w in sys.argv[1:] if w in WEAPONS] or list(WEAPONS)
+    with Pool(len(weapons)) as pool:
+        pool.map(render_weapon, weapons)
+    if "mallet" in weapons:
+        write_sheet("grunt_hd", grunt_frames(), GRUNT_MATS)
 
 
 if __name__ == "__main__":

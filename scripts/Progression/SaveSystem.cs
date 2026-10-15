@@ -28,7 +28,8 @@ public static class SaveSystem
     // 2: gear (Equipped, Stash). 3: campaign progress and gold.
     // Older files load as-is: missing fields take their defaults.
     // 4: a look per character (which clown), and save slots.
-    public const int CurrentVersion = 4;
+    // 5: a weapon per character and a skill tree per weapon.
+    public const int CurrentVersion = 5;
     /// <summary>Three save slots, chosen on the title screen.</summary>
     public const int Slots = 3;
     /// <summary>Before slots there was one file; it becomes slot 1 the first time slots are used.</summary>

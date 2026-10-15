@@ -575,6 +575,19 @@ for ratio, amp in ((1.0, 1.0), (2.41, 0.5), (3.9, 0.3), (5.2, 0.2)):
 place(clang, shape(filt(noise(0.05), "hp", 1500), lambda t: math.exp(-t / 0.01)), 0.32, 0.8)
 write("clang", clang)
 
+# The rubber chicken: a strangled, wheezing squawk through a squeezed rubber throat.
+def squawk(sec=0.42):
+    def f(t):
+        u = t / sec
+        return 900 + 700 * math.sin(math.pi * min(1.0, u * 1.4)) + 120 * math.sin(t * 2 * math.pi * 23)
+    reed = osc(f, sec, saw(18))
+    wheeze = filt(noise(sec), "bp", 2200, 1.5)
+    s = add((filt(reed, "bp", 1400, 2.2), 1.0), (filt(reed, "bp", 3100, 3.5), 0.6), (wheeze, 0.25))
+    return shape(s, lambda t: min(1.0, t / 0.015) * max(0.0, 1.0 - (t / sec) ** 3))
+
+
+write("squawk", squawk())
+
 # The Ringmaster: a full calliope fanfare over a drum roll.
 rm = silence(3.2)
 place(rm, drumroll(1.2), 0, 0.7)

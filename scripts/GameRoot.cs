@@ -106,7 +106,7 @@ public partial class GameRoot : Node3D
         ClownSquad.Visuals.ArtStyle.Classic = Has("classic");
 
         // Tests run against a throwaway save, so they never read or touch a real one.
-        bool probe = Has("animtest") || Has("movetest") || Has("aitest") || Has("wavetest") || Has("losetest") || Has("tentshot") || Has("castshot") || Has("demo");
+        bool probe = Has("animtest") || Has("movetest") || Has("aitest") || Has("wavetest") || Has("losetest") || Has("tentshot") || Has("skillshot") || Has("castshot") || Has("demo");
         if (Has("bossrush")) BossRush.Active = true;
         _rush = BossRush.Active;
         if (probe)
@@ -234,6 +234,7 @@ public partial class GameRoot : Node3D
 
         if (_outcomeProbe.Length > 0) StartOutcomeProbe();
         if (Has("tentshot")) StartTentShot();
+        if (Has("skillshot")) StartSkillShot();
         if (Has("stageshot")) StartStageShot();
         if (Has("demo")) StartDemo();
 
@@ -262,6 +263,20 @@ public partial class GameRoot : Node3D
             if (phase is WaveDirector.Phase.Victory or WaveDirector.Phase.Defeat)
                 GetTree().CreateTimer(6.0, true, false, true).Timeout += () => GetTree().Quit();
         };
+    }
+
+    /// <summary>"weapon hammer" and "skills all" on a test's command line: fight with that weapon, its whole tree learned.</summary>
+    private static void ApplyProbeWeapon(CharacterRecord record)
+    {
+        string[] args = OS.GetCmdlineUserArgs();
+        int at = Array.IndexOf(args, "weapon");
+        if (at >= 0 && at + 1 < args.Length && Enum.TryParse(args[at + 1], true, out WeaponKind kind)) record.Weapon = kind;
+        if (Array.IndexOf(args, "skills") is int k and >= 0 && k + 1 < args.Length && args[k + 1] == "all")
+        {
+            List<string> known = Weapons.Learned(record, record.Weapon);
+            foreach (Skill s in Weapons.Get(record.Weapon).Tree) if (!known.Contains(s.Id)) known.Add(s.Id);
+        }
+        GD.Print($"Probe weapon: {Weapons.Get(record.Weapon).Name}, {Weapons.Learned(record, record.Weapon).Count} skills.");
     }
 
     /// <summary>"level N" on the command line: raise the player's record to that level, points spent evenly.</summary>
@@ -298,6 +313,26 @@ public partial class GameRoot : Node3D
             GetTree().CreateTimer(0.5).Timeout += () =>
             {
                 GetViewport().GetTexture().GetImage().SavePng($"C:/Claude/ClownSquad/debug/stage_{id}_b.png");
+                GetTree().Quit();
+            };
+        };
+    }
+
+    /// <summary>"-- skillshot weapon hammer level 10": the skill menu as seen on the map, a few skills learned. Needs a window.</summary>
+    private void StartSkillShot()
+    {
+        PlayerFighter p = _players[0];
+        ApplyProbeLevel(p);
+        CharacterRecord r = p.Record!;
+        Skill[] tree = Weapons.Get(r.Weapon).Tree;
+        foreach (string id in new[] { tree[0].Id, tree[1].Id, tree[3].Id }) Weapons.Learn(r, Array.Find(tree, x => x.Id == id)!);
+        p.ApplyProgression(r);
+        GetTree().CreateTimer(1.5, processAlways: true).Timeout += () =>
+        {
+            AddChild(new SkillMenu(Seats(), betweenStages: true));
+            GetTree().CreateTimer(0.6, processAlways: true).Timeout += () =>
+            {
+                GetViewport().GetTexture().GetImage().SavePng($"C:/Claude/ClownSquad/debug/skills_{r.Weapon.ToString().ToLowerInvariant()}.png");
                 GetTree().Quit();
             };
         };
@@ -494,6 +529,7 @@ public partial class GameRoot : Node3D
         CharacterRecord record = SaveSystem.CharacterFor(index, p.DisplayName);
         p.DisplayName = record.Name;
         p.Look = record.Look;
+        if (SaveSystem.Path == "user://probe_save.json") ApplyProbeWeapon(record);
         p.ApplyProgression(record);
         AddChild(p);
         Vector3 home = new(-1.5f + index * 1.5f, 0f, 1.5f);
@@ -1041,7 +1077,7 @@ public partial class GameRoot : Node3D
         bool fresh = held && !_pauseHeld;
         _pauseHeld = held;
         if (!fresh) return;
-        var items = new List<(PauseMenu.Choice, string)> { (PauseMenu.Choice.Resume, "RESUME"), (PauseMenu.Choice.Stats, "STAT TENT"), (PauseMenu.Choice.Inventory, "INVENTORY"), (PauseMenu.Choice.Settings, "SETTINGS") };
+        var items = new List<(PauseMenu.Choice, string)> { (PauseMenu.Choice.Resume, "RESUME"), (PauseMenu.Choice.Stats, "STAT TENT"), (PauseMenu.Choice.Inventory, "INVENTORY"), (PauseMenu.Choice.Skills, "SKILLS"), (PauseMenu.Choice.Settings, "SETTINGS") };
         if (_stage is not null) items.Add((PauseMenu.Choice.Retry, "RETRY STAGE"));
         items.Add((PauseMenu.Choice.Map, "BACK TO THE MAP"));
         _pause = new PauseMenu(items, devices, choice =>
@@ -1052,6 +1088,8 @@ public partial class GameRoot : Node3D
             {
                 case PauseMenu.Choice.Stats: _tent?.Open(); break;
                 case PauseMenu.Choice.Inventory: AddChild(new InventoryMenu(Seats())); break;
+                // Mid-stage: skills can be learned, but the weapon stays in hand until the stage is over.
+                case PauseMenu.Choice.Skills: AddChild(new SkillMenu(Seats(), betweenStages: false)); break;
                 case PauseMenu.Choice.Settings:
                     GetTree().Paused = true;
                     var settings = new SettingsMenu(devices);
@@ -1245,7 +1283,7 @@ public partial class GameRoot : Node3D
 
         sb.AppendLine();
         sb.AppendLine("WASD move | J attack | Space jump | K dodge      pad: stick | X | A | B");
-        sb.AppendLine("hold attack 3s: throw mallet | hold attack + left/right: spin | attack in air: flip");
+        sb.AppendLine("hold attack 3s: throw mallet or chicken, hammer pounds the ground | hold attack + left/right: spin | attack in air: flip");
         _hud.Text = sb.ToString();
     }
 

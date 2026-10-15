@@ -17,8 +17,14 @@ using ClownSquad.World;
 /// </summary>
 public partial class MalletProjectile : Node3D
 {
-    private static string Sheet =>
-        ArtStyle.Sheet("res://assets/sprites/mallet_spin.png", "res://assets/sprites/mallet_spin_hd.png");
+    /// <summary>What was thrown and how the skill tree has changed it.</summary>
+    public readonly record struct Throw(string SpinSheet, float Damage, float Range, bool Explodes, bool Launches)
+    {
+        public static readonly Throw Mallet = new("mallet_spin_hd", 1f, 1f, false, false);
+    }
+
+    private string Sheet =>
+        ArtStyle.Sheet("res://assets/sprites/mallet_spin.png", $"res://assets/sprites/{_throw.SpinSheet}.png");
 
     private const float OutSpeed = 15f;
     private const float ReturnSpeed = 18f;
@@ -31,6 +37,7 @@ public partial class MalletProjectile : Node3D
     private const float ReturnDamage = 14f;
 
     private PlayerFighter _owner = null!;
+    private Throw _throw = Throw.Mallet;
     private Vector3 _dir;
     private bool _returning;
     private float _travelled;
@@ -39,9 +46,9 @@ public partial class MalletProjectile : Node3D
     private readonly HashSet<Fighter> _hitOut = new();
     private readonly HashSet<Fighter> _hitBack = new();
 
-    public static void Spawn(PlayerFighter owner, Vector3 direction)
+    public static void Spawn(PlayerFighter owner, Vector3 direction, Throw? how = null)
     {
-        var mallet = new MalletProjectile { _owner = owner, _dir = direction.Normalized() };
+        var mallet = new MalletProjectile { _owner = owner, _dir = direction.Normalized(), _throw = how ?? Throw.Mallet };
         owner.GetParent().AddChild(mallet);
         Vector3 p = owner.GlobalPosition;
         mallet.GlobalPosition = new Vector3(p.X + mallet._dir.X * 0.8f, 0f, p.Z);
@@ -115,9 +122,10 @@ public partial class MalletProjectile : Node3D
         GlobalPosition = next;
         HitAlongPath(_hitOut, OutDamage, _dir);
 
-        if (atEdge || _travelled >= MaxTravel)
+        if (atEdge || _travelled >= MaxTravel * _throw.Range)
         {
             _returning = true;
+            if (_throw.Explodes) Explode();
             _sprite.FlipH = !_sprite.FlipH;   // tumble back the other way
             if (_sprite.MaterialOverride is ShaderMaterial m) LitSprite.Apply(m, Colors.White, 0f, _sprite.FlipH);
         }
@@ -140,6 +148,22 @@ public partial class MalletProjectile : Node3D
         HitAlongPath(_hitBack, ReturnDamage, dir);
     }
 
+    /// <summary>EGGSPLOSIVE: it goes off where it turns.</summary>
+    private void Explode()
+    {
+        ImpactEffect.Spawn(GetParent(), GlobalPosition, 1.8f);
+        Sfx.Play("kaboom", 1.3f, -5f);
+        CameraShake.Request(this, 0.1f, 0.22f);
+        foreach (Node node in GetTree().GetNodesInGroup(Fighter.Group))
+        {
+            if (node is not Fighter f || f.Hostile == _owner.Hostile || !f.CanBeHit()) continue;
+            Vector3 d = f.GlobalPosition - GlobalPosition;
+            d.Y = 0f;
+            if (d.Length() > 2.0f) continue;
+            _owner.StrikeFromProjectile(f, OutDamage * _throw.Damage, d.LengthSquared() > 0.01f ? d.Normalized() : _dir, 5f, 4.5f);
+        }
+    }
+
     private void HitAlongPath(HashSet<Fighter> already, float damage, Vector3 travel)
     {
         foreach (Node node in GetTree().GetNodesInGroup(Fighter.Group))
@@ -153,7 +177,7 @@ public partial class MalletProjectile : Node3D
 
             already.Add(f);
             Vector3 push = new(Mathf.Sign(travel.X) == 0 ? _dir.X : Mathf.Sign(travel.X), 0f, 0f);
-            _owner.StrikeFromProjectile(f, damage, push, 3.5f, 0f);
+            _owner.StrikeFromProjectile(f, damage * _throw.Damage, push, 3.5f, _throw.Launches ? 5.5f : 0f);
         }
     }
 }

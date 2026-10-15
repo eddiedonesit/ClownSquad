@@ -323,7 +323,7 @@ public partial class ClownHud : CanvasLayer
         _hint = new Label
         {
             Text = "move WASD/stick   attack J/X   jump Space/A   dodge K/B\n" +
-                   "hold attack: throw   +left/right: spin   attack in air: flip\n" +
+                   "hold attack: throw (hammer: quake)   +left/right: spin   air: flip\n" +
                    "TAB/SELECT stats   F1 controls   F3 debug",
             HorizontalAlignment = HorizontalAlignment.Right,
             LabelSettings = Style(11, new Color(1f, 1f, 1f, 0.95f), 4),

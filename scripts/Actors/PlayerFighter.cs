@@ -15,22 +15,25 @@ using ClownSquad.Visuals;
 /// </summary>
 public partial class PlayerFighter : Fighter
 {
-    private enum State { Free, Attacking, Dodging, Special, Charging, Spinning, Throwing, Flipping }
+    private enum State { Free, Attacking, Dodging, Special, Charging, Spinning, Throwing, Flipping, Quaking }
 
-    /// <summary>One swing in the combo. Timings are in seconds.</summary>
-    private readonly record struct AttackStep(
-        float Startup, float Active, float Recovery,
-        float Damage, float Knockback, float Hitstop,
-        float Range, float Launch);
+    // The combo comes from the weapon in hand (Weapons.cs): an escalating chain
+    // where only the finisher launches, so a full string is what opens a juggle.
+    private AttackStep[] Combo = Weapons.Get(WeaponKind.Mallet).Combo;
 
-    // Escalating chain: fast opener, faster mid, slow committal finisher. Only
-    // the finisher launches, so a full string is what opens a juggle.
-    private static readonly AttackStep[] Combo =
-    {
-        new(0.08f, 0.06f, 0.16f, 10f, 2.0f, 0.050f, 1.9f, 0f),
-        new(0.08f, 0.06f, 0.18f, 12f, 2.5f, 0.060f, 1.9f, 0f),
-        new(0.13f, 0.08f, 0.32f, 22f, 8.5f, 0.110f, 2.3f, 6.5f),
-    };
+    /// <summary>The weapon in hand, from the record. Fixed for the length of a stage.</summary>
+    public WeaponKind Weapon { get; private set; } = WeaponKind.Mallet;
+    private WeaponDef _weapon = Weapons.Get(WeaponKind.Mallet);
+    private WeaponPerks _perks = WeaponPerks.None;
+    private bool _secondWindUsed;
+
+    // The hammer's charge move: a ground pound, and (with AFTERSHOCK) a second rumble.
+    private const float QuakeRadius = 2.6f;
+    private const float QuakeDamage = 30f;
+    private const float QuakeImpact = 0.18f;
+    private const float AftershockAt = 0.62f;
+    private float _quakeTime;
+    private int _quakeHits;
 
     private const float ComboWindow = 0.45f;
     private const float DodgeDuration = 0.35f;
@@ -73,7 +76,8 @@ public partial class PlayerFighter : Fighter
     // Players blink while floored and while invulnerable after respawning.
     protected override bool BlinkWhileDown => !Hostile;
 
-    public override string AttackSound => HasMalletMoves ? "bonk" : "slap";
+    public override string AttackSound => !HasMalletMoves ? "slap" : Weapon == WeaponKind.Chicken ? "squeak" : "bonk";
+    public override float AttackPitch => Weapon switch { WeaponKind.Hammer => 0.7f, WeaponKind.Chicken => 1.3f, _ => 1f };
     public override string HurtSound => Hostile ? "squeak" : "honk";
     public override string DeathSound => Hostile ? "slide_down" : "wah_short";
 
@@ -96,7 +100,7 @@ public partial class PlayerFighter : Fighter
     /// <summary>Which squad clown this player looks like (Roster id). Set before the fighter enters the scene.</summary>
     public string Look { get; set; } = "pip";
 
-    protected override string SheetPath => Hostile ? base.SheetPath : ClownSquad.Progression.Roster.Sheet(Look);
+    protected override string SheetPath => Hostile ? base.SheetPath : ClownSquad.Progression.Roster.Sheet(Look, Weapon);
     private float _critMultiplier = 1.75f;
     private float _launchMultiplier = 1f;
     private float _kaboom;
@@ -137,6 +141,7 @@ public partial class PlayerFighter : Fighter
         State.Spinning => "SPIN",
         State.Throwing => "THROW",
         State.Flipping => "FLIP",
+        State.Quaking => "QUAKE",
         _ => Armed ? "free" : "free (unarmed)",
     };
 
@@ -193,6 +198,15 @@ public partial class PlayerFighter : Fighter
     {
         Record = record;
         if (_baseMoveSpeed < 0f) _baseMoveSpeed = MoveSpeed;
+        // The weapon is taken up once, before the sprite is built; it cannot
+        // change mid-stage, but learned skills can (the skill menu works anywhere).
+        if (!IsInsideTree())
+        {
+            Weapon = record.Weapon;
+            _weapon = Weapons.Get(Weapon);
+        }
+        _perks = Weapons.Perks(record);
+        Combo = BuildCombo(_weapon, _perks);
         float oldMax = MaxHealth;
         MaxHealth = Leveling.MaxHealth(record);
         DamageMultiplier = Leveling.DamageMultiplier(record);
@@ -203,6 +217,25 @@ public partial class PlayerFighter : Fighter
         _kaboom = Leveling.Kaboom(record);
         _critRng.Randomize();
         if (IsInsideTree() && !IsDead && MaxHealth > oldMax) Heal(MaxHealth - oldMax);
+    }
+
+    /// <summary>The weapon's combo with the skill tree applied: extra swings go in before the finisher.</summary>
+    private static AttackStep[] BuildCombo(WeaponDef w, WeaponPerks k)
+    {
+        var steps = new List<AttackStep>(w.Combo);
+        for (int i = 0; i < k.ExtraSteps; i++) steps.Insert(steps.Count - 1, w.Extra);
+        for (int i = 0; i < steps.Count; i++)
+        {
+            AttackStep s = steps[i];
+            bool last = i == steps.Count - 1;
+            steps[i] = s with
+            {
+                Damage = s.Damage * k.Damage * (last ? k.Finisher : 1f),
+                Knockback = s.Knockback * k.Knockback,
+                Launch = s.Launch * k.Launch,
+            };
+        }
+        return steps.ToArray();
     }
 
     /// <summary>
@@ -270,6 +303,7 @@ public partial class PlayerFighter : Fighter
             case State.Spinning: TickSpinning(cmd, dt); break;
             case State.Throwing: TickThrowing(dt); break;
             case State.Flipping: TickFlipping(dt); break;
+            case State.Quaking: TickQuake(dt); break;
         }
     }
 
@@ -401,7 +435,7 @@ public partial class PlayerFighter : Fighter
     {
         AttackStep step = Combo[_comboIndex];
         float prev = _phaseTime;
-        _phaseTime += dt / SwingTimeScale;
+        _phaseTime += dt / SwingTimeScale * _perks.SwingSpeed;
 
         // Slight forward drift makes swings feel committed rather than static.
         float drift = _phaseTime < step.Startup + step.Active ? 2.2f : 0.6f;
@@ -419,9 +453,10 @@ public partial class PlayerFighter : Fighter
             if (HasMalletMoves)   // only a mallet strikes the ground
             {
                 Vector3 at = GlobalPosition + Facing * MalletForward + new Vector3(0f, MalletHeight, 0f);
-                ImpactEffect.Spawn(GetParent(), at, 0.7f + _comboIndex * 0.25f);
-                Sfx.Play("thump", 1.1f, -4f);
-                CameraShake.Request(this, 0.035f + _comboIndex * 0.03f, 0.16f + _comboIndex * 0.04f);
+                float heft = Weapon switch { WeaponKind.Hammer => 1.45f, WeaponKind.Chicken => 0.6f, _ => 1f };
+                ImpactEffect.Spawn(GetParent(), at, (0.7f + _comboIndex * 0.25f) * heft);
+                Sfx.Play("thump", Weapon == WeaponKind.Hammer ? 0.8f : 1.1f, -4f);
+                CameraShake.Request(this, (0.035f + _comboIndex * 0.03f) * heft, 0.16f + _comboIndex * 0.04f);
             }
         }
 
@@ -519,6 +554,16 @@ public partial class PlayerFighter : Fighter
         _bufferedAttack = false;
         Dust(0.3f);
         Sfx.Play("zip");
+        if (_perks.SquawkDodge)
+        {
+            // SQUAWK: the slide goes off like a startled hen; anyone close is frozen to the spot.
+            Sfx.Play("squawk", 1.1f);
+            foreach (Fighter other in Opponents())
+            {
+                Vector3 to = other.GlobalPosition - GlobalPosition;
+                if (new Vector2(to.X, to.Z).Length() < 1.9f) other.Stagger(0.9f);
+            }
+        }
     }
 
     private void TickDodge(float dt)
@@ -578,7 +623,11 @@ public partial class PlayerFighter : Fighter
             if (_heldTime >= SpinMinCharge) { StartSpin(); return; }
         }
 
-        if (_heldTime >= FullCharge) { StartThrow(); return; }
+        if (_heldTime >= FullCharge)
+        {
+            if (_weapon.Charge == ChargeMove.Quake) StartQuake(); else StartThrow();
+            return;
+        }
 
         // The shudder and the glow both quicken as the charge builds, so the
         // player can read how close the throw is without a meter.
@@ -632,12 +681,12 @@ public partial class PlayerFighter : Fighter
             {
                 Vector3 to = other.GlobalPosition - GlobalPosition;
                 if (new Vector2(to.X, to.Z).Length() > SpinRadius || Mathf.Abs(to.Y) > 1.9f) continue;
-                Strike(other, 6f, _spinDir, 1.4f, 0.025f, 0f, 0.3f);
+                Strike(other, 6f * _perks.SpinDamage * (Weapon == WeaponKind.Hammer ? 1.4f : 1f), _spinDir, 1.4f, 0.025f, 0f, 0.3f);
             }
         }
 
         bool stillHeld = cmd.AttackHeld && Mathf.Abs(cmd.Move.X) > 0.2f;
-        if (_spinTime >= SpinMax || (_spinTime >= SpinMin && !stillHeld))
+        if (_spinTime >= SpinMax * _perks.SpinTime || (_spinTime >= SpinMin && !stillHeld))
             EndMalletMove();
     }
 
@@ -664,8 +713,12 @@ public partial class PlayerFighter : Fighter
                 _thrown = true;
                 Armed = false;
                 Visual.ClipPrefix = "empty_";
-                MalletProjectile.Spawn(this, Facing);
-                Sfx.Play("fwee");
+                MalletProjectile.Spawn(this, Facing, new MalletProjectile.Throw(
+                    _weapon.SpinSheet,
+                    _perks.ThrowDamage,
+                    _perks.ThrowRange * (Weapon == WeaponKind.Chicken ? 1.5f : 1f),
+                    _perks.ThrowExplodes, _perks.ThrowLaunches));
+                Sfx.Play(_weapon.ThrowSound);
                 CameraShake.Request(this, 0.04f, 0.12f);
             }
         }
@@ -675,6 +728,45 @@ public partial class PlayerFighter : Fighter
         }
 
         if (_throwTime >= 0.38f) EndMalletMove();
+    }
+
+    /// <summary>Big Bertha's charge: a ground pound that hits everyone around.</summary>
+    private void StartQuake()
+    {
+        Visual.Tint = BaseTint;
+        Sfx.Stop(_chargeVoice);
+        _chargeVoice = null;
+        _quakeTime = 0f;
+        _quakeHits = 0;
+        _state = State.Quaking;
+        Sfx.Play("whoosh", 0.7f);
+    }
+
+    private void TickQuake(float dt)
+    {
+        _quakeTime += dt;
+        ApplyGroundMovement(Vector3.Zero, dt);
+        PinClipFrame("attack", _quakeTime < QuakeImpact * 0.6f ? 1 : _quakeTime < QuakeImpact ? 2 : 3);
+
+        int due = _quakeTime >= QuakeImpact ? 1 : 0;
+        if (_perks.Aftershock && _quakeTime >= AftershockAt) due = 2;
+        while (_quakeHits < due)
+        {
+            bool first = _quakeHits == 0;
+            _quakeHits++;
+            float radius = QuakeRadius * _perks.QuakeRadius * (first ? 1f : 1.2f);
+            float damage = QuakeDamage * _perks.QuakeDamage * (first ? 1f : 0.6f);
+            Vector3 at = GlobalPosition + Facing * MalletForward + new Vector3(0f, MalletHeight, 0f);
+            ImpactEffect.Spawn(GetParent(), at, first ? 2.2f : 1.6f);
+            Dust(first ? 1.2f : 0.9f);
+            Sfx.Play("kaboom", first ? 0.7f : 0.55f, -3f);
+            CameraShake.Request(this, first ? 0.2f : 0.13f, 0.35f);
+            bool crit = RollCrit();
+            DamageInRadius(radius, Scaled(damage, crit), 6f * _perks.Knockback, 0.1f, first ? 5.5f * _perks.Launch : 3.5f, 0.6f);
+            if (crit) Sfx.Play("crit");
+        }
+
+        if (_quakeTime >= (_perks.Aftershock ? AftershockAt + 0.2f : 0.55f)) EndMalletMove();
     }
 
     /// <summary>The boomerang came home.</summary>
@@ -743,6 +835,13 @@ public partial class PlayerFighter : Fighter
         other.TakeDamage(new DamageInfo(Scaled(damage, crit), dir, knockback, crit ? hitstop * 1.6f : hitstop, this, launch, stun));
         ApplyHitstop(crit ? hitstop * 1.6f : hitstop);
         Spark(other, crit);
+        Encore(other);
+    }
+
+    /// <summary>ENCORE: a knockout heals.</summary>
+    private void Encore(Fighter other)
+    {
+        if (_perks.HealOnKill > 0f && other.IsDead && !IsDead) Heal(MaxHealth * _perks.HealOnKill);
     }
 
     /// <summary>A hit delivered by this fighter's thrown weapon rather than its body.</summary>
@@ -751,12 +850,14 @@ public partial class PlayerFighter : Fighter
         bool crit = RollCrit();
         other.TakeDamage(new DamageInfo(Scaled(damage, crit), dir, knockback, 0.06f, this, launch, 0.35f));
         Spark(other, crit);
+        Encore(other);
     }
 
     private bool RollCrit() => CritChance > 0f && _critRng.Randf() < CritChance;
 
     private float Scaled(float damage, bool crit) =>
-        damage * DamageMultiplier * ExtraDamageMultiplier * (crit ? _critMultiplier : 1f);
+        damage * DamageMultiplier * ExtraDamageMultiplier * (crit ? _critMultiplier : 1f)
+        * (_perks.LastStand && Health < MaxHealth * 0.3f ? 1.3f : 1f);
 
     private void Spark(Fighter other, bool crit = false)
     {
@@ -793,10 +894,28 @@ public partial class PlayerFighter : Fighter
         _comboIndex = 0;
     }
 
+    // UNSTOPPABLE: a hit lands but does not stop the swing.
+    protected override bool HasPoise => _perks.Unstoppable && _state is State.Attacking or State.Quaking;
+
+    /// <summary>THICK SKIN softens hits; SECOND WIND catches a player about to go down.</summary>
+    public override void TakeDamage(in DamageInfo info)
+    {
+        if (_perks.DamageTaken >= 1f && !_perks.SecondWind) { base.TakeDamage(info); return; }
+        base.TakeDamage(new DamageInfo(info.Amount * _perks.DamageTaken, info.KnockbackDirection, info.KnockbackForce,
+                                       info.Hitstop, info.Source, info.Launch, info.Stun));
+        if (_perks.SecondWind && !_secondWindUsed && !IsDead && Health < MaxHealth * 0.25f)
+        {
+            _secondWindUsed = true;
+            Heal(MaxHealth * 0.3f);
+            PopText.Spawn(GetParent(), GlobalPosition + new Vector3(0f, BodyHeight + 0.4f, 0f), "SECOND WIND!", new Color(0.5f, 1f, 0.6f), 0.8f, 0.8f);
+            Sfx.Play("level_up", 1.2f, -6f);
+        }
+    }
+
     /// <summary>Invulnerable through the middle of the roll, not its edges.</summary>
     public override bool CanBeHit()
     {
-        if (_state == State.Dodging && _dodgeTime >= IFrameStart && _dodgeTime <= IFrameEnd)
+        if (_state == State.Dodging && _dodgeTime >= IFrameStart && _dodgeTime <= IFrameEnd * _perks.DodgeFrames)
             return false;
         return base.CanBeHit();
     }

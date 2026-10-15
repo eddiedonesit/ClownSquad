@@ -13,7 +13,7 @@ using ClownSquad.Input;
 /// </summary>
 public partial class PauseMenu : CanvasLayer
 {
-    public enum Choice { Resume, Stats, Inventory, Settings, Retry, Map, Title, Quit }
+    public enum Choice { Resume, Stats, Inventory, Skills, Settings, Retry, Map, Title, Quit }
 
     private readonly List<(Choice choice, string label)> _items;
     private readonly List<int> _devices;

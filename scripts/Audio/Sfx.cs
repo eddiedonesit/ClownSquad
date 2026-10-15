@@ -36,7 +36,7 @@ public partial class Sfx : Node
         ["crowd_ooh"] = -6f, ["crowd_gasp"] = -6f, ["crowd_boo"] = -7f, ["crowd_laugh"] = -7f, ["drumroll"] = -5f,
         ["belly_drum"] = -3f, ["ball_bounce"] = -7f, ["whip_crack"] = 0f, ["tiger_roar"] = -3f, ["car_horn"] = -6f,
         ["engine"] = -9f, ["twang"] = -8f, ["tada"] = -6f, ["fire_roar"] = -7f, ["glass_smash"] = -4f,
-        ["giggle"] = -6f, ["clang"] = -4f, ["ringmaster_fanfare"] = -4f,
+        ["giggle"] = -6f, ["clang"] = -4f, ["ringmaster_fanfare"] = -4f, ["squawk"] = -6f,
     };
 
     private readonly Dictionary<string, List<AudioStream>> _banks = new();
