@@ -58,7 +58,7 @@ public partial class TitleScreen : Node3D
     {
         // Tests and debug runs go straight where they are going.
         string[] args = OS.IsDebugBuild() ? OS.GetCmdlineUserArgs() : Array.Empty<string>();
-        foreach (string f in new[] { "wavetest", "losetest", "movetest", "animtest", "aitest", "sandbox", "fight", "stage", "tentshot", "stageshot", "castshot", "weapontest", "skillshot", "demo", "bossrush" })
+        foreach (string f in new[] { "wavetest", "losetest", "movetest", "animtest", "aitest", "sandbox", "fight", "stage", "tentshot", "stageshot", "castshot", "weapontest", "bindtest", "skillshot", "demo", "bossrush" })
             if (Array.IndexOf(args, f) >= 0) { CallDeferred(MethodName.Go, Campaign.FightScene); return; }
         if (Array.IndexOf(args, "mapshot") >= 0) { CallDeferred(MethodName.Go, Campaign.MapScene); return; }
 
@@ -130,9 +130,15 @@ public partial class TitleScreen : Node3D
         GetTree().CreateTimer(1.75).Timeout += () => Shot("intro_panels");
         GetTree().CreateTimer(2.75).Timeout += () => Shot("intro_logo");
         GetTree().CreateTimer(5.6).Timeout += () => OpenSettings();
-        GetTree().CreateTimer(6.0).Timeout += () => { Shot("settings"); _settings?.QueueFree(); _settings = null; OpenBestiary(); };
-        GetTree().CreateTimer(6.15).Timeout += () => { Shot("bestiary"); _bestiary?.QueueFree(); _bestiary = null; };
-        GetTree().CreateTimer(6.2).Timeout += () =>
+        GetTree().CreateTimer(6.0).Timeout += () =>
+        {
+            Shot("settings");
+            var controls = new ControlsMenu(new[] { ClownSquad.Input.LocalDeviceInput.Keyboard });
+            AddChild(controls);
+            GetTree().CreateTimer(0.1).Timeout += () => { Shot("controls"); controls.QueueFree(); _settings?.QueueFree(); _settings = null; OpenBestiary(); };
+        };
+        GetTree().CreateTimer(6.25).Timeout += () => { Shot("bestiary"); _bestiary?.QueueFree(); _bestiary = null; };
+        GetTree().CreateTimer(6.3).Timeout += () =>
         {
             Shot("title");
             _newGame = false;

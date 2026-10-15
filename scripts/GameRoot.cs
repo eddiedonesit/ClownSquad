@@ -109,7 +109,7 @@ public partial class GameRoot : Node3D
         ClownSquad.Visuals.ArtStyle.Classic = Has("classic");
 
         // Tests run against a throwaway save, so they never read or touch a real one.
-        bool probe = Has("animtest") || Has("movetest") || Has("aitest") || Has("wavetest") || Has("losetest") || Has("tentshot") || Has("skillshot") || Has("weapontest") || Has("castshot") || Has("demo");
+        bool probe = Has("animtest") || Has("movetest") || Has("aitest") || Has("wavetest") || Has("losetest") || Has("tentshot") || Has("skillshot") || Has("weapontest") || Has("bindtest") || Has("castshot") || Has("demo");
         // Which kind of play this is, and so which save it uses (Session). The
         // stage chosen on the map is read before a Begin clears it.
         StageDef? picked = Campaign.Pending;
@@ -159,6 +159,7 @@ public partial class GameRoot : Node3D
         if (Has("animtest")) { AddChild(new ClownSquad.Debug.AnimationProbe()); return; }
         if (Has("movetest")) { AddChild(new ClownSquad.Debug.MovesProbe()); return; }
         if (Has("weapontest")) { AddChild(new ClownSquad.Debug.WeaponProbe()); return; }
+        if (Has("bindtest")) { AddChild(new ClownSquad.Debug.BindingsProbe()); return; }
         if (Has("castshot")) { SpawnPlayers(); AddChild(new ClownSquad.Debug.CastLineup()); return; }
 
         _aiProbe = Has("aitest");

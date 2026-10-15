@@ -17,6 +17,7 @@ MUST=(
   "movetest"
   "weapontest"
   "weapontest skills all"
+  "bindtest"
   "animtest"        # trace only: passes unless it crashes
   "aitest"          # trace only: passes unless it crashes
   "wavetest stage 1-1"

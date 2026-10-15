@@ -36,7 +36,7 @@ public partial class PauseMenu : CanvasLayer
     public static bool PauseHeld(IEnumerable<int> devices)
     {
         foreach (int d in devices)
-            if (d == LocalDeviceInput.Keyboard ? Godot.Input.IsKeyPressed(Key.Escape) : Godot.Input.IsJoyButtonPressed(d, JoyButton.Start))
+            if (Bindings.Held(d, GameAction.Pause))
                 return true;
         return false;
     }

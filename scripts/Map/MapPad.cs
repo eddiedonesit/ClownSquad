@@ -35,13 +35,14 @@ public sealed class MapPad
     {
         if (_device == LocalDeviceInput.Keyboard)
         {
-            into[(int)Press.Up] = K(Key.W) || K(Key.Up);
-            into[(int)Press.Down] = K(Key.S) || K(Key.Down);
-            into[(int)Press.Left] = K(Key.A) || K(Key.Left);
-            into[(int)Press.Right] = K(Key.D) || K(Key.Right);
-            into[(int)Press.Enter] = K(Key.J) || K(Key.Space) || K(Key.Enter);
-            into[(int)Press.World] = K(Key.Q) || K(Key.E);
-            into[(int)Press.Back] = K(Key.Escape) || K(Key.Backspace) || K(Key.K);
+            // Fixed keys (arrows, Enter, Esc, Backspace) always work; the rebound ones work too.
+            into[(int)Press.Up] = K(Key.Up) || H(GameAction.Up);
+            into[(int)Press.Down] = K(Key.Down) || H(GameAction.Down);
+            into[(int)Press.Left] = K(Key.Left) || H(GameAction.Left);
+            into[(int)Press.Right] = K(Key.Right) || H(GameAction.Right);
+            into[(int)Press.Enter] = K(Key.Enter) || H(GameAction.Attack) || H(GameAction.Jump);
+            into[(int)Press.World] = H(GameAction.PrevWeapon) || H(GameAction.NextWeapon);
+            into[(int)Press.Back] = K(Key.Escape) || K(Key.Backspace) || H(GameAction.Dodge);
             return;
         }
         float x = Godot.Input.GetJoyAxis(_device, JoyAxis.LeftX), y = Godot.Input.GetJoyAxis(_device, JoyAxis.LeftY);
@@ -49,11 +50,12 @@ public sealed class MapPad
         into[(int)Press.Down] = y > 0.6f || B(JoyButton.DpadDown);
         into[(int)Press.Left] = x < -0.6f || B(JoyButton.DpadLeft);
         into[(int)Press.Right] = x > 0.6f || B(JoyButton.DpadRight);
-        into[(int)Press.Enter] = B(JoyButton.A) || B(JoyButton.X);
+        into[(int)Press.Enter] = H(GameAction.Attack) || H(GameAction.Jump);
         into[(int)Press.World] = B(JoyButton.LeftShoulder) || B(JoyButton.RightShoulder);
-        into[(int)Press.Back] = B(JoyButton.B);
+        into[(int)Press.Back] = H(GameAction.Dodge);
     }
 
     private static bool K(Key k) => Godot.Input.IsKeyPressed(k);
     private bool B(JoyButton b) => Godot.Input.IsJoyButtonPressed(_device, b);
+    private bool H(GameAction a) => Bindings.Held(_device, a);
 }

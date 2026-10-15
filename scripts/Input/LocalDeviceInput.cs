@@ -27,6 +27,8 @@ public sealed class LocalDeviceInput : IInputSource
 
     public string Describe() => _device == Keyboard ? "Keyboard" : $"Gamepad {_device}";
 
+    private bool Held(GameAction a) => Bindings.Held(_device, a);
+
     public InputCommand Poll()
     {
         Vector2 move;
@@ -35,12 +37,8 @@ public sealed class LocalDeviceInput : IInputSource
         if (_device == Keyboard)
         {
             move = new Vector2(
-                (Godot.Input.IsKeyPressed(Key.D) ? 1f : 0f) - (Godot.Input.IsKeyPressed(Key.A) ? 1f : 0f),
-                (Godot.Input.IsKeyPressed(Key.S) ? 1f : 0f) - (Godot.Input.IsKeyPressed(Key.W) ? 1f : 0f));
-            attackHeld = Godot.Input.IsKeyPressed(Key.J);
-            dodgeHeld = Godot.Input.IsKeyPressed(Key.K) || Godot.Input.IsKeyPressed(Key.Shift);
-            jumpHeld = Godot.Input.IsKeyPressed(Key.Space);
-            specialHeld = Godot.Input.IsKeyPressed(Key.L);
+                (Held(GameAction.Right) ? 1f : 0f) - (Held(GameAction.Left) ? 1f : 0f),
+                (Held(GameAction.Down) ? 1f : 0f) - (Held(GameAction.Up) ? 1f : 0f));
         }
         else
         {
@@ -56,12 +54,16 @@ public sealed class LocalDeviceInput : IInputSource
                 // Rescale past the deadzone so slow walking stays available.
                 move = move.Normalized() * ((move.Length() - StickDeadzone) / (1f - StickDeadzone));
             }
-            attackHeld = Godot.Input.IsJoyButtonPressed(_device, JoyButton.X);
-            dodgeHeld = Godot.Input.IsJoyButtonPressed(_device, JoyButton.B)
-                     || Godot.Input.IsJoyButtonPressed(_device, JoyButton.RightShoulder);
-            jumpHeld = Godot.Input.IsJoyButtonPressed(_device, JoyButton.A);
-            specialHeld = Godot.Input.IsJoyButtonPressed(_device, JoyButton.Y);
+            // The d-pad (or whatever movement is bound to) works alongside the stick.
+            Vector2 pad = new((Held(GameAction.Right) ? 1f : 0f) - (Held(GameAction.Left) ? 1f : 0f),
+                              (Held(GameAction.Down) ? 1f : 0f) - (Held(GameAction.Up) ? 1f : 0f));
+            if (pad != Vector2.Zero) move = pad;
         }
+        // Buttons come from the rebindable table (Settings > CONTROLS).
+        attackHeld = Held(GameAction.Attack);
+        dodgeHeld = Held(GameAction.Dodge);
+        jumpHeld = Held(GameAction.Jump);
+        specialHeld = Held(GameAction.Special);
 
         bool attackPressed = attackHeld && !_attackHeldLast;
         bool dodgePressed = dodgeHeld && !_dodgeHeldLast;

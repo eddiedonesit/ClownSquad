@@ -39,10 +39,9 @@ public partial class GameRoot
     {
         if (_endedAt < 0 || GameClock.Seconds - _endedAt < 1.5 || _outcomeProbe.Length > 0) return;
 
-        bool pressed = Godot.Input.IsKeyPressed(Key.J) || Godot.Input.IsKeyPressed(Key.Enter);
+        bool pressed = Godot.Input.IsKeyPressed(Key.Enter) || Bindings.Held(LocalDeviceInput.Keyboard, GameAction.Attack);
         foreach (int pad in Godot.Input.GetConnectedJoypads())
-            pressed |= Godot.Input.IsJoyButtonPressed(pad, JoyButton.X)
-                    || Godot.Input.IsJoyButtonPressed(pad, JoyButton.Start);
+            pressed |= Bindings.Held(pad, GameAction.Attack) || Bindings.Held(pad, GameAction.Pause);
         // A fresh press only, and not straight out of the Stat Tent, whose
         // buttons overlap: the press that spent a point must not restart.
         bool fresh = pressed && !_restartHeld;
@@ -61,8 +60,8 @@ public partial class GameRoot
     {
         if ((_stage is null && !_rush) || _endedAt < 0 || GameClock.Seconds - _endedAt < 1.5 || _outcomeProbe.Length > 0) return;
         if (_tent is not null && (_tent.IsOpen || _tent.MsSinceClosed < 400 || _tentDueAt >= 0)) return;
-        bool held = Godot.Input.IsKeyPressed(Key.K);
-        foreach (int pad in Godot.Input.GetConnectedJoypads()) held |= Godot.Input.IsJoyButtonPressed(pad, JoyButton.B);
+        bool held = Bindings.Held(LocalDeviceInput.Keyboard, GameAction.Dodge);
+        foreach (int pad in Godot.Input.GetConnectedJoypads()) held |= Bindings.Held(pad, GameAction.Dodge);
         bool fresh = held && !_retryHeld;
         _retryHeld = held;
         if (fresh) Retry();

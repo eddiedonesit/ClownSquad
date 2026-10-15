@@ -15,19 +15,22 @@ using ClownSquad.Progression;
 /// </summary>
 public partial class SettingsMenu : CanvasLayer
 {
-    private enum Row { Music, Sound, Shake, Difficulty, Fullscreen, Back }
+    private enum Row { Music, Sound, Shake, Difficulty, Fullscreen, Controls, Back }
 
     private readonly List<MapPad> _pads = new();
     private readonly List<Label> _labels = new();
     private readonly List<Label> _values = new();
     private Label _note = null!;
     private int _cursor;
+    private readonly List<int> _devices;
+    private ControlsMenu? _controls;
 
     public event Action? Closed;
 
     public SettingsMenu(IEnumerable<int> devices)
     {
-        foreach (int d in devices) _pads.Add(new MapPad(d));
+        _devices = new List<int>(devices);
+        foreach (int d in _devices) _pads.Add(new MapPad(d));
         Layer = 24;
         ProcessMode = ProcessModeEnum.Always;
     }
@@ -99,6 +102,7 @@ public partial class SettingsMenu : CanvasLayer
             ("SCREEN SHAKE", GameSettings.Shake <= 0f ? "OFF" : GameSettings.Shake < 0.9f ? "LOW" : "FULL"),
             ("DIFFICULTY", GameSettings.Difficulty.ToString().ToUpperInvariant()),
             ("FULLSCREEN", GameSettings.Fullscreen ? "ON" : "OFF"),
+            ("CONTROLS", ""),
             ("BACK", ""),
         };
         for (int i = 0; i < _labels.Count; i++)
@@ -115,12 +119,14 @@ public partial class SettingsMenu : CanvasLayer
             Row.Difficulty => GameSettings.Describe(GameSettings.Difficulty) + " Takes effect on the next enemies to arrive.",
             Row.Shake => "How much the camera shakes on big hits.",
             Row.Fullscreen => "Fill the screen, or play in a window.",
+            Row.Controls => "Rebind every key and gamepad button.",
             _ => "",
         };
     }
 
     public override void _Process(double delta)
     {
+        if (_controls is not null) return;
         foreach (MapPad pad in _pads)
         {
             MapPad.Press p = pad.Poll();
@@ -141,6 +147,7 @@ public partial class SettingsMenu : CanvasLayer
             case MapPad.Press.Right: Change(1); break;
             case MapPad.Press.Enter:
                 if ((Row)_cursor == Row.Back) { Close(); return; }
+                if ((Row)_cursor == Row.Controls) { OpenControls(); return; }
                 Change(1);
                 break;
             case MapPad.Press.Back: Close(); return;
@@ -174,6 +181,13 @@ public partial class SettingsMenu : CanvasLayer
         }
         GameSettings.Apply();
         Sfx.Play("clack", 1f + dir * 0.1f);      // heard at the new sound volume
+    }
+
+    private void OpenControls()
+    {
+        _controls = new ControlsMenu(_devices);
+        _controls.Closed += () => { _controls = null; foreach (MapPad p in _pads) p.Swallow(); };
+        AddChild(_controls);
     }
 
     private void Close()

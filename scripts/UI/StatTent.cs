@@ -451,9 +451,7 @@ public sealed class MenuPad
     }
 
     /// <summary>Whether the device's "open the stat menu" button is down: Tab, or Back/Select.</summary>
-    public static bool OpenHeld(int device) => device == LocalDeviceInput.Keyboard
-        ? Godot.Input.IsKeyPressed(Key.Tab)
-        : Godot.Input.IsJoyButtonPressed(device, JoyButton.Back);
+    public static bool OpenHeld(int device) => Bindings.Held(device, GameAction.Stats);
 
     public Press Poll()
     {
@@ -470,24 +468,26 @@ public sealed class MenuPad
     {
         if (_device == LocalDeviceInput.Keyboard)
         {
-            into[(int)Press.Up] = K(Key.W) || K(Key.Up);
-            into[(int)Press.Down] = K(Key.S) || K(Key.Down);
-            into[(int)Press.Add] = K(Key.J) || K(Key.D) || K(Key.Right);
-            into[(int)Press.Undo] = K(Key.K) || K(Key.A) || K(Key.Left);
-            into[(int)Press.Done] = K(Key.Space) || K(Key.Tab) || K(Key.Enter) || K(Key.Escape);
-            into[(int)Press.Page] = K(Key.Q) || K(Key.E);
+            // Fixed keys (arrows, Enter, Esc) always work; the rebound ones work too.
+            into[(int)Press.Up] = K(Key.Up) || H(GameAction.Up);
+            into[(int)Press.Down] = K(Key.Down) || H(GameAction.Down);
+            into[(int)Press.Add] = K(Key.Right) || H(GameAction.Right) || H(GameAction.Attack);
+            into[(int)Press.Undo] = K(Key.Left) || H(GameAction.Left) || H(GameAction.Dodge);
+            into[(int)Press.Done] = K(Key.Enter) || K(Key.Escape) || H(GameAction.Jump) || H(GameAction.Stats) || H(GameAction.Pause);
+            into[(int)Press.Page] = H(GameAction.PrevWeapon) || H(GameAction.NextWeapon);
             return;
         }
         float y = Godot.Input.GetJoyAxis(_device, JoyAxis.LeftY);
         float x = Godot.Input.GetJoyAxis(_device, JoyAxis.LeftX);
         into[(int)Press.Up] = y < -0.6f || B(JoyButton.DpadUp);
         into[(int)Press.Down] = y > 0.6f || B(JoyButton.DpadDown);
-        into[(int)Press.Add] = B(JoyButton.X) || B(JoyButton.DpadRight) || x > 0.75f;
-        into[(int)Press.Undo] = B(JoyButton.B) || B(JoyButton.DpadLeft) || x < -0.75f;
-        into[(int)Press.Done] = B(JoyButton.A) || B(JoyButton.Back) || B(JoyButton.Start);
+        into[(int)Press.Add] = H(GameAction.Attack) || B(JoyButton.DpadRight) || x > 0.75f;
+        into[(int)Press.Undo] = H(GameAction.Dodge) || B(JoyButton.DpadLeft) || x < -0.75f;
+        into[(int)Press.Done] = H(GameAction.Jump) || H(GameAction.Stats) || H(GameAction.Pause);
         into[(int)Press.Page] = B(JoyButton.LeftShoulder) || B(JoyButton.RightShoulder);
     }
 
     private static bool K(Key k) => Godot.Input.IsKeyPressed(k);
     private bool B(JoyButton b) => Godot.Input.IsJoyButtonPressed(_device, b);
+    private bool H(GameAction a) => Bindings.Held(_device, a);
 }
