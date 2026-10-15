@@ -14,19 +14,19 @@ public static class BossRush
     public const int Level = 30;
     public const int Bosses = 10;
 
-    /// <summary>True while a rush is being played (set before the fight scene loads).</summary>
-    public static bool Active { get; set; }
+    /// <summary>True while a rush is being played.</summary>
+    public static bool Active => Session.Mode == PlayMode.BossRush;
 
     public static void Start(SceneTree tree)
     {
-        Active = true;
-        ClownSquad.Map.Campaign.Pending = null;
+        Session.BeginBossRush();
         tree.ChangeSceneToFile(ClownSquad.Map.Campaign.FightScene);
     }
 
+    /// <summary>Back to the title, out of rush mode and off the rush save.</summary>
     public static void Leave(SceneTree tree)
     {
-        Active = false;
+        Session.BeginCampaign();
         tree.ChangeSceneToFile(ClownSquad.Map.Campaign.TitleScene);
     }
 

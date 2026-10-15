@@ -62,9 +62,8 @@ public partial class WorldMap3D : Node3D
         Engine.TimeScale = 1.0;
         GetTree().Paused = false;
         if (Sfx.Instance is null) AddChild(new Sfx());
-        SaveSystem.UseActiveSlot();
-        // Belt and braces: whatever route led here, the map is never part of a boss rush.
-        ClownSquad.World.BossRush.Active = false;
+        // The map is the campaign, whatever route led here (Session).
+        Session.BeginCampaign();
         SaveSystem.Load();
         _state = SaveSystem.Data.Campaign;
         string[] cli = OS.GetCmdlineUserArgs();
