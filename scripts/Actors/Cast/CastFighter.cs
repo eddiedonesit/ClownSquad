@@ -391,6 +391,37 @@ public partial class BossFighter : CastFighter, IBoss
     public override float XpScale => 10f;
     public override bool RollsRank => false;
 
+    /// <summary>
+    /// Bosses are drawn this much bigger than the squad's pixel density, on top
+    /// of being drawn big in their sheets: every boss stands well over the
+    /// players. Their sizes and offsets in the code scale with it (Big).
+    /// </summary>
+    protected override float DrawScale => 1.35f;
+    protected float Big => DrawScale;
+
+    /// <summary>Where the sprite sits relative to the body (a rider on a ball, in a carriage).</summary>
+    protected Vector3 VisualBase { get; set; }
+    private float _life;
+
+    /// <summary>
+    /// Secondary motion on top of the frames: a slow breath, a heavy bounce in
+    /// the step, a squash on landing. It is what keeps a big sprite alive
+    /// between its key poses.
+    /// </summary>
+    private void Liven(float dt)
+    {
+        if (Visual is null) return;
+        _life += dt;
+        float speed = Flat(Velocity).Length();
+        bool walking = speed > 0.6f && Grounded;
+        float breath = Mathf.Sin(_life * 2.2f) * 0.022f;
+        float step = walking ? Mathf.Abs(Mathf.Sin(_life * Mathf.Clamp(speed, 2f, 6f) * 1.5f)) : 0f;
+        float sx = 1f - breath * 0.7f + step * 0.025f;
+        float sy = 1f + breath - step * 0.035f;
+        Visual.Scale = Visual.Scale.Lerp(new Vector3(sx, sy, 1f), 1f - Mathf.Exp(-18f * dt));
+        Visual.Position = VisualBase + new Vector3(0f, step * 0.07f * Big, 0f);
+    }
+
     protected override float StunScale => 0.45f;
     protected override float LaunchScale => 0f;
     protected override bool HasPoise => InSpecial;
@@ -414,6 +445,7 @@ public partial class BossFighter : CastFighter, IBoss
     protected override void TickAlways(float dt)
     {
         base.TickAlways(dt);
+        Liven(dt);
         if (!IsDead && PhaseNumber > _shownPhase)
         {
             _shownPhase = PhaseNumber;

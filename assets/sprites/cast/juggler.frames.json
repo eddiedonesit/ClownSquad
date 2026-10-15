@@ -2,45 +2,49 @@
  "frame_width": 220,
  "frame_height": 300,
  "baseline": 260,
- "count": 20,
+ "count": 24,
  "clips": {
   "idle": [
    0,
    1,
    2,
-   3
+   3,
+   4,
+   5
   ],
   "walk": [
-   4,
-   5,
    6,
    7,
    8,
-   9
-  ],
-  "attack": [
+   9,
    10,
    11,
    12,
    13
   ],
-  "hit": [
-   14
-  ],
-  "air": [
+  "attack": [
+   14,
    15,
-   16
+   16,
+   17
   ],
-  "special": [
-   17,
+  "hit": [
    18
   ],
+  "air": [
+   19,
+   20
+  ],
+  "special": [
+   21,
+   22
+  ],
   "down": [
-   19
+   23
   ]
  },
  "fps": {
-  "idle": 5,
-  "walk": 10
+  "idle": 7,
+  "walk": 13
  }
 }

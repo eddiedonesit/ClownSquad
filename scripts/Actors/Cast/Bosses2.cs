@@ -15,8 +15,8 @@ using ClownSquad.World;
 public partial class ElasticBoss : BossFighter
 {
     protected override string Cast => "elastic";
-    public override float BodyHeight => 2.4f;
-    protected override float ReachScale => 1.3f;
+    public override float BodyHeight => 2.4f * Big;
+    protected override float ReachScale => 1.3f * Big;
     protected override string Tagline => "HE GOES TO ANY LENGTH";
     private Node3D _arm = null!;
     private MeshInstance3D _sleeve = null!;
@@ -83,7 +83,7 @@ public partial class ElasticBoss : BossFighter
         PinClipFrame("special", 0);
         const float Wind = 0.55f, Out = 0.22f, Hold = 0.15f, Back = 0.3f;
         _arm.Visible = MoveTime >= Wind;
-        _arm.Position = new Vector3(Facing.X * 0.4f, 1.45f, 0.06f);
+        _arm.Position = new Vector3(Facing.X * 0.4f * Big, 1.45f * Big, 0.06f);
         _arm.Scale = new Vector3(Facing.X, 1f, 1f);
         if (MoveTime < Wind) return false;
         if (MoveTime - dt < Wind) { ClearTelegraphs(); Sfx.Play("slide_up", 1.4f); }
@@ -190,8 +190,8 @@ public partial class TrapezeArtist : BossFighter
         }
     }
     protected override string Tagline => Primary ? "NO NET!" : "";
-    public override float BodyHeight => 1.9f;
-    protected override float ReachScale => 1.15f;
+    public override float BodyHeight => 1.9f * Big;
+    protected override float ReachScale => 1.15f * Big;
     public override float XpScale => 6f;
 
     private Act _act = Act.Aloft;
@@ -226,8 +226,8 @@ public partial class TrapezeArtist : BossFighter
         _rig = new TrapezeRig();
         Stage.AddChild(_rig);
         if (Partner is not null) Partner._rig = _rig;
-        Hold = () => _rig.Grip(Bar) - new Vector3(0f, 2.0f, 0f);
-        if (Partner is not null) Partner.Hold = () => _rig.Grip(Partner.Bar) - new Vector3(0f, 2.0f, 0f);
+        Hold = () => _rig.Grip(Bar) - new Vector3(0f, 2.0f * Big, 0f);
+        if (Partner is not null) Partner.Hold = () => _rig.Grip(Partner.Bar) - new Vector3(0f, 2.0f * Big, 0f);
     }
 
     public override bool CanBeHit() => _act is Act.Ground or Act.Diving && base.CanBeHit();
@@ -297,7 +297,7 @@ public partial class TrapezeArtist : BossFighter
                 {
                     _act = Act.Aloft;
                     _timer = Alone ? 1.2f : 3f;
-                    Hold = () => _rig!.Grip(Bar) - new Vector3(0f, 2.0f, 0f);
+                    Hold = () => _rig!.Grip(Bar) - new Vector3(0f, 2.0f * Big, 0f);
                 }
                 return;
         }
@@ -365,8 +365,8 @@ public partial class TrapezeRig : Node3D
 public partial class FireEaterBoss : BossFighter
 {
     protected override string Cast => "fireeater";
-    public override float BodyHeight => 2.0f;
-    protected override float ReachScale => 1.25f;
+    public override float BodyHeight => 2.0f * Big;
+    protected override float ReachScale => 1.25f * Big;
     protected override string Tagline => "HOT STUFF - MIND THE GLASS";
     public override string AttackSound => "whoosh";
     private GpuParticles3D _flame = null!;
@@ -417,7 +417,7 @@ public partial class FireEaterBoss : BossFighter
             if (MoveTime - dt < 0.7f)
             {
                 ClearTelegraphs();
-                _flame.Position = new Vector3(Facing.X * 0.55f, 1.7f, 0.08f);
+                _flame.Position = new Vector3(Facing.X * 0.55f * Big, 1.7f * Big, 0.08f);
                 if (_flame.ProcessMaterial is ParticleProcessMaterial pm) pm.Direction = new Vector3(Facing.X, 0.05f, 0f);
                 _flame.Emitting = true;
                 Sfx.Play("kaboom", 0.6f, -6f);

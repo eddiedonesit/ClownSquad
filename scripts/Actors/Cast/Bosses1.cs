@@ -15,10 +15,10 @@ using ClownSquad.World;
 public partial class BallRiderBoss : BossFighter
 {
     protected override string Cast => "ballrider";
-    private const float BallR = 0.75f;
-    public override float BodyHeight => 3.2f;
-    public override float BodyHalfWidth => 0.85f;
-    protected override float ReachScale => 1.2f;
+    private float BallR => 0.75f * Big;
+    public override float BodyHeight => 3.6f;
+    public override float BodyHalfWidth => 0.85f * Big;
+    protected override float ReachScale => 1.2f * Big;
     protected override string Tagline => "HE NEVER DROPS A PIN";
     private MeshInstance3D _ball = null!;
     private float _lastX;
@@ -33,7 +33,7 @@ public partial class BallRiderBoss : BossFighter
         MoveSpeed = 3.0f;
         Acceleration = 20f;
         base._Ready();
-        Visual.Position = new Vector3(0f, BallR * 1.9f, 0f);
+        VisualBase = new Vector3(0f, BallR * 1.9f, 0f);
         _ball = new MeshInstance3D
         {
             Mesh = new SphereMesh { Radius = BallR, Height = BallR * 2f, RadialSegments = 24, Rings = 12 },
@@ -121,8 +121,8 @@ public partial class BallRiderBoss : BossFighter
 public partial class TrainerBoss : BossFighter
 {
     protected override string Cast => "trainer";
-    protected override float ReachScale => 1.25f;
-    public override float BodyHeight => 1.9f;
+    protected override float ReachScale => 1.25f * Big;
+    public override float BodyHeight => 1.9f * Big;
     protected override string Tagline => "AND RAJAH, THE TERROR OF THE BIG TOP";
     public TigerFighter? Tiger;
     private bool _alone;
@@ -186,10 +186,10 @@ public partial class TrainerBoss : BossFighter
 public partial class TigerFighter : CastFighter
 {
     protected override string Cast => "tiger";
-    protected override float DrawScale => 1.55f;
-    protected override float ReachScale => 1.5f;
-    public override float BodyHeight => 1.7f;
-    public override float BodyHalfWidth => 1.1f;
+    protected override float DrawScale => 1.85f;
+    protected override float ReachScale => 1.7f;
+    public override float BodyHeight => 2.0f;
+    public override float BodyHalfWidth => 1.3f;
     public override float XpScale => 4f;
     public override bool RollsRank => false;
     protected override float LaunchScale => 0f;
@@ -254,9 +254,10 @@ public partial class TigerFighter : CastFighter
 public partial class ClownCarBoss : BossFighter
 {
     protected override string Cast => "clowncar";
-    public override float BodyHeight => 2.3f;
-    public override float BodyHalfWidth => 1.9f;
-    protected override float ReachScale => 1.45f;
+    protected override float DrawScale => 1.12f;
+    public override float BodyHeight => 2.3f * Big;
+    public override float BodyHalfWidth => 1.9f * Big;
+    protected override float ReachScale => 1.45f * Big;
     protected override bool HasPoise => true;
     protected override float StunScale => 0.1f;
     public override string AttackSound => "bonk";

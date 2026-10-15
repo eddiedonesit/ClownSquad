@@ -470,15 +470,17 @@ class Rig:
 
     def hat(self, c, x, y, r):
         k, kind = self.k, self.s.get("hat", "cone")
-        top = y - r * 0.6
+        # Hats sit on top of the head: the brim rides just above the brows,
+        # so the forehead, brows and eyes all show below it.
+        top = y - r * 0.84 if kind != "bandana" else y - r * 0.62
         if kind == "cone":
             c.part()
-            c.poly([(x - r * 0.95, top), (x + r * 0.95, top), (x + r * 0.45, top - r * 0.9), (x - r * 0.2, top - r * 1.7), (x - r * 0.65, top - r * 0.8)], HATC)
+            c.poly([(x - r * 0.8, top), (x + r * 0.8, top), (x + r * 0.4, top - r * 0.8), (x - r * 0.15, top - r * 1.55), (x - r * 0.55, top - r * 0.75)], HATC)
             c.recolor(lambda xx, yy, m: ACCENT if math.floor((xx + yy * 0.75) / (5 * k)) % 3 == 0 else m)
             c.part()
-            c.ellipse(x, top, r * 1.05, r * 0.23, ACCENT)
+            c.ellipse(x, top, r * 0.9, r * 0.2, ACCENT)
             c.part()
-            c.ellipse(x - r * 0.25, top - r * 1.75, r * 0.25, r * 0.25, WHITE)
+            c.ellipse(x - r * 0.2, top - r * 1.6, r * 0.24, r * 0.24, WHITE)
         elif kind == "top":
             c.part()
             c.poly([(x - r * 0.62, top), (x + r * 0.62, top), (x + r * 0.58, top - r * 1.3), (x - r * 0.58, top - r * 1.3)], HATC)
@@ -487,9 +489,9 @@ class Rig:
             c.ellipse(x, top, r * 1.0, r * 0.2, HATC)
         elif kind == "beret":
             c.part()
-            c.ellipse(x - r * 0.1, top + r * 0.05, r * 1.0, r * 0.38, HATC)
+            c.ellipse_rot(x - r * 0.15, top + r * 0.02, r * 0.95, r * 0.34, -0.12, HATC)
             c.part()
-            c.ellipse(x - r * 0.1, top - r * 0.32, r * 0.12, r * 0.12, HATC)
+            c.ellipse(x - r * 0.15, top - r * 0.34, r * 0.12, r * 0.12, HATC)
         elif kind == "fez":
             c.part()
             c.poly([(x - r * 0.5, top + r * 0.05), (x + r * 0.5, top + r * 0.05), (x + r * 0.4, top - r * 0.75), (x - r * 0.4, top - r * 0.75)], HATC)
@@ -845,7 +847,7 @@ CAST = {
     "balloonist": dict(k=1.0, build="round", suit=(70, 180, 120), accent=(250, 250, 250), pattern="dots", hair=(250, 200, 80),
                        hat="bowler", hat_col=(60, 50, 70), neck="bowtie", balloon=(240, 80, 120)),
     "stiltwalker": dict(k=1.0, legs="stilts", suit=(60, 60, 120), accent=(250, 220, 90), pattern="plain", tails=True,
-                        hair=(200, 200, 210), hat="top", hat_col=(40, 40, 60), neck="collar", pants=(220, 60, 80), ch=420),
+                        hair=(200, 200, 210), hat="top", hat_col=(40, 40, 60), neck="collar", pants=(220, 60, 80), ch=420, cw=330),
     "mime": dict(k=1.0, face="mime", suit=(30, 30, 40), accent=(245, 245, 250), pattern="stripes", hair_style="none",
                  hat="beret", hat_col=(30, 30, 40), neck="scarf", nose=False, shoe=(30, 30, 40), pants=(30, 30, 40),
                  trim=(230, 60, 70)),
@@ -912,36 +914,47 @@ def humanoid_clips(name):
 
     clips = []
     uni = s.get("legs") == "unicycle"
-    # idle: breathing (and juggling, for those who juggle)
-    for i in range(4):
-        b = [0, 1, 2, 1][i]
-        kw = dict(by=b, na=14 + b, fa=-8 - b)
-        if j and name != "fireeater":
-            kw.update(juggle=i / 4, na=60 + (i % 2) * 20, ne=60, fa=40 + ((i + 1) % 2) * 20, fe=60, item_n=None, item_f=None)
-        if name == "fireeater":
-            kw.update(juggle=i / 4, na=70 + (i % 2) * 25, ne=50, fa=45 + ((i + 1) % 2) * 25, fe=50, item_n=None, item_f=None)
-        if name == "mime":
-            kw.update(na=80, ne=70, fa=70, fe=80)                     # palms on the invisible box
-        if uni:
-            kw.update(na=90, ne=0, fa=-80, fe=0, pedal=i * 20)          # arms out for balance
-        if name == "strongman":
-            kw.update(na=20, ne=90, fa=-20, fe=90)                    # fists on hips
-        if name == "balloonist":
-            kw.update(fa=150 + b * 3, fe=10)                           # the bunch held up high
-        clips.append(("idle", base(**kw)))
-    # walk: a stride (or pedalling, or a stilt step)
+    # Bosses move bigger: more breath, more swagger, a heavier stride.
+    amp = 1.7 if name in BOSSES else 1.0
+    # idle: six frames of breathing, arm sway, a head bob and a blink
+    # (and juggling, for those who juggle)
     for i in range(6):
         ph = i / 6 * math.tau
-        kw = dict(nf=math.sin(ph) * 9, nfl=max(0, math.cos(ph)) * 5, ff=-math.sin(ph) * 9, ffl=max(0, -math.cos(ph)) * 5,
-                  by=abs(math.sin(ph)) * 1.5, na=12 - math.sin(ph) * 18, fa=-10 + math.sin(ph) * 18)
+        b = (1 - math.cos(ph)) * 1.4 * amp                            # 0 .. 2.8 px down and back
+        sway = math.sin(ph) * 7 * amp
+        kw = dict(by=b, na=14 + sway, ne=12 + sway * 0.5, fa=-8 - sway, fe=10 + sway * 0.5,
+                  head_dy=-math.sin(ph) * 0.8 * amp, lean=math.sin(ph) * 1.5 * amp,
+                  eyes="closed" if i == 3 else "open")
+        if j and name != "fireeater":
+            kw.update(juggle=i / 6, na=60 + (i % 2) * 20, ne=60, fa=40 + ((i + 1) % 2) * 20, fe=60, item_n=None, item_f=None, eyes="open")
+        if name == "fireeater":
+            kw.update(juggle=i / 6, na=70 + (i % 2) * 25, ne=50, fa=45 + ((i + 1) % 2) * 25, fe=50, item_n=None, item_f=None, eyes="open")
+        if name == "mime":
+            kw.update(na=80 + sway, ne=70, fa=70 - sway, fe=80)       # palms feeling the invisible box
+        if uni:
+            kw.update(na=90 + sway * 2, ne=0, fa=-80 - sway * 2, fe=0, pedal=i * 15, nf=0, ff=0)   # wobbling for balance
+        if name == "strongman":
+            kw.update(na=20 + sway * 0.5, ne=90, fa=-20, fe=90, lean=-2 + math.sin(ph) * 2)   # fists on hips, chest out
+        if name == "balloonist":
+            kw.update(fa=150 + sway, fe=10)                            # the bunch held up high
+        if name in ("trainer", "ringmaster"):
+            kw.update(na=30 + sway * 2, ne=40 + sway, whip="coil")     # flicking the coiled whip
+        clips.append(("idle", base(**kw)))
+    # walk: eight frames of stride (or pedalling, or stilt steps), arms swinging, body bobbing
+    for i in range(8):
+        ph = i / 8 * math.tau
+        stride = 11 * (1.15 if amp > 1 else 1.0)
+        kw = dict(nf=math.sin(ph) * stride, nfl=max(0, math.cos(ph)) * 7, ff=-math.sin(ph) * stride, ffl=max(0, -math.cos(ph)) * 7,
+                  by=abs(math.sin(ph)) * 2.2 * amp, na=12 - math.sin(ph) * 24, fa=-10 + math.sin(ph) * 24,
+                  lean=3 + math.cos(ph * 2) * 1.5 * amp, head_dy=abs(math.sin(ph)) * 0.8)
         if j and name not in ("fireeater",):
-            kw.update(juggle=i / 6, na=60 + (i % 2) * 20, ne=60, fa=40 + ((i + 1) % 2) * 20, fe=60, item_n=None, item_f=None)
+            kw.update(juggle=i / 8, na=60 + (i % 2) * 20, ne=60, fa=40 + ((i + 1) % 2) * 20, fe=60, item_n=None, item_f=None)
         if name == "fireeater":
             kw.update(item_n="torch", item_f="torch")
         if uni:
-            kw.update(pedal=i * 60, na=90 + math.sin(ph) * 15, ne=0, fa=-80 - math.sin(ph) * 15, fe=0, nf=0, ff=0)
+            kw.update(pedal=i * 45, na=90 + math.sin(ph) * 15, ne=0, fa=-80 - math.sin(ph) * 15, fe=0, nf=0, ff=0)
         if s.get("legs") == "stilts":
-            kw.update(nf=math.sin(ph) * 14, ff=-math.sin(ph) * 14)
+            kw.update(nf=math.sin(ph) * 16, ff=-math.sin(ph) * 16)
         clips.append(("walk", base(**kw)))
     # attack: wind-up, strike, follow-through, recover (pinned to the swing in game)
     atk = [
@@ -1032,11 +1045,14 @@ def humanoid_clips(name):
 
 def beast_clips(name):
     clips = []
-    for i in range(4):
-        clips.append(("idle", dict(by=[0, 1, 1, 0][i], tail=[0, 4, 8, 4][i])))
     for i in range(6):
-        ph = i / 6 * 360
-        clips.append(("walk", dict(nf=ph, nb=ph + 180, ff=ph + 180, bf=ph, lift_n=8, lift_f=8, by=abs(math.sin(rad(ph))) * 2, tail=i * 2)))
+        ph = i / 6 * math.tau
+        clips.append(("idle", dict(by=(1 - math.cos(ph)) * 1.5, tail=math.sin(ph) * 12, head_up=math.sin(ph) * 2,
+                                   head_ang=math.sin(ph) * 15, mouth="open" if i == 3 else None)))
+    for i in range(8):
+        ph = i / 8 * 360
+        clips.append(("walk", dict(nf=ph, nb=ph + 180, ff=ph + 180, bf=ph, lift_n=10, lift_f=10, by=abs(math.sin(rad(ph))) * 3,
+                                   tail=math.sin(rad(ph)) * 10, head_up=math.sin(rad(ph * 2)) * 1.5)))
     for a in (dict(head_up=4, mouth="open", angry=True), dict(head_up=-2, nf=60, lift_n=20, mouth="open", angry=True),
               dict(head_up=-4, nf=90, lift_n=10, mouth="open", angry=True), dict(head_up=0, nf=20)):
         clips.append(("attack", a))
@@ -1051,7 +1067,8 @@ def beast_clips(name):
 
 # ------------------------------------------------------------ output
 
-FRAME_FPS = {"idle": 5, "walk": 10}
+FRAME_FPS = {"idle": 7, "walk": 13}
+BOSSES = {"ballrider", "trainer", "elastic", "trapeze_a", "trapeze_b", "fireeater", "strongman", "ringmaster", "tot"}
 
 
 def render(name):

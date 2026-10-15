@@ -16,7 +16,7 @@ using ClownSquad.World;
 public partial class TotStackBoss : BossFighter
 {
     protected override string Cast => "tot";
-    private const float Step = 0.7f;
+    private float Step => 0.7f * Big;
     protected override string Tagline => "FIVE TIMES THE TROUBLE";
     public override float BodyHeight => 0.3f + Mathf.Max(1, _count) * Step;
     public override float BodyHalfWidth => 0.5f;
@@ -31,6 +31,7 @@ public partial class TotStackBoss : BossFighter
     private readonly List<ShaderMaterial?> _mats = new();
     private Node3D _pivot = null!;
     private int _count = 5;
+    private float _lift = 0.45f;
     private int _lost;
     private bool _lying;
     private bool _conga;
@@ -53,6 +54,7 @@ public partial class TotStackBoss : BossFighter
         SpriteFrames frames = FrameLibrary.Load(SheetPath, ArtStyle.FramesFor(SheetPath));
         FrameLibrary.SheetInfo info = FrameLibrary.Info(SheetPath);
         float lift = (info.Baseline - info.FrameHeight * 0.5f) * SpritePixelSize;
+        _lift = lift;
         for (int i = 0; i < 5; i++)
         {
             var s = new AnimatedSprite3D
@@ -178,11 +180,11 @@ public partial class TotStackBoss : BossFighter
             if (_conga && _trail.Count > 0)
             {
                 int idx = Mathf.Max(0, _trail.Count - 1 - i * 5);
-                s.GlobalPosition = _trail[idx] + new Vector3(0f, 0.45f, 0.01f * i);
+                s.GlobalPosition = _trail[idx] + new Vector3(0f, _lift, 0.01f * i);
             }
             else
             {
-                s.Position = s.Position.Lerp(new Vector3(0f, 0.45f + i * Step, 0.01f * i), 1f - Mathf.Exp(-14f * dt));
+                s.Position = s.Position.Lerp(new Vector3(0f, _lift + i * Step, 0.01f * i), 1f - Mathf.Exp(-14f * dt));
             }
         }
 
@@ -228,9 +230,10 @@ public partial class TotStackBoss : BossFighter
 public partial class StrongmanBoss : BossFighter
 {
     protected override string Cast => "strongman";
-    public override float BodyHeight => 2.6f;
-    public override float BodyHalfWidth => 0.95f;
-    protected override float ReachScale => 1.45f;
+    protected override float DrawScale => 1.22f;
+    public override float BodyHeight => 2.6f * Big;
+    public override float BodyHalfWidth => 0.95f * Big;
+    protected override float ReachScale => 1.45f * Big;
     protected override bool HasPoise => true;
     protected override float StunScale => 0.12f;
     protected override float SwingTimeScale => 1.3f;
@@ -363,9 +366,9 @@ public partial class StrongmanBoss : BossFighter
 public partial class RingmasterBoss : BossFighter
 {
     protected override string Cast => "ringmaster";
-    public override float BodyHeight => _mounted ? 2.6f : 2.1f;
-    public override float BodyHalfWidth => _mounted ? 1.4f : 0.55f;
-    protected override float ReachScale => 1.3f;
+    public override float BodyHeight => (_mounted ? 2.6f : 2.1f) * Big;
+    public override float BodyHalfWidth => (_mounted ? 1.4f : 0.55f) * Big;
+    protected override float ReachScale => 1.3f * Big;
     protected override string Tagline => "LADIES AND GENTLEMEN... THE GRAND FINALE!";
     private const string CarriageSheet = Folder + "carriage.png";
 
@@ -396,7 +399,7 @@ public partial class RingmasterBoss : BossFighter
         _cart.Position = new Vector3(0f, (info.Baseline - info.FrameHeight * 0.5f) * SpritePixelSize, 0.06f);
         AddChild(_cart);
         _cart.Play("idle");
-        Visual.Position = new Vector3(0f, 0.55f, 0f);
+        VisualBase = new Vector3(0f, 0.55f * Big, 0f);
 
         AddMove("charge", 0f, 40f, 5f, () =>
         {
@@ -535,7 +538,7 @@ public partial class RingmasterBoss : BossFighter
         {
             bool flip = Facing.X < 0f;
             _cart.FlipH = flip;
-            _cart.Position = new Vector3(flip ? -0.65f : 0.65f, _cart.Position.Y, 0.06f);
+            _cart.Position = new Vector3((flip ? -0.65f : 0.65f) * Big, _cart.Position.Y, 0.06f);
             float speed = Flat(Velocity).Length();
             string clip = speed > 0.5f ? "walk" : "idle";
             if (_cart.Animation != clip) _cart.Play(clip);
@@ -560,7 +563,7 @@ public partial class RingmasterBoss : BossFighter
         tw.TweenInterval(6f);
         tw.TweenProperty(_cart, "modulate:a", 0f, 1f);
         tw.TweenCallback(Callable.From(_cart.QueueFree));
-        Visual.Position = Vector3.Zero;
+        VisualBase = Vector3.Zero;
         ImpactEffect.Spawn(Stage, at + new Vector3(0f, 0.8f, 0f), 2.6f);
         Sfx.Play("kaboom");
         CameraShake.Request(this, 0.2f, 0.4f);
