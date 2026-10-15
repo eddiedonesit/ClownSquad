@@ -14,3 +14,4 @@ alternatives weighed, and the consequences accepted.
 | [0007](0007-world-map-campaign.md) | World map campaign | Accepted |
 | [0008](0008-enemy-cast-and-bosses.md) | The enemy cast and a boss for every world | Accepted |
 | [0009](0009-weapons-and-skill-trees.md) | Weapons, and a skill tree per weapon | Accepted |
+| [0010](0010-online-host-join.md) | Online co-op: host-authoritative puppets over ENet, direct IP | Accepted (phases 0-1 built) |

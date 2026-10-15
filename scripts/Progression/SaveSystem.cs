@@ -86,6 +86,16 @@ public static class SaveSystem
         Converters = { new System.Text.Json.Serialization.JsonStringEnumConverter() },
     };
 
+    /// <summary>A character as JSON, the save file's format: what a guest sends to join an online game.</summary>
+    public static string CharacterToJson(CharacterRecord r) => JsonSerializer.Serialize(r, Json);
+
+    /// <summary>A character from JSON, or null if it does not parse.</summary>
+    public static CharacterRecord? CharacterFromJson(string json)
+    {
+        try { return JsonSerializer.Deserialize<CharacterRecord>(json, Json); }
+        catch (JsonException) { return null; }
+    }
+
     /// <summary>Where saves go. Tests point this elsewhere so they never touch a real save.</summary>
     public static string Path { get; set; } = SlotPath(1);
 

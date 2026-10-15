@@ -58,6 +58,7 @@ public partial class TitleScreen : Node3D
     {
         // Tests and debug runs go straight where they are going.
         string[] args = OS.IsDebugBuild() ? OS.GetCmdlineUserArgs() : Array.Empty<string>();
+        if (Array.IndexOf(args, "nettest") >= 0) { SetProcess(false); AddChild(new ClownSquad.Debug.NetProbe()); return; }
         foreach (string f in new[] { "wavetest", "losetest", "movetest", "animtest", "aitest", "sandbox", "fight", "stage", "tentshot", "stageshot", "castshot", "weapontest", "bindtest", "skillshot", "practice", "practicetest", "demo", "bossrush" })
             if (Array.IndexOf(args, f) >= 0) { CallDeferred(MethodName.Go, Campaign.FightScene); return; }
         if (Array.IndexOf(args, "mapshot") >= 0) { CallDeferred(MethodName.Go, Campaign.MapScene); return; }
@@ -103,6 +104,21 @@ public partial class TitleScreen : Node3D
     private SettingsMenu? _settings;
 
     private BestiaryMenu? _bestiary;
+    private OnlineMenu? _online;
+
+    /// <summary>Online play, as P1's character from the most recent save (a fresh PIP if there is none).</summary>
+    private void OpenOnline()
+    {
+        var devices = new List<int> { LocalDeviceInput.Keyboard };
+        devices.AddRange(Godot.Input.GetConnectedJoypads());
+        int recent = MostRecentSlot();
+        CharacterRecord me = recent > 0 && SaveSystem.Peek(recent) is SaveData d && d.Characters.Count > 0
+            ? d.Characters[0]
+            : new CharacterRecord { Name = "PIP", Look = "pip" };
+        _online = new OnlineMenu(devices, me);
+        _online.Closed += () => { _online = null; foreach (MapPad p in _pads) p.Swallow(); };
+        AddChild(_online);
+    }
 
     private void OpenBestiary()
     {
@@ -137,8 +153,10 @@ public partial class TitleScreen : Node3D
             AddChild(controls);
             GetTree().CreateTimer(0.1).Timeout += () => { Shot("controls"); controls.QueueFree(); _settings?.QueueFree(); _settings = null; OpenBestiary(); };
         };
-        GetTree().CreateTimer(6.25).Timeout += () => { Shot("bestiary"); _bestiary?.QueueFree(); _bestiary = null; };
-        GetTree().CreateTimer(6.3).Timeout += () =>
+        GetTree().CreateTimer(6.25).Timeout += () => { Shot("bestiary"); _bestiary?.QueueFree(); _bestiary = null; OpenOnline(); };
+        GetTree().CreateTimer(6.4).Timeout += () => { Shot("online"); _online?.HostForShot(); };
+        GetTree().CreateTimer(6.6).Timeout += () => { Shot("online_lobby"); ClownSquad.Net.NetSession.Instance?.Leave(quiet: true); _online?.QueueFree(); _online = null; };
+        GetTree().CreateTimer(6.75).Timeout += () =>
         {
             Shot("title");
             _newGame = false;
@@ -282,6 +300,7 @@ public partial class TitleScreen : Node3D
         if (recent > 0) _main.Add(("CONTINUE", () => { SaveSystem.ActiveSlot = recent; _newGame = false; EnterSquad(); }));
         _main.Add(("NEW GAME", () => { _newGame = true; ShowSlots(); }));
         if (recent > 0) _main.Add(("LOAD GAME", () => { _newGame = false; ShowSlots(); }));
+        _main.Add(("ONLINE", OpenOnline));
         _main.Add(("BOSS RUSH", () => { _starting = true; Sfx.Play("drumroll"); BossRush.Start(GetTree()); }));
         // Practice with the clowns of the last save played (a copy: nothing is kept).
         _main.Add(("PRACTICE RING", () =>
@@ -479,7 +498,7 @@ public partial class TitleScreen : Node3D
         _logo.Rotation = Mathf.Sin((float)_clock * 1.6f) * 0.025f;
         _logo.Scale = Vector2.One * (1f + 0.025f * Mathf.Sin((float)_clock * 3.1f));
         foreach (DirectionalSprite s in _standees) s.Tick((float)delta);
-        if (_starting || _intro is not null || _settings is not null || _bestiary is not null) return;
+        if (_starting || _intro is not null || _settings is not null || _bestiary is not null || _online is not null) return;
         _menuBacking.Visible = _mode != Mode.Squad;
 
         if (_mode == Mode.Squad) { TickSquad(); return; }

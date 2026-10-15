@@ -111,11 +111,15 @@ immediately; pads join by pressing a button.
 | Act cards | The first time each enemy kind appears, a NEW ACT! card shows its portrait, name and how to beat it |
 | Boss rush | Title > BOSS RUSH: all ten bosses back to back as level-30 clowns on a save of its own, half a heal between, against the clock; best time kept |
 | Bestiary | Title > BESTIARY: every act met in any save slot, with portrait and tip; bosses show whether they are beaten; unmet ones are silhouettes |
+| Practice ring | Title > PRACTICE RING: your clowns (a copy of the last save; nothing kept) with three dummies; change weapon on the spot, switch the whole tree on and off, call in grunts, damage meter |
+| Controls | Settings > CONTROLS: rebind every action on keyboard and gamepad (user://controls.cfg); taken keys swap; d-pad moves |
+| Online | Title > ONLINE: host (UDP 7777) or join by IP, lobby with everyone's clown, level and weapon; guests bring their own character. Playing stages online is phase 2 (ADR 0010) |
+| Session | One place for cross-scene mode and save path (Campaign, BossRush, Practice, Test); command-line test flags only in debug builds |
 | Tooling | Procedural sprite/effect/enemy generators, animation probe, AI probe, variant renderer, the smart test bot (reads telegraphs, hazards and shots; dodges and jumps rings), weapon probe, `tools/run_probes.sh` |
 
 ## Not built
 
-From the GDD: online co-op (status and plan in [REVIEW-2026-10-15](REVIEW-2026-10-15.md) §4),
+From the GDD: online play of stages (lobby built; phases 2-4 in ADR 0010),
 monster capture, classes, story. Also not yet: Steam integration (achievements,
 cloud saves), controller rebinding, localisation.
 
@@ -154,8 +158,10 @@ run-based or level-based structure, and max player count.
   user's Claude Code settings.
 - Balance needs human playtesting: the smart bot wins 7-B about half the time and
   reaches boss 7 of 10 in the boss rush; the eight weapons are tuned by probe only.
+- Saved for later: the daily circus (seeded daily stage with modifiers, local best).
 - The code review of 2026-10-15 ([REVIEW-2026-10-15](REVIEW-2026-10-15.md)) lists
-  the open risks, highest first: no git remote and the repo synced by Google
-  Drive; GameRoot doing too many jobs; global state crossing scenes.
+  the open risks; R2 (GameRoot split), R3 (Session), R4 (Fx), R6 (rebinding)
+  and R7 (debug flags) are done. Still open: R1, push to GitHub and stop
+  Google Drive syncing the repo.
 - The soundtrack is synthesised. A composer or licensed recordings would be
   the step up for release; the song structure and loop points carry over.

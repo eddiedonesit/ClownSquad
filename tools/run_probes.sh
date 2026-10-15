@@ -19,6 +19,8 @@ MUST=(
   "weapontest skills all"
   "bindtest"
   "practicetest"
+  "nettest host"    # these two talk to each other over localhost
+  "nettest join"
   "animtest"        # trace only: passes unless it crashes
   "aitest"          # trace only: passes unless it crashes
   "wavetest stage 1-1"
