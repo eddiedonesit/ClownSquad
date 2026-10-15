@@ -14,7 +14,7 @@ using ClownSquad.Visuals;
 public partial class GlassField : Node3D
 {
     public static readonly List<GlassField> All = new();
-    public PlayerFighter Owner = null!;
+    public PlayerFighter Shooter = null!;
     public float Damage = 5f;
     public float Seconds = 9f;
     private readonly List<Node3D> _shards = new();
@@ -25,7 +25,7 @@ public partial class GlassField : Node3D
 
     public static GlassField Scatter(PlayerFighter owner, Vector3 at, float radius, int count, float seconds = 9f)
     {
-        var g = new GlassField { Owner = owner, Seconds = seconds };
+        var g = new GlassField { Shooter = owner, Seconds = seconds };
         owner.GetParent().AddChild(g);
         g.GlobalPosition = new Vector3(at.X, 0f, at.Z);
         var rng = new RandomNumberGenerator();
@@ -79,8 +79,8 @@ public partial class GlassField : Node3D
             if (_age > Seconds + 1f) QueueFree();
             return;
         }
-        if (!IsInstanceValid(Owner)) return;
-        foreach (Node n in GetTree().GetNodesInGroup(Fighter.Group))
+        if (!IsInstanceValid(Shooter)) return;
+        foreach (Node n in Fighter.Live)
         {
             if (n is not Fighter f || f.Hostile || f.IsDead || !f.CanBeHit() || f.GlobalPosition.Y > 0.3f) continue;
             if (_next.TryGetValue(f, out float when) && _age < when) continue;
@@ -90,7 +90,7 @@ public partial class GlassField : Node3D
                 d.Y = 0f;
                 if (d.Length() > 0.4f) continue;
                 _next[f] = _age + 0.7f;
-                f.TakeDamage(new DamageInfo(Damage * Owner.DamageMultiplier, d.LengthSquared() > 0.01f ? d.Normalized() : Vector3.Right, 2f, 0.04f, Owner, 0f, 0.35f));
+                f.TakeDamage(new DamageInfo(Damage * Shooter.DamageMultiplier, d.LengthSquared() > 0.01f ? d.Normalized() : Vector3.Right, 2f, 0.04f, Shooter, 0f, 0.35f));
                 ClownSquad.Audio.Sfx.Play("ding", 2.2f, -6f);
                 PopText.Spawn(GetParent(), f.GlobalPosition + new Vector3(0f, f.BodyHeight + 0.2f, 0f), "OUCH!", new Color(0.7f, 0.9f, 1f), 0.6f, 0.5f);
                 break;
@@ -107,7 +107,7 @@ public partial class GlassField : Node3D
 /// </summary>
 public partial class Hazard : Node3D
 {
-    public PlayerFighter Owner = null!;
+    public PlayerFighter Shooter = null!;
     public float Radius = 1f;
     public float Damage = 4f;
     public float Seconds = 4f;
@@ -126,7 +126,7 @@ public partial class Hazard : Node3D
     public static Hazard Fire(PlayerFighter owner, Vector3 at, float radius, float seconds, float damage, float warmUp = 0.6f,
                               float thickness = 0f, float grow = 0f)
     {
-        var h = new Hazard { Owner = owner, Radius = radius, Seconds = seconds, Damage = damage, WarmUp = warmUp, Thickness = thickness, Grow = grow };
+        var h = new Hazard { Shooter = owner, Radius = radius, Seconds = seconds, Damage = damage, WarmUp = warmUp, Thickness = thickness, Grow = grow };
         owner.GetParent().AddChild(h);
         h.GlobalPosition = new Vector3(at.X, 0f, at.Z);
         return h;
@@ -208,8 +208,8 @@ public partial class Hazard : Node3D
             if (left < -1f) QueueFree();
             return;
         }
-        if (!IsInstanceValid(Owner)) return;
-        foreach (Node n in GetTree().GetNodesInGroup(Fighter.Group))
+        if (!IsInstanceValid(Shooter)) return;
+        foreach (Node n in Fighter.Live)
         {
             if (n is not Fighter f || f.Hostile || f.IsDead || !f.CanBeHit() || f.GlobalPosition.Y > 0.6f) continue;
             Vector3 d = f.GlobalPosition - GlobalPosition;
@@ -218,7 +218,7 @@ public partial class Hazard : Node3D
             if (dist > Radius || (Thickness > 0f && dist < Radius - Thickness)) continue;
             if (_next.TryGetValue(f, out float when) && _age < when) continue;
             _next[f] = _age + 0.5f;
-            f.TakeDamage(new DamageInfo(Damage * Owner.DamageMultiplier, d.LengthSquared() > 0.01f ? d.Normalized() : Vector3.Right, 3f, 0.03f, Owner, 2.5f, 0.25f));
+            f.TakeDamage(new DamageInfo(Damage * Shooter.DamageMultiplier, d.LengthSquared() > 0.01f ? d.Normalized() : Vector3.Right, 3f, 0.03f, Shooter, 2.5f, 0.25f));
         }
     }
 }

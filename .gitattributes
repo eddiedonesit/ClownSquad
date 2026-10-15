@@ -1,0 +1,18 @@
+# Text is stored and checked out with LF everywhere (Godot, .NET and Python
+# all read it), so no tool ever flips a file's line endings and every commit
+# diff shows only real changes.
+* text=auto eol=lf
+
+# Binary assets: never touched.
+*.png binary
+*.jpg binary
+*.wav binary
+*.ogg binary
+*.mp3 binary
+*.mp4 binary
+*.avi binary
+*.ttf binary
+*.otf binary
+*.glb binary
+*.res binary
+*.scn binary

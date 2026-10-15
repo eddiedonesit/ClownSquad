@@ -74,7 +74,7 @@ public partial class Food : Node3D
         _age += delta;
         _sprite.Position = new Vector3(0f, 0.35f + 0.05f * Mathf.Sin((float)_age * 4f), 0f);
         // Left where it lies for anyone at full health, so nobody wastes it.
-        foreach (Node n in GetTree().GetNodesInGroup(Fighter.Group))
+        foreach (Node n in Fighter.Live)
         {
             if (n is not PlayerFighter p || p.Hostile || p.IsDead || p.Health >= p.MaxHealth) continue;
             Vector3 d = p.GlobalPosition - GlobalPosition;

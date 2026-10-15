@@ -149,7 +149,7 @@ public sealed class BrawlerAi : IInputSource
     {
         const float Personal = 1.15f;
         Vector2 push = Vector2.Zero;
-        foreach (Node node in _self.GetTree().GetNodesInGroup(Fighter.Group))
+        foreach (Node node in Fighter.Live)
         {
             if (node is not Fighter f || f == _self || f.Hostile != _self.Hostile || f.IsDead) continue;
             Vector3 away = _self.GlobalPosition - f.GlobalPosition;
@@ -168,7 +168,7 @@ public sealed class BrawlerAi : IInputSource
     {
         Fighter? best = null;
         float bestDist = float.MaxValue;
-        foreach (Node node in _self.GetTree().GetNodesInGroup(Fighter.Group))
+        foreach (Node node in Fighter.Live)
         {
             if (node is not Fighter f || f == _self || f.IsDead) continue;
             if (f.Hostile == _self.Hostile) continue;

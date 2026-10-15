@@ -238,7 +238,7 @@ public partial class WaveDirector : Node
         if (BonusLeft <= 0f)
         {
             BonusLeft = 0f;
-            foreach (Node n in GetTree().GetNodesInGroup(Fighter.Group))
+            foreach (Node n in Fighter.Live)
                 if (n is GruntClown g && !g.IsDead) g.BeginDespawn(0.1f);
             Set(Phase.Victory);
             return;

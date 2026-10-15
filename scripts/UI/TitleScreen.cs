@@ -126,7 +126,7 @@ public partial class TitleScreen : Node3D
     private void TitleShots()
     {
         if (DisplayServer.GetName() == "headless") { GetTree().CreateTimer(6.0).Timeout += () => GetTree().Quit(); return; }
-        void Shot(string name) => GetViewport().GetTexture().GetImage().SavePng($"C:/Claude/ClownSquad/debug/{name}.png");
+        void Shot(string name) => GetViewport().GetTexture().GetImage().SavePng($"{ClownSquad.Debug.DebugShots.Dir}{name}.png");
         GetTree().CreateTimer(1.75).Timeout += () => Shot("intro_panels");
         GetTree().CreateTimer(2.75).Timeout += () => Shot("intro_logo");
         GetTree().CreateTimer(5.6).Timeout += () => OpenSettings();

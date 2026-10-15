@@ -1,6 +1,7 @@
 namespace ClownSquad.Actors;
 
 using System;
+using System.Collections.Generic;
 using Godot;
 using ClownSquad.Audio;
 using ClownSquad.Combat;
@@ -19,6 +20,45 @@ public partial class Fighter : CharacterBody3D
 
     /// <summary>Raised for every hit that lands: attacker (if any), victim, damage.</summary>
     public static event Action<Fighter?, Fighter, float>? HitLanded;
+
+    // Everyone in the fight, kept here as well as in the "fighters" group.
+    // Hit checks, AI and projectiles ask "who is in the fight" every frame;
+    // GetNodesInGroup copies the whole group across the engine boundary each
+    // time, where this hands back one cached array, rebuilt only when someone
+    // joins or leaves. It is a snapshot, so it is safe to iterate while hits
+    // kill, despawn or spawn fighters.
+    private static readonly List<Fighter> InFight = new();
+    private static Fighter[] _live = Array.Empty<Fighter>();
+    private static bool _liveDirty;
+
+    /// <summary>Every fighter in the fight (the members of <see cref="Group"/>), safe to iterate while it changes.</summary>
+    public static Fighter[] Live
+    {
+        get
+        {
+            if (_liveDirty) { _live = InFight.ToArray(); _liveDirty = false; }
+            return _live;
+        }
+    }
+
+    private void JoinFight()
+    {
+        if (InFight.Contains(this)) return;
+        InFight.Add(this);
+        _liveDirty = true;
+    }
+
+    private void LeaveFight()
+    {
+        if (InFight.Remove(this)) _liveDirty = true;
+    }
+
+    // Notifications rather than _EnterTree/_ExitTree, which subclasses override.
+    public override void _Notification(int what)
+    {
+        if (what == NotificationExitTree) LeaveFight();
+        else if (what == NotificationEnterTree && IsInGroup(Group)) JoinFight();
+    }
 
     protected virtual string SheetPath =>
         ArtStyle.Sheet("res://assets/sprites/clown_16bit.png", "res://assets/sprites/pip_hd.png");
@@ -128,6 +168,7 @@ public partial class Fighter : CharacterBody3D
     {
         Health = MaxHealth;
         AddToGroup(Group);
+        JoinFight();
 
         // Fighters pass through one another. Body blocking lets a crowd pin the
         // player in place, and it let launched bodies come to rest on top of
@@ -475,7 +516,7 @@ public partial class Fighter : CharacterBody3D
                                  float launch = 0f, float stun = 0.3f)
     {
         int hits = 0;
-        foreach (Node node in GetTree().GetNodesInGroup(Group))
+        foreach (Node node in Fighter.Live)
         {
             if (node is not Fighter f || f == this || !f.CanBeHit()) continue;
             if (f.Hostile == Hostile) continue;
@@ -498,6 +539,7 @@ public partial class Fighter : CharacterBody3D
     public void BeginDespawn(float lieFor = 0.9f)
     {
         RemoveFromGroup(Group);
+        LeaveFight();
         _despawnIn = lieFor + 0.7f;
     }
 

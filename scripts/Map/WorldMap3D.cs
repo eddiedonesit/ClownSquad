@@ -63,6 +63,8 @@ public partial class WorldMap3D : Node3D
         GetTree().Paused = false;
         if (Sfx.Instance is null) AddChild(new Sfx());
         SaveSystem.UseActiveSlot();
+        // Belt and braces: whatever route led here, the map is never part of a boss rush.
+        ClownSquad.World.BossRush.Active = false;
         SaveSystem.Load();
         _state = SaveSystem.Data.Campaign;
         string[] cli = OS.GetCmdlineUserArgs();
@@ -98,7 +100,7 @@ public partial class WorldMap3D : Node3D
             {
                 // Without a window there is nothing rendered to save; the map still loaded.
                 if (!DisplayServer.GetName().Contains("headless"))
-                    GetViewport().GetTexture().GetImage().SavePng("C:/Claude/ClownSquad/debug/world_map3d.png");
+                    GetViewport().GetTexture().GetImage().SavePng(ClownSquad.Debug.DebugShots.Dir + "world_map3d.png");
                 GetTree().Quit();
             };
     }

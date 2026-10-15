@@ -17,7 +17,7 @@ using ClownSquad.World;
 /// </summary>
 public partial class PlayerShot : Node3D
 {
-    public PlayerFighter Owner = null!;
+    public PlayerFighter Shooter = null!;
     public Vector3 Velocity;
     public float Gravity;
     public float Damage = 8f;
@@ -44,7 +44,7 @@ public partial class PlayerShot : Node3D
     /// <summary>A shot straight down the lane.</summary>
     public static PlayerShot Fire(PlayerFighter owner, Node3D model, Vector3 from, Vector3 dir, float speed)
     {
-        var s = new PlayerShot { Owner = owner, Velocity = dir.Normalized() * speed };
+        var s = new PlayerShot { Shooter = owner, Velocity = dir.Normalized() * speed };
         s.Begin(model, from);
         return s;
     }
@@ -52,7 +52,7 @@ public partial class PlayerShot : Node3D
     /// <summary>A shot lobbed to land on a spot after some seconds.</summary>
     public static PlayerShot Lob(PlayerFighter owner, Node3D model, Vector3 from, Vector3 to, float seconds, float gravity = 20f)
     {
-        var s = new PlayerShot { Owner = owner, Gravity = gravity, Range = 99f };
+        var s = new PlayerShot { Shooter = owner, Gravity = gravity, Range = 99f };
         Vector3 d = to - from;
         s.Velocity = new Vector3(d.X / seconds, (to.Y - from.Y + 0.5f * gravity * seconds * seconds) / seconds, d.Z / seconds);
         s.Begin(model, from);
@@ -63,7 +63,7 @@ public partial class PlayerShot : Node3D
     {
         _model = model;
         AddChild(model);
-        Owner.GetParent().AddChild(this);
+        Shooter.GetParent().AddChild(this);
         GlobalPosition = from;
     }
 
@@ -71,7 +71,7 @@ public partial class PlayerShot : Node3D
     {
         float dt = (float)delta;
         _age += dt;
-        if (!IsInstanceValid(Owner) || _age > 5f) { QueueFree(); return; }
+        if (!IsInstanceValid(Shooter) || _age > 5f) { QueueFree(); return; }
 
         Velocity += Vector3.Down * Gravity * dt;
         Vector3 step = Velocity * dt;
@@ -79,15 +79,15 @@ public partial class PlayerShot : Node3D
         _travelled += new Vector2(step.X, step.Z).Length();
         _model.RotateZ(SpinSpeed * dt * (Velocity.X >= 0f ? -1f : 1f));
 
-        foreach (Node n in GetTree().GetNodesInGroup(Fighter.Group))
+        foreach (Node n in Fighter.Live)
         {
-            if (n is not Fighter f || f.Hostile == Owner.Hostile || f.IsDead || _hit.Contains(f) || !f.CanBeHit()) continue;
+            if (n is not Fighter f || f.Hostile == Shooter.Hostile || f.IsDead || _hit.Contains(f) || !f.CanBeHit()) continue;
             Vector3 d = f.GlobalPosition + new Vector3(0f, f.BodyHeight * 0.5f, 0f) - GlobalPosition;
             if (Mathf.Abs(d.X) > HitRadius + f.BodyHalfWidth * 0.5f || Mathf.Abs(d.Z) > LaneBand || Mathf.Abs(d.Y) > f.BodyHeight * 0.6f + HitRadius) continue;
             if (Splat > 0f) { Land(); return; }            // a pie splats on whoever it meets first
             _hit.Add(f);
             Vector3 dir = new(Velocity.X >= 0f ? 1f : -1f, 0f, 0f);
-            Owner.StrikeFromProjectile(f, Damage, dir, Knockback, Launch);
+            Shooter.StrikeFromProjectile(f, Damage, dir, Knockback, Launch);
             if (Blind > 0f && !f.IsDead) f.Stagger(Blind);
             if (!Pierce) { End(); return; }
         }
@@ -116,13 +116,13 @@ public partial class PlayerShot : Node3D
         PopText.Spawn(GetParent(), at + new Vector3(0f, 1.2f, 0f), sound == "splat" ? "SPLAT!" : "POP!", tint, 0.8f, 0.5f);
         Sfx.Play(sound, pitch, -2f);
         CameraShake.Request(this, 0.05f, 0.18f);
-        foreach (Node n in GetTree().GetNodesInGroup(Fighter.Group))
+        foreach (Node n in Fighter.Live)
         {
-            if (n is not Fighter f || f.Hostile == Owner.Hostile || f.IsDead || !f.CanBeHit()) continue;
+            if (n is not Fighter f || f.Hostile == Shooter.Hostile || f.IsDead || !f.CanBeHit()) continue;
             Vector3 d = f.GlobalPosition - at;
             d.Y = 0f;
             if (d.Length() > radius) continue;
-            Owner.StrikeFromProjectile(f, damage, d.LengthSquared() > 0.01f ? d.Normalized() : Vector3.Right, Knockback, Launch);
+            Shooter.StrikeFromProjectile(f, damage, d.LengthSquared() > 0.01f ? d.Normalized() : Vector3.Right, Knockback, Launch);
             if (Blind > 0f && !f.IsDead) f.Stagger(Blind);
         }
     }

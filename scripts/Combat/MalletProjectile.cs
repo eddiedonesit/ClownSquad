@@ -154,7 +154,7 @@ public partial class MalletProjectile : Node3D
         ImpactEffect.Spawn(GetParent(), GlobalPosition, 1.8f);
         Sfx.Play("kaboom", 1.3f, -5f);
         CameraShake.Request(this, 0.1f, 0.22f);
-        foreach (Node node in GetTree().GetNodesInGroup(Fighter.Group))
+        foreach (Node node in Fighter.Live)
         {
             if (node is not Fighter f || f.Hostile == _owner.Hostile || !f.CanBeHit()) continue;
             Vector3 d = f.GlobalPosition - GlobalPosition;
@@ -166,7 +166,7 @@ public partial class MalletProjectile : Node3D
 
     private void HitAlongPath(HashSet<Fighter> already, float damage, Vector3 travel)
     {
-        foreach (Node node in GetTree().GetNodesInGroup(Fighter.Group))
+        foreach (Node node in Fighter.Live)
         {
             if (node is not Fighter f || f == _owner || f.Hostile == _owner.Hostile) continue;
             if (already.Contains(f) || !f.CanBeHit()) continue;

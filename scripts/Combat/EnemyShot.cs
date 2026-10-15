@@ -17,7 +17,7 @@ using ClownSquad.World;
 /// </summary>
 public partial class EnemyShot : Node3D
 {
-    public PlayerFighter Owner = null!;
+    public PlayerFighter Shooter = null!;
     public Vector3 Velocity;
     public float Gravity;
     public float Damage = 10f;
@@ -44,7 +44,7 @@ public partial class EnemyShot : Node3D
     /// <summary>Lob a shot from `from` so it lands at `to` after `seconds`.</summary>
     public static EnemyShot Lob(PlayerFighter owner, Node3D model, Vector3 from, Vector3 to, float seconds, float gravity = 18f, bool mark = true)
     {
-        var s = new EnemyShot { Owner = owner, Gravity = gravity };
+        var s = new EnemyShot { Shooter = owner, Gravity = gravity };
         Vector3 d = to - from;
         s.Velocity = new Vector3(d.X / seconds, (to.Y - from.Y + 0.5f * gravity * seconds * seconds) / seconds, d.Z / seconds);
         s.Launch0(owner, model, from);
@@ -55,7 +55,7 @@ public partial class EnemyShot : Node3D
     /// <summary>Fling a shot straight along a direction at a speed.</summary>
     public static EnemyShot Fling(PlayerFighter owner, Node3D model, Vector3 from, Vector3 dir, float speed)
     {
-        var s = new EnemyShot { Owner = owner, Velocity = dir.Normalized() * speed };
+        var s = new EnemyShot { Shooter = owner, Velocity = dir.Normalized() * speed };
         s.Launch0(owner, model, from);
         return s;
     }
@@ -78,7 +78,7 @@ public partial class EnemyShot : Node3D
     {
         float dt = (float)delta;
         _age += dt;
-        if (_age > Life || !IsInstanceValid(Owner)) { Gone(); return; }
+        if (_age > Life || !IsInstanceValid(Shooter)) { Gone(); return; }
 
         if (Homing > 0f && Nearest() is Fighter t)
         {
@@ -89,14 +89,14 @@ public partial class EnemyShot : Node3D
         GlobalPosition += Velocity * dt;
         _model.RotateZ(SpinSpeed * dt * (Velocity.X >= 0f ? -1f : 1f));
 
-        foreach (Node n in GetTree().GetNodesInGroup(Fighter.Group))
+        foreach (Node n in Fighter.Live)
         {
             if (n is not Fighter f || f.Hostile || f.IsDead || _hit.Contains(f) || !f.CanBeHit()) continue;
             Vector3 d = f.GlobalPosition + new Vector3(0f, f.BodyHeight * 0.5f, 0f) - GlobalPosition;
             if (Mathf.Abs(d.X) > HitRadius + f.BodyHalfWidth * 0.5f || Mathf.Abs(d.Z) > HitRadius || Mathf.Abs(d.Y) > f.BodyHeight * 0.6f + HitRadius) continue;
             _hit.Add(f);
             Vector3 dir = new(Mathf.Sign(Velocity.X == 0f ? 1f : Velocity.X), 0f, 0f);
-            f.TakeDamage(new DamageInfo(Damage * Owner.DamageMultiplier, dir, Knockback, 0.06f, Owner, Launch, 0.35f));
+            f.TakeDamage(new DamageInfo(Damage * Shooter.DamageMultiplier, dir, Knockback, 0.06f, Shooter, Launch, 0.35f));
             ImpactEffect.Spawn(GetParent(), GlobalPosition, 0.5f);
             if (!Pierce && BurstRadius <= 0f && Gravity <= 0f) { Gone(); return; }
         }
@@ -109,13 +109,13 @@ public partial class EnemyShot : Node3D
                 ImpactEffect.Spawn(GetParent(), at + new Vector3(0f, 0.2f, 0f), BurstRadius * 0.9f);
                 Sfx.Play("kaboom", 1.3f, -6f);
                 CameraShake.Request(this, 0.06f, 0.2f);
-                foreach (Node n in GetTree().GetNodesInGroup(Fighter.Group))
+                foreach (Node n in Fighter.Live)
                 {
                     if (n is not Fighter f || f.Hostile || f.IsDead || !f.CanBeHit()) continue;
                     Vector3 d = f.GlobalPosition - at;
                     d.Y = 0f;
                     if (d.Length() > BurstRadius) continue;
-                    f.TakeDamage(new DamageInfo(BurstDamage * Owner.DamageMultiplier, d.LengthSquared() > 0.01f ? d.Normalized() : Vector3.Right, 5f, 0.08f, Owner, 4f, 0.4f));
+                    f.TakeDamage(new DamageInfo(BurstDamage * Shooter.DamageMultiplier, d.LengthSquared() > 0.01f ? d.Normalized() : Vector3.Right, 5f, 0.08f, Shooter, 4f, 0.4f));
                 }
             }
             else
@@ -131,7 +131,7 @@ public partial class EnemyShot : Node3D
     {
         Fighter? best = null;
         float bd = float.MaxValue;
-        foreach (Node n in GetTree().GetNodesInGroup(Fighter.Group))
+        foreach (Node n in Fighter.Live)
         {
             if (n is not Fighter f || f.Hostile || f.IsDead) continue;
             float d = f.GlobalPosition.DistanceSquaredTo(GlobalPosition);

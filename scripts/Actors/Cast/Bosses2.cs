@@ -507,7 +507,7 @@ public partial class FireEaterBoss : BossFighter
             {
                 var shards = new List<Vector3>();
                 foreach (GlassField g in new List<GlassField>(GlassField.All))
-                    if (g.Owner == this && Flat(g.GlobalPosition - GlobalPosition).Length() < 3f) shards.AddRange(g.Take(GlobalPosition, 7 - shards.Count));
+                    if (g.Shooter == this && Flat(g.GlobalPosition - GlobalPosition).Length() < 3f) shards.AddRange(g.Take(GlobalPosition, 7 - shards.Count));
                 Vector3 aim = Target() is Fighter t ? Flat(t.GlobalPosition - GlobalPosition).Normalized() : Facing;
                 for (int i = 0; i < shards.Count; i++)
                 {
@@ -574,7 +574,7 @@ public partial class FireEaterBoss : BossFighter
     private bool GlassNearby()
     {
         foreach (GlassField g in GlassField.All)
-            if (g.Owner == this && g.Count > 0 && Flat(g.GlobalPosition - GlobalPosition).Length() < 3f) return true;
+            if (g.Shooter == this && g.Count > 0 && Flat(g.GlobalPosition - GlobalPosition).Length() < 3f) return true;
         return false;
     }
 

@@ -215,7 +215,7 @@ public partial class CastFighter : PlayerFighter
 
     protected IEnumerable<Fighter> Players()
     {
-        foreach (Node n in GetTree().GetNodesInGroup(Group))
+        foreach (Node n in Fighter.Live)
             if (n is Fighter f && !f.Hostile && !f.IsDead) yield return f;
     }
 

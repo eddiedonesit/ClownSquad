@@ -61,6 +61,7 @@ public partial class CameraShake : Node
 
     public override void _Process(double delta)
     {
+        if (_camera is null) return;      // not under a camera
         if (_punch > 0f)
         {
             _punch = Mathf.Max(0f, _punch - PunchDecay * (float)delta * Mathf.Max(_punch, 0.25f));
@@ -80,7 +81,7 @@ public partial class CameraShake : Node
         _remaining -= (float)delta;
         float falloff = Mathf.Max(_remaining, 0f) / _duration;
         float a = _amplitude * falloff * falloff;
-        _camera.Position = _rest + new Vector3(
+        _camera!.Position = _rest + new Vector3(
             _rng.RandfRange(-a, a), _rng.RandfRange(-a, a), _rng.RandfRange(-a, a));
     }
 }

@@ -993,7 +993,7 @@ public partial class PlayerFighter : Fighter
 
     private IEnumerable<Fighter> Opponents()
     {
-        foreach (Node node in GetTree().GetNodesInGroup(Group))
+        foreach (Node node in Fighter.Live)
         {
             if (node is Fighter other && other != this && other.Hostile != Hostile && other.CanBeHit())
                 yield return other;

@@ -419,7 +419,7 @@ public partial class InvisibleWall : Node3D
         _left -= (float)delta;
         _mat.AlbedoColor = new Color(0.85f, 0.95f, 1f, 0.05f + 0.04f * Mathf.Sin(_left * 9f));
         if (_left <= 0f) { QueueFree(); return; }
-        foreach (Node n in GetTree().GetNodesInGroup(Fighter.Group))
+        foreach (Node n in Fighter.Live)
         {
             if (n is not Fighter f || f.Hostile || f.IsDead) continue;
             float rel = f.GlobalPosition.X - _x;

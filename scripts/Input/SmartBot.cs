@@ -136,7 +136,7 @@ public sealed class SmartBot : IInputSource
             if (n is Hazard h && h.Covers(p)) { d += 1.5f; urgency = Mathf.Max(urgency, 0.5f); }
             if (n is GlassField g && g.Covers(p)) d += 1f;
         }
-        foreach (Node n in tree.GetNodesInGroup(Fighter.Group))
+        foreach (Node n in Fighter.Live)
             if (n is BossClown b && b.SlamComing && Flat(b.GlobalPosition - p).Length() < BossClown.SlamReach + 0.5f)
             {
                 d += 3f;
@@ -196,7 +196,7 @@ public sealed class SmartBot : IInputSource
     {
         Fighter? best = null;
         float bestScore = float.MaxValue;
-        foreach (Node n in tree.GetNodesInGroup(Fighter.Group))
+        foreach (Node n in Fighter.Live)
         {
             if (n is not Fighter f || !f.Hostile || f.IsDead || !f.CanBeHit()) continue;
             if (f.GlobalPosition.Y > 1.5f) continue;                        // up on a trapeze

@@ -203,7 +203,7 @@ public partial class BossClown : PlayerFighter, IBoss
     {
         Fighter? target = null;
         float best = float.MaxValue;
-        foreach (Node n in GetTree().GetNodesInGroup(Group))
+        foreach (Node n in Fighter.Live)
         {
             if (n is not Fighter f || f.Hostile || f.IsDead) continue;
             float d = f.GlobalPosition.DistanceTo(GlobalPosition);
@@ -408,7 +408,7 @@ public partial class BossClown : PlayerFighter, IBoss
         Vector3 best = new(f * reach, 0.95f, 0.14f);
         float bestDist = reach * 1.3f;
         float band = DepthBand * ReachScale;
-        foreach (Node n in GetTree().GetNodesInGroup(Group))
+        foreach (Node n in Fighter.Live)
         {
             if (n is not Fighter other || other.Hostile || other.IsDead) continue;
             Vector3 to = other.GlobalPosition - GlobalPosition;

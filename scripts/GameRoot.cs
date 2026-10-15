@@ -245,7 +245,7 @@ public partial class GameRoot : Node3D
             foreach (string s in args[snapsAt + 1].Split(','))
                 if (double.TryParse(s, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out double t))
                     GetTree().CreateTimer(t, true, false, true).Timeout += () =>
-                        GetViewport().GetTexture().GetImage().SavePng($"C:/Claude/ClownSquad/debug/snap_{s}.png");
+                        GetViewport().GetTexture().GetImage().SavePng($"{ClownSquad.Debug.DebugShots.Dir}snap_{s}.png");
     }
 
     /// <summary>
@@ -307,13 +307,13 @@ public partial class GameRoot : Node3D
         string id = _stage?.Id.Replace("*", "bonus") ?? "fight";
         GetTree().CreateTimer(1.6).Timeout += () =>
         {
-            GetViewport().GetTexture().GetImage().SavePng($"C:/Claude/ClownSquad/debug/stage_{id}.png");
+            GetViewport().GetTexture().GetImage().SavePng($"{ClownSquad.Debug.DebugShots.Dir}stage_{id}.png");
             _camX += 14f;                                  // further along the road
             if (_rig is not null) _rig.Position = new Vector3(_camX, 0f, 0f);
             _scenery?.Follow(_camX);
             GetTree().CreateTimer(0.5).Timeout += () =>
             {
-                GetViewport().GetTexture().GetImage().SavePng($"C:/Claude/ClownSquad/debug/stage_{id}_b.png");
+                GetViewport().GetTexture().GetImage().SavePng($"{ClownSquad.Debug.DebugShots.Dir}stage_{id}_b.png");
                 GetTree().Quit();
             };
         };
@@ -333,7 +333,7 @@ public partial class GameRoot : Node3D
             AddChild(new SkillMenu(Seats(), betweenStages: true));
             GetTree().CreateTimer(0.6, processAlways: true).Timeout += () =>
             {
-                GetViewport().GetTexture().GetImage().SavePng($"C:/Claude/ClownSquad/debug/skills_{r.Weapon.ToString().ToLowerInvariant()}.png");
+                GetViewport().GetTexture().GetImage().SavePng($"{ClownSquad.Debug.DebugShots.Dir}skills_{r.Weapon.ToString().ToLowerInvariant()}.png");
                 GetTree().Quit();
             };
         };
@@ -356,15 +356,15 @@ public partial class GameRoot : Node3D
         SceneTreeTimer first = GetTree().CreateTimer(3.0, processAlways: true);
         first.Timeout += () =>
         {
-            GetViewport().GetTexture().GetImage().SavePng("C:/Claude/ClownSquad/debug/hud_level.png");
+            GetViewport().GetTexture().GetImage().SavePng(ClownSquad.Debug.DebugShots.Dir + "hud_level.png");
             _tent!.Open();
             GetTree().CreateTimer(0.6, processAlways: true).Timeout += () =>
             {
-                GetViewport().GetTexture().GetImage().SavePng("C:/Claude/ClownSquad/debug/stat_tent.png");
+                GetViewport().GetTexture().GetImage().SavePng(ClownSquad.Debug.DebugShots.Dir + "stat_tent.png");
                 _tent.ShowPage(1);
                 GetTree().CreateTimer(0.4, processAlways: true).Timeout += () =>
                 {
-                    GetViewport().GetTexture().GetImage().SavePng("C:/Claude/ClownSquad/debug/gear_page.png");
+                    GetViewport().GetTexture().GetImage().SavePng(ClownSquad.Debug.DebugShots.Dir + "gear_page.png");
                     GetTree().Quit();
                 };
             };
@@ -755,7 +755,7 @@ public partial class GameRoot : Node3D
         GD.Print("The secret shop has appeared.");
         if (_outcomeProbe.Length > 0 && !DisplayServer.GetName().Contains("headless"))
             GetTree().CreateTimer(0.8).Timeout += () =>
-                GetViewport().GetTexture().GetImage().SavePng("C:/Claude/ClownSquad/debug/secret_shop.png");
+                GetViewport().GetTexture().GetImage().SavePng(ClownSquad.Debug.DebugShots.Dir + "secret_shop.png");
     }
 
     private void TickSecretCurtain()
@@ -1080,7 +1080,8 @@ public partial class GameRoot : Node3D
         if (!fresh) return;
         var items = new List<(PauseMenu.Choice, string)> { (PauseMenu.Choice.Resume, "RESUME"), (PauseMenu.Choice.Stats, "STAT TENT"), (PauseMenu.Choice.Inventory, "INVENTORY"), (PauseMenu.Choice.Skills, "SKILLS"), (PauseMenu.Choice.Settings, "SETTINGS") };
         if (_stage is not null) items.Add((PauseMenu.Choice.Retry, "RETRY STAGE"));
-        items.Add((PauseMenu.Choice.Map, "BACK TO THE MAP"));
+        // A boss rush is left for the title, never the map: the map would carry the rush on into the next stage.
+        items.Add((PauseMenu.Choice.Map, _rush ? "QUIT BOSS RUSH" : "BACK TO THE MAP"));
         _pause = new PauseMenu(items, devices, choice =>
         {
             _pause = null;
@@ -1098,7 +1099,10 @@ public partial class GameRoot : Node3D
                     AddChild(settings);
                     break;
                 case PauseMenu.Choice.Retry: Retry(); break;
-                case PauseMenu.Choice.Map: SaveSystem.Save(); GoToMap(); break;
+                case PauseMenu.Choice.Map:
+                    SaveSystem.Save();
+                    if (_rush) BossRush.Leave(GetTree()); else GoToMap();
+                    break;
             }
         });
         AddChild(_pause);
@@ -1172,7 +1176,7 @@ public partial class GameRoot : Node3D
         panel.PivotOffset = new Vector2(210, 80);
         CreateTween().TweenProperty(panel, "scale", Vector2.One, 0.3f).SetTrans(Tween.TransitionType.Back).SetEase(Tween.EaseType.Out);
         if (_outcomeProbe.Length > 0)
-            GetTree().CreateTimer(0.5).Timeout += () => GetViewport().GetTexture().GetImage().SavePng("C:/Claude/ClownSquad/debug/results.png");
+            GetTree().CreateTimer(0.5).Timeout += () => GetViewport().GetTexture().GetImage().SavePng(ClownSquad.Debug.DebugShots.Dir + "results.png");
     }
 
     // Combo counter: consecutive hits by players, reset after a short lull.
@@ -1334,13 +1338,13 @@ public partial class GameRoot : Node3D
         if (b.Hanging && !_hangShot && !DisplayServer.GetName().Contains("headless"))
         {
             _hangShot = true;
-            GetViewport().GetTexture().GetImage().SavePng("C:/Claude/ClownSquad/debug/flop_hang.png");
+            GetViewport().GetTexture().GetImage().SavePng(ClownSquad.Debug.DebugShots.Dir + "flop_hang.png");
         }
 
         if (b.DebugState.StartsWith("ATK") && !_punchShot && !DisplayServer.GetName().Contains("headless"))
         {
             _punchShot = true;
-            GetViewport().GetTexture().GetImage().SavePng("C:/Claude/ClownSquad/debug/boss_punch.png");
+            GetViewport().GetTexture().GetImage().SavePng(ClownSquad.Debug.DebugShots.Dir + "boss_punch.png");
         }
 
         if (++_aiProbeTick > 26)
@@ -1476,7 +1480,7 @@ public partial class GameRoot : Node3D
         // A few stills along the way, when there is a window to take them from.
         if (!DisplayServer.GetName().Contains("headless") && GameClock.Seconds > 4.0 + _shots * 5.0 && _shots < 6)
         {
-            GetViewport().GetTexture().GetImage().SavePng($"C:/Claude/ClownSquad/debug/wave_{_shots}.png");
+            GetViewport().GetTexture().GetImage().SavePng($"{ClownSquad.Debug.DebugShots.Dir}wave_{_shots}.png");
             _shots++;
         }
 
@@ -1492,7 +1496,7 @@ public partial class GameRoot : Node3D
         hurt.Sort((a, b) => b.Value.CompareTo(a.Value));
         GD.Print($"  damage taken by source: {string.Join(", ", hurt.ConvertAll(kv => $"{kv.Key} {kv.Value:F0}"))}");
         if (got == "timeout")
-            foreach (Node n in GetTree().GetNodesInGroup(Fighter.Group))
+            foreach (Node n in Fighter.Live)
                 if (n is Fighter f && f.Hostile)
                     GD.Print($"  still standing: {f.Name} '{f.DisplayName}' hp {f.Health:F0}/{f.MaxHealth:F0} at {f.GlobalPosition.X:F1},{f.GlobalPosition.Y:F1},{f.GlobalPosition.Z:F1}");
         var heard = new List<string>();

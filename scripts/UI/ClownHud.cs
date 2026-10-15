@@ -443,7 +443,7 @@ public partial class ClownHud : CanvasLayer
         }
 
         IBoss? boss = null;
-        foreach (Node n in GetTree().GetNodesInGroup(Fighter.Group))
+        foreach (Node n in Fighter.Live)
             if (n is IBoss { PrimaryBoss: true } b) { boss = b; break; }
         _bossRoot.Visible = boss is not null;
         if (boss is null) return;

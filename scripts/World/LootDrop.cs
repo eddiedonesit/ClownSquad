@@ -126,7 +126,7 @@ public partial class LootDrop : Node3D
         if (target is null)
         {
             float best = Magnet;
-            foreach (Node n in GetTree().GetNodesInGroup(Fighter.Group))
+            foreach (Node n in Fighter.Live)
             {
                 if (n is not PlayerFighter p || p.Hostile || p.IsDead || p.Record is null) continue;
                 float d = Flat(p.GlobalPosition - GlobalPosition).Length();
