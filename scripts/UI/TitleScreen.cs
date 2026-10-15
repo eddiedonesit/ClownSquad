@@ -71,25 +71,42 @@ public partial class TitleScreen : Node3D
         _pads.Add(new MapPad(LocalDeviceInput.Keyboard));
         foreach (int pad in Godot.Input.GetConnectedJoypads()) _pads.Add(new MapPad(pad));
         ShowMain();
-        Sfx.PlayMusic("music_title");
 
-        if (Array.IndexOf(args, "titleshot") >= 0)
-            GetTree().CreateTimer(2.0).Timeout += () =>
+        // The comic-book opening plays over the ring; the menu waits for it.
+        _ui.Visible = false;
+        _intro = new ComicIntro(() => _logo.GetGlobalRect());
+        _intro.LogoLanded += () => Sfx.PlayMusic("music_title");
+        _intro.Finished += () => { _ui.Visible = true; _intro = null; };
+        AddChild(_intro);
+
+        if (Array.IndexOf(args, "titleshot") >= 0) TitleShots();
+    }
+
+    private ComicIntro? _intro;
+
+    /// <summary>Screenshots of the intro and every title page, for checking the art (needs a window).</summary>
+    private void TitleShots()
+    {
+        if (DisplayServer.GetName() == "headless") { GetTree().CreateTimer(6.0).Timeout += () => GetTree().Quit(); return; }
+        void Shot(string name) => GetViewport().GetTexture().GetImage().SavePng($"C:/Claude/ClownSquad/debug/{name}.png");
+        GetTree().CreateTimer(1.75).Timeout += () => Shot("intro_panels");
+        GetTree().CreateTimer(2.75).Timeout += () => Shot("intro_logo");
+        GetTree().CreateTimer(6.2).Timeout += () =>
+        {
+            Shot("title");
+            _newGame = false;
+            ShowSlots();
+            GetTree().CreateTimer(0.6).Timeout += () =>
             {
-                GetViewport().GetTexture().GetImage().SavePng("C:/Claude/ClownSquad/debug/title.png");
-                _newGame = false;
-                ShowSlots();
-                GetTree().CreateTimer(0.6).Timeout += () =>
+                Shot("load_slots");
+                EnterSquad();
+                GetTree().CreateTimer(1.0).Timeout += () =>
                 {
-                    GetViewport().GetTexture().GetImage().SavePng("C:/Claude/ClownSquad/debug/load_slots.png");
-                    EnterSquad();
-                    GetTree().CreateTimer(1.0).Timeout += () =>
-                    {
-                        GetViewport().GetTexture().GetImage().SavePng("C:/Claude/ClownSquad/debug/squad_select.png");
-                        GetTree().Quit();
-                    };
+                    Shot("squad_select");
+                    GetTree().Quit();
                 };
             };
+        };
     }
 
     private void Go(string scene) => GetTree().ChangeSceneToFile(scene);
@@ -404,7 +421,7 @@ public partial class TitleScreen : Node3D
         _logo.Rotation = Mathf.Sin((float)_clock * 1.6f) * 0.025f;
         _logo.Scale = Vector2.One * (1f + 0.025f * Mathf.Sin((float)_clock * 3.1f));
         foreach (DirectionalSprite s in _standees) s.Tick((float)delta);
-        if (_starting) return;
+        if (_starting || _intro is not null) return;
         _menuBacking.Visible = _mode != Mode.Squad;
 
         if (_mode == Mode.Squad) { TickSquad(); return; }
