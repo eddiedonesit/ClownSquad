@@ -97,7 +97,7 @@ public partial class GameRoot
         var items = new List<(PauseMenu.Choice, string)> { (PauseMenu.Choice.Resume, "RESUME"), (PauseMenu.Choice.Stats, "STAT TENT"), (PauseMenu.Choice.Inventory, "INVENTORY"), (PauseMenu.Choice.Skills, "SKILLS"), (PauseMenu.Choice.Settings, "SETTINGS") };
         if (_stage is not null) items.Add((PauseMenu.Choice.Retry, "RETRY STAGE"));
         // A boss rush is left for the title, never the map: the map would carry the rush on into the next stage.
-        items.Add((PauseMenu.Choice.Map, _rush ? "QUIT BOSS RUSH" : "BACK TO THE MAP"));
+        items.Add((PauseMenu.Choice.Map, _rush ? "QUIT BOSS RUSH" : _practice ? "LEAVE PRACTICE" : "BACK TO THE MAP"));
         _pause = new PauseMenu(items, devices, choice =>
         {
             _pause = null;
@@ -107,7 +107,8 @@ public partial class GameRoot
                 case PauseMenu.Choice.Stats: _tent?.Open(); break;
                 case PauseMenu.Choice.Inventory: AddChild(new InventoryMenu(Seats())); break;
                 // Mid-stage: skills can be learned, but the weapon stays in hand until the stage is over.
-                case PauseMenu.Choice.Skills: AddChild(new SkillMenu(Seats(), betweenStages: false)); break;
+                // In the practice ring anything goes: weapons swap there too.
+                case PauseMenu.Choice.Skills: AddChild(new SkillMenu(Seats(), betweenStages: _practice)); break;
                 case PauseMenu.Choice.Settings:
                     GetTree().Paused = true;
                     var settings = new SettingsMenu(devices);
@@ -117,7 +118,9 @@ public partial class GameRoot
                 case PauseMenu.Choice.Retry: Retry(); break;
                 case PauseMenu.Choice.Map:
                     SaveSystem.Save();
-                    if (_rush) BossRush.Leave(GetTree()); else GoToMap();
+                    if (_rush) BossRush.Leave(GetTree());
+                    else if (_practice) { Session.BeginCampaign(); GetTree().ChangeSceneToFile(Campaign.TitleScene); }
+                    else GoToMap();
                     break;
             }
         });

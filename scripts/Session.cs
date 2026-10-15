@@ -38,8 +38,12 @@ public static class Session
     /// <summary>The campaign on the active slot. The title screen and the map begin this.</summary>
     public static void BeginCampaign()
     {
+        bool fromElsewhere = Mode != PlayMode.Campaign;
         Reset(PlayMode.Campaign);
         SaveSystem.UseActiveSlot();
+        // Coming back from practice, a rush or a test, what is in memory is that
+        // mode's copy: read the slot again so it can never be saved over it.
+        if (fromElsewhere) SaveSystem.Load();
     }
 
     /// <summary>A fresh boss rush: its own save, wiped each run.</summary>

@@ -58,7 +58,7 @@ public partial class TitleScreen : Node3D
     {
         // Tests and debug runs go straight where they are going.
         string[] args = OS.IsDebugBuild() ? OS.GetCmdlineUserArgs() : Array.Empty<string>();
-        foreach (string f in new[] { "wavetest", "losetest", "movetest", "animtest", "aitest", "sandbox", "fight", "stage", "tentshot", "stageshot", "castshot", "weapontest", "bindtest", "skillshot", "demo", "bossrush" })
+        foreach (string f in new[] { "wavetest", "losetest", "movetest", "animtest", "aitest", "sandbox", "fight", "stage", "tentshot", "stageshot", "castshot", "weapontest", "bindtest", "skillshot", "practice", "practicetest", "demo", "bossrush" })
             if (Array.IndexOf(args, f) >= 0) { CallDeferred(MethodName.Go, Campaign.FightScene); return; }
         if (Array.IndexOf(args, "mapshot") >= 0) { CallDeferred(MethodName.Go, Campaign.MapScene); return; }
 
@@ -283,6 +283,14 @@ public partial class TitleScreen : Node3D
         _main.Add(("NEW GAME", () => { _newGame = true; ShowSlots(); }));
         if (recent > 0) _main.Add(("LOAD GAME", () => { _newGame = false; ShowSlots(); }));
         _main.Add(("BOSS RUSH", () => { _starting = true; Sfx.Play("drumroll"); BossRush.Start(GetTree()); }));
+        // Practice with the clowns of the last save played (a copy: nothing is kept).
+        _main.Add(("PRACTICE RING", () =>
+        {
+            _starting = true;
+            if (recent > 0) SaveSystem.ActiveSlot = recent;
+            Session.BeginPractice();
+            GetTree().ChangeSceneToFile(Campaign.FightScene);
+        }));
         _main.Add(("BESTIARY", OpenBestiary));
         _main.Add(("SETTINGS", OpenSettings));
         _main.Add(("QUIT", () => GetTree().Quit()));

@@ -143,6 +143,44 @@ public partial class GameRoot
     }
 
 
+    /// <summary>
+    /// "-- practicetest": the practice ring's controls, driven directly: change
+    /// weapon both ways, the full tree on and off, grunts called and capped,
+    /// the HUD panel keeping its place. Quits with a pass or fail line.
+    /// </summary>
+    private void StartPracticeProbe()
+    {
+        int fails = 0;
+        void Check(string what, bool ok, string detail) { if (!ok) fails++; GD.Print($"  [{(ok ? "PASS" : "FAIL")}] {what}: {detail}"); }
+        GD.Print("=== PRACTICE PROBE ===");
+        GetTree().CreateTimer(1.0).Timeout += () =>
+        {
+            PlayerFighter p = _players[0];
+            CharacterRecord rec = p.Record!;
+            Check("starts with the save's weapon", p.Weapon == rec.Weapon, $"{p.Weapon}");
+            SwapWeapon(p, rec, 1);
+            PlayerFighter q = _players[0];
+            Check("next weapon", q != p && q.Weapon == WeaponKind.Hammer && _players.Count == 1, $"{q.Weapon}, {_players.Count} player(s)");
+            SwapWeapon(q, q.Record!, -2);
+            PlayerFighter r = _players[0];
+            Check("previous wraps round", r.Weapon == WeaponKind.BalloonSword, $"{r.Weapon}");
+            ToggleTree(r, r.Record!);
+            Check("all skills on", Weapons.Learned(r.Record!, r.Weapon).Count == 9, $"{Weapons.Learned(r.Record!, r.Weapon).Count}/9");
+            ToggleTree(r, r.Record!);
+            Check("all skills off", Weapons.Learned(r.Record!, r.Weapon).Count == 0, $"{Weapons.Learned(r.Record!, r.Weapon).Count}/9");
+            CallGrunts(); CallGrunts(); CallGrunts();
+            Check("grunts capped", _practiceGrunts.Count == MaxPracticeGrunts, $"{_practiceGrunts.Count}");
+            GetTree().CreateTimer(1.5).Timeout += () =>
+            {
+                Check("new fighter is live", IsInstanceValid(r) && r.IsInsideTree() && !r.IsDead, $"hp {r.Health:F0}");
+                Check("old fighters gone", !IsInstanceValid(p) && !IsInstanceValid(q), "freed");
+                Check("practice save, not a slot", SaveSystem.Path == Session.TestSave, SaveSystem.Path);
+                GD.Print(fails == 0 ? "=== PRACTICE PROBE: ALL PASS ===" : $"=== PRACTICE PROBE: {fails} FAILURE(S) ===");
+                GetTree().Quit(fails == 0 ? 0 : 1);
+            };
+        };
+    }
+
     // -------------------------------------------------------------- probes
 
     private float _aiProbeTime;

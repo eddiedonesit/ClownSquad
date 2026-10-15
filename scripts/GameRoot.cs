@@ -109,16 +109,17 @@ public partial class GameRoot : Node3D
         ClownSquad.Visuals.ArtStyle.Classic = Has("classic");
 
         // Tests run against a throwaway save, so they never read or touch a real one.
-        bool probe = Has("animtest") || Has("movetest") || Has("aitest") || Has("wavetest") || Has("losetest") || Has("tentshot") || Has("skillshot") || Has("weapontest") || Has("bindtest") || Has("castshot") || Has("demo");
+        bool probe = Has("animtest") || Has("movetest") || Has("aitest") || Has("wavetest") || Has("losetest") || Has("tentshot") || Has("skillshot") || Has("weapontest") || Has("bindtest") || Has("practicetest") || Has("castshot") || Has("demo");
         // Which kind of play this is, and so which save it uses (Session). The
         // stage chosen on the map is read before a Begin clears it.
         StageDef? picked = Campaign.Pending;
         if (probe) Session.BeginTest();
         else if (Has("bossrush") || Session.Mode == PlayMode.BossRush) Session.BeginBossRush();   // fresh every run, retries too
+        else if (Has("practice")) Session.BeginPractice();
         else if (Session.Mode == PlayMode.Campaign) { SaveSystem.UseActiveSlot(); SaveSystem.Load(); }
         // A probe of the boss rush ("-- wavetest bossrush") runs the rush on the test save.
         _rush = Session.Mode == PlayMode.BossRush || (probe && Has("bossrush"));
-        _practice = Session.Mode == PlayMode.Practice;
+        _practice = Session.Mode == PlayMode.Practice || Has("practicetest");
 
         // A stage chosen on the world map, or named on the command line
         // ("-- stage 2-3"). With neither, and no test or sandbox asked for, the
@@ -169,13 +170,29 @@ public partial class GameRoot : Node3D
         SpawnPlayers();
         if (_rush) foreach (PlayerFighter rp in _players) ApplyLevel(rp, BossRush.Level);
         BuildHud();
-        ClownSquad.Audio.Sfx.PlayMusic(_stage switch
+
+        // "-- snaps 4,8.5,12": screenshots at those seconds into the fight (needs a window).
+        int snapsAt = Array.IndexOf(args, "snaps");
+        if (snapsAt >= 0 && snapsAt + 1 < args.Length && DisplayServer.GetName() != "headless")
+            foreach (string s in args[snapsAt + 1].Split(','))
+                if (double.TryParse(s, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out double t))
+                    GetTree().CreateTimer(t, true, false, true).Timeout += () =>
+                        GetViewport().GetTexture().GetImage().SavePng($"{ClownSquad.Debug.DebugShots.Dir}snap_{s}.png");
+
+        ClownSquad.Audio.Sfx.PlayMusic(_practice ? "music_bonus" : _stage switch
         {
             StageDef { Kind: StageKind.Boss } => "music_boss",
             StageDef { Kind: StageKind.Bonus } => "music_bonus",
             StageDef song => $"music_world{song.World}",
             _ => "music_world1",
         });
+
+        if (_practice)
+        {
+            SetUpPractice();
+            if (Has("practicetest")) StartPracticeProbe();
+            return;
+        }
 
         if (Has("sandbox") || _aiProbe)
         {
@@ -231,14 +248,6 @@ public partial class GameRoot : Node3D
         if (Has("skillshot")) StartSkillShot();
         if (Has("stageshot")) StartStageShot();
         if (Has("demo")) StartDemo();
-
-        // "-- snaps 4,8.5,12": screenshots at those seconds into the fight (needs a window).
-        int snapsAt = Array.IndexOf(args, "snaps");
-        if (snapsAt >= 0 && snapsAt + 1 < args.Length && DisplayServer.GetName() != "headless")
-            foreach (string s in args[snapsAt + 1].Split(','))
-                if (double.TryParse(s, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out double t))
-                    GetTree().CreateTimer(t, true, false, true).Timeout += () =>
-                        GetViewport().GetTexture().GetImage().SavePng($"{ClownSquad.Debug.DebugShots.Dir}snap_{s}.png");
     }
 
     /// <summary>
@@ -312,6 +321,7 @@ public partial class GameRoot : Node3D
         // Leaving the scene (quit, or replaying the stage) always saves.
         SaveSystem.Save();
         Fighter.HitLanded -= OnHitLanded;
+        Fighter.HitLanded -= OnPracticeHit;
         Arena.Current = null;
     }
 
@@ -358,6 +368,7 @@ public partial class GameRoot : Node3D
         PollStatTent();
         PollForRestart();
         UpdateHud();
+        if (_practice) TickPractice();
     }
 
 }
