@@ -55,28 +55,7 @@ public partial class ClownHud : CanvasLayer
 
     private Control _bossRoot = null!;
     private TextureRect _bossFace = null!;
-    private static readonly Dictionary<string, Rect2> FaceCache = new();
-
-    /// <summary>
-    /// The head in a cast sheet's first frame: the top of the drawn figure,
-    /// found from the pixels once and remembered, so any new character gets a
-    /// portrait without anyone measuring it.
-    /// </summary>
-    private static Rect2 FaceOf(string sheet)
-    {
-        if (FaceCache.TryGetValue(sheet, out Rect2 r)) return r;
-        Image img = GD.Load<Texture2D>(sheet).GetImage();
-        if (img.IsCompressed()) img.Decompress();
-        FrameLibrary.SheetInfo info = FrameLibrary.Info(sheet);
-        int x0 = info.FrameWidth, x1 = 0, y0 = info.FrameHeight, y1 = 0;
-        for (int y = 0; y < info.FrameHeight; y += 2)
-            for (int x = 0; x < info.FrameWidth; x += 2)
-                if (img.GetPixel(x, y).A > 0.5f) { x0 = Math.Min(x0, x); x1 = Math.Max(x1, x); y0 = Math.Min(y0, y); y1 = Math.Max(y1, y); }
-        float side = Math.Min(x1 - x0, (y1 - y0) * 0.45f);
-        r = new Rect2((x0 + x1) * 0.5f - side * 0.5f, y0, side, side);
-        FaceCache[sheet] = r;
-        return r;
-    }
+    private static Rect2 FaceOf(string sheet) => Portraits.FaceOf(sheet);
     private CandyBar _bossBar = null!;
     private Label _bossName = null!;
 

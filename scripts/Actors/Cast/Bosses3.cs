@@ -18,6 +18,7 @@ public partial class TotStackBoss : BossFighter
     protected override string Cast => "tot";
     private float Step => 0.7f * Big;
     protected override string Tagline => "FIVE TIMES THE TROUBLE";
+    protected override string[] Signature => new[] { "giggle", "slide_up" };
     public override float BodyHeight => 0.3f + Mathf.Max(1, _count) * Step;
     public override float BodyHalfWidth => 0.5f;
     protected override bool HasPoise => InSpecial && !_lying;
@@ -75,7 +76,7 @@ public partial class TotStackBoss : BossFighter
         {
             _laneDir = Facing;
             Track(Telegraph.Lane(Stage, GlobalPosition, _laneDir, _count * Step + 0.9f, 1.2f, 0.8f));
-            Sfx.Play("slide_down", 1.2f);
+            Sfx.Play("giggle", 0.9f);
         }, dt =>
         {
             Stop(dt);
@@ -239,6 +240,7 @@ public partial class StrongmanBoss : BossFighter
     protected override float SwingTimeScale => 1.3f;
     public override string AttackSound => "bonk";
     protected override string Tagline => "STRONGEST MAN IN THE WORLD (HE SAYS)";
+    protected override string[] Signature => new[] { "clang" };
     private Fighter? _held;
     private bool _flex;
     private readonly HashSet<Fighter> _waved = new();
@@ -267,6 +269,7 @@ public partial class StrongmanBoss : BossFighter
                 ImpactEffect.Spawn(Stage, at + new Vector3(0f, 0.1f, 0f), 2.2f);
                 CameraShake.Request(this, 0.2f, 0.35f);
                 Sfx.Play("kaboom", 0.6f);
+                Sfx.Play("clang");
             }
             if (MoveTime > 0.9f && MoveTime < 1.4f)
             {
@@ -375,6 +378,7 @@ public partial class RingmasterBoss : BossFighter
     public override float BodyHalfWidth => (_mounted ? 1.4f : 0.55f) * Big;
     protected override float ReachScale => 1.3f * Big;
     protected override string Tagline => "LADIES AND GENTLEMEN... THE GRAND FINALE!";
+    protected override string[] Signature => new[] { "ringmaster_fanfare", "whip_crack" };
     private const string CarriageSheet = Folder + "carriage.png";
 
     private bool _mounted = true;
@@ -433,7 +437,7 @@ public partial class RingmasterBoss : BossFighter
             PinClipFrame("attack", MoveTime < 0.25f ? 0 : MoveTime < 0.5f ? 1 : 2);
             if (MoveTime >= 0.5f && MoveTime - dt < 0.5f)
             {
-                Sfx.Play("crit", 1.4f);
+                Sfx.Play("whip_crack", 0.95f);
                 HitPlayers(f => Telegraph.InLane(f.GlobalPosition, GlobalPosition, Facing, 5.5f, 0.9f), 16f, 6f, 0f, 0.6f, 0.1f, Facing);
             }
             if (PhaseNumber == 3 && MoveTime > 0.85f && MoveTime - dt <= 0.85f)

@@ -401,6 +401,192 @@ def crowd_cheer(sec=2.6, seed=5):
 
 write("crowd_cheer", crowd_cheer())
 
+
+# ------------------------------------------------- the crowd, reacting
+# A crowd is many voices on one vowel: each a sawtooth through two vowel
+# formants, its own pitch and timing, all following the same contour.
+
+VOWELS = {"oo": (350, 800), "ah": (750, 1200), "uh": (600, 1000), "ha": (800, 1300), "ee": (300, 2300)}
+
+
+def crowd_vowel(sec, vowel, contour, n=14, lo=140, hi=330, seed=1, breath=0.25):
+    rnd = random.Random(seed)
+    f1, f2 = VOWELS[vowel]
+    out = silence(sec + 0.3)
+    for _ in range(n):
+        f0 = rnd.uniform(lo, hi)
+        d = sec * rnd.uniform(0.75, 1.0)
+        start = rnd.uniform(0.0, sec - d + 0.05)
+        v = osc(lambda t, f0=f0, d=d: f0 * contour(min(1.0, t / d)), d, saw(14), rnd.uniform(4.5, 6.5), 0.012)
+        v = add((filt(v, "bp", f1 * rnd.uniform(0.9, 1.1), 2.2), 1.0), (filt(v, "bp", f2 * rnd.uniform(0.9, 1.1), 3.0), 0.5))
+        place(out, shape(v, lambda t, d=d: math.sin(math.pi * min(1.0, t / d)) ** 0.7), start, 0.1)
+    air = shape(filt(noise(sec), "bp", 1400, 0.7), lambda t: math.sin(math.pi * min(1.0, t / sec)))
+    place(out, air, 0, breath)
+    return out
+
+
+# "Ooooooh": impressed, rising then settling. For a boss's entrance.
+write("crowd_ooh", crowd_vowel(1.8, "oo", lambda u: 1.0 + 0.35 * math.sin(math.pi * u) - 0.1 * u, n=18, seed=11))
+# A sharp gasp: everyone at once, up and cut off.
+gasp = crowd_vowel(0.55, "ah", lambda u: 1.0 + 0.5 * u, n=16, lo=180, hi=420, seed=12, breath=0.6)
+write("crowd_gasp", gasp)
+# Booing: low, falling, a little ragged.
+write("crowd_boo", crowd_vowel(1.6, "oo", lambda u: 1.0 - 0.25 * u + 0.04 * math.sin(30 * u), n=16, lo=95, hi=190, seed=13))
+
+
+def crowd_laugh(sec=1.6, seed=14):
+    """Laughter: overlapping 'ha-ha-ha' runs, each falling in pitch."""
+    rnd = random.Random(seed)
+    out = silence(sec + 0.2)
+    for _ in range(12):
+        at = rnd.uniform(0, 0.4)
+        f0 = rnd.uniform(160, 380)
+        for k in range(rnd.randint(3, 6)):
+            d = 0.11
+            v = osc(lambda t, f=f0 * (1 - 0.05 * k): f, d, saw(12))
+            v = filt(v, "bp", 850, 2.0)
+            place(out, shape(v, lambda t: math.sin(math.pi * min(1.0, t / d))), at + k * 0.17, 0.09)
+    return out
+
+
+write("crowd_laugh", crowd_laugh())
+
+
+def drumroll(sec=1.4):
+    """A snare roll swelling to a cymbal crash: the introduction."""
+    out = silence(sec + 0.9)
+    t = 0.0
+    while t < sec:
+        u = t / sec
+        hit = shape(filt(noise(0.05), "bp", 2400, 1.2), lambda x: math.exp(-x / 0.02))
+        body = shape(osc(lambda x: 190, 0.04), lambda x: math.exp(-x / 0.015))
+        place(out, add((hit, 0.8), (body, 0.4)), t, 0.25 + 0.6 * u)
+        t += 0.032
+    place(out, cymbal(0.9), sec, 0.9)
+    place(out, shape(osc(lambda x: 55 + 40 * math.exp(-x / 0.04), 0.4), lambda x: math.exp(-x / 0.15)), sec, 0.9)
+    return out
+
+
+write("drumroll", drumroll())
+
+# ------------------------------------------------- boss signature sounds
+
+# Bertie: two deep belly drums and a low honk.
+belly = silence(1.0)
+for i in range(2):
+    place(belly, shape(osc(lambda t: 48 + 70 * math.exp(-t / 0.05), 0.4, ((1, 1.0), (2, 0.4))), lambda t: math.exp(-t / 0.14)), i * 0.22, 1.0)
+place(belly, honk(150, 0.45), 0.5, 0.6)
+write("belly_drum", belly)
+
+# Bobo: a big rubber ball bouncing to rest.
+ball = silence(1.4)
+gap, at = 0.32, 0.0
+for i in range(5):
+    place(ball, boing(200 + i * 25, 0.28), at, 0.9 - i * 0.14)
+    place(ball, shape(filt(noise(0.03), "lp", 500), lambda t: math.exp(-t / 0.01)), at, 0.6)
+    at += gap
+    gap *= 0.7
+write("ball_bounce", ball)
+
+# The whip: a fast swish and a supersonic crack.
+whip = silence(0.5)
+place(whip, whoosh(600, 3800, 0.14), 0, 0.6)
+place(whip, shape(filt(noise(0.05), "hp", 2500), lambda t: math.exp(-t / 0.004)), 0.14, 1.4)
+place(whip, shape(osc(lambda t: 2400, 0.03), lambda t: math.exp(-t / 0.006)), 0.14, 0.4)
+write("whip_crack", whip)
+
+
+def roar(sec=1.3, base=95):
+    """A big cat's roar: a growling low tone with rough breath, swelling and fading."""
+    growl = osc(lambda t: base * (1 + 0.25 * math.sin(math.pi * min(1.0, t / sec))), sec, saw(40), 23, 0.05)
+    rough = filt(noise(sec), "lp", 1400)
+    body = [g * (0.6 + 0.8 * abs(r)) for g, r in zip(growl, rough)]
+    body = add((filt(body, "bp", 500, 0.9), 1.0), (filt(body, "bp", 1100, 1.5), 0.6), (filt(noise(sec), "bp", 900, 0.6), 0.3))
+    return shape(body, lambda t: min(1.0, t / 0.12) * math.sin(math.pi * min(1.0, t / sec)) ** 0.5)
+
+
+write("tiger_roar", roar())
+
+# The Jalopy: an "ah-OOGA" horn and a puttering engine.
+ooga = silence(0.9)
+horn = osc(lambda t: 160 + 220 * min(1.0, t / 0.35) ** 0.5, 0.7, saw(30), 7, 0.02)
+horn = add((filt(horn, "bp", 900, 1.5), 1.0), (filt(horn, "bp", 2200, 2.5), 0.4))
+place(ooga, shape(horn, lambda t: min(1.0, t / 0.02) * (1.0 if t < 0.6 else max(0.0, (0.7 - t) / 0.1))), 0, 1.0)
+write("car_horn", ooga)
+eng = silence(1.2)
+for i in range(16):
+    pop_ = shape(add((filt(noise(0.05), "lp", 700), 1.0), (osc(lambda t: 60, 0.05), 0.8)), lambda t: math.exp(-t / 0.018))
+    place(eng, pop_, i * 0.07 + (0.015 if i % 3 == 0 else 0), 0.7 + 0.3 * (i % 2))
+write("engine", eng)
+
+# Stretch: a rubber band drawn out and let go.
+twang = silence(0.9)
+place(twang, shape(osc(lambda t: 160 + 520 * min(1.0, t / 0.45), 0.45, ((1, 1.0), (2, 0.5), (3, 0.2))), lambda t: 0.5 * min(1.0, t / 0.05)), 0, 0.7)
+place(twang, boing(330, 0.45), 0.45, 0.9)
+write("twang", twang)
+
+# The Fratelli: "ta-DA!" on the brass, arms up.
+tada = silence(1.2)
+place(tada, organ("G4", 0.14), 0, 0.9)
+place(tada, organ("C5", 0.7), 0.16, 1.0)
+place(tada, organ("E5", 0.7, 0.6), 0.16, 1.0)
+place(tada, organ("G5", 0.7, 0.5), 0.16, 1.0)
+place(tada, cymbal(0.8), 0.16, 0.4)
+write("tada", tada)
+
+# Pyro Pete: a roaring jet of flame.
+flame = shape(add((filt(noise(1.2), "lp", lambda t: 400 + 1800 * min(1.0, t / 0.3)), 1.0), (filt(noise(1.2), "bp", 180, 0.8), 0.6)),
+              lambda t: min(1.0, t / 0.15) * (1.0 if t < 0.8 else max(0.0, (1.2 - t) / 0.4)))
+write("fire_roar", flame)
+
+
+def glass_smash(seed=21):
+    """A bottle shattering: a sharp crack and a shower of ringing shards."""
+    rnd = random.Random(seed)
+    out = silence(1.0)
+    place(out, shape(filt(noise(0.06), "hp", 3000), lambda t: math.exp(-t / 0.01)), 0, 1.2)
+    for _ in range(22):
+        f0 = rnd.uniform(2600, 7500)
+        tink = shape(osc(lambda t, f0=f0: f0, 0.2), lambda t: math.exp(-t / rnd.uniform(0.02, 0.06)))
+        place(out, tink, rnd.uniform(0.0, 0.45) ** 1.5, rnd.uniform(0.1, 0.3))
+    return out
+
+
+write("glass_smash", glass_smash())
+
+# The Totem Tots: five little giggles tumbling over each other.
+gig = silence(1.2)
+rg = random.Random(31)
+for k in range(5):
+    f0 = rg.uniform(520, 760)
+    for j in range(4):
+        v = osc(lambda t, f=f0 * (1 + 0.06 * j): f, 0.07, saw(10))
+        v = filt(v, "bp", 1500, 2.0)
+        place(gig, shape(v, lambda t: math.sin(math.pi * min(1.0, t / 0.07))), k * 0.13 + j * 0.09, 0.14)
+write("giggle", gig)
+
+# Iron Ivan: an effortful "HUP!" and a barbell's iron clang.
+clang = silence(1.6)
+heave = osc(lambda t: 110 * (1 + 0.2 * min(1.0, t / 0.2)), 0.3, saw(30))
+heave = add((filt(heave, "bp", 600, 1.8), 1.0), (filt(heave, "bp", 1000, 2.5), 0.5))
+place(clang, shape(heave, lambda t: math.sin(math.pi * min(1.0, t / 0.3))), 0, 0.8)
+for ratio, amp in ((1.0, 1.0), (2.41, 0.5), (3.9, 0.3), (5.2, 0.2)):
+    place(clang, shape(osc(lambda t, r=ratio: 260 * r, 1.2), lambda t: math.exp(-t / 0.4)), 0.32, amp * 0.5)
+place(clang, shape(filt(noise(0.05), "hp", 1500), lambda t: math.exp(-t / 0.01)), 0.32, 0.8)
+write("clang", clang)
+
+# The Ringmaster: a full calliope fanfare over a drum roll.
+rm = silence(3.2)
+place(rm, drumroll(1.2), 0, 0.7)
+tune = (("C5", 0.16), ("C5", 0.16), ("C5", 0.16), ("G5", 0.5), ("E5", 0.16), ("G5", 0.16), ("C6", 0.9))
+at = 1.2
+for n, d in tune:
+    place(rm, organ(n, d), at)
+    place(rm, organ(hz(n) / 2, d, 0.5), at)
+    at += d
+place(rm, cymbal(1.0), 1.2 + 1.3, 0.5)
+write("ringmaster_fanfare", rm)
+
 # --------------------------------------------------------------- music
 
 def march():

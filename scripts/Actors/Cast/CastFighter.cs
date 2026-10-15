@@ -437,8 +437,29 @@ public partial class BossFighter : CastFighter, IBoss
     /// <summary>The boss's world, for its level of aggression. Set by the spawner.</summary>
     public int World { get; set; } = 1;
 
+    /// <summary>The sounds that announce this boss: played as it is revealed.</summary>
+    protected virtual string[] Signature => new[] { "fanfare" };
+
+    /// <summary>Seconds left of the entrance, while the boss stands for its introduction.</summary>
+    private float _presenting = UI.BossIntro.Seconds;
+    protected bool Presenting => _presenting > 0f;
+
+    public override bool CanBeHit() => !Presenting && base.CanBeHit();
+
+    protected override void Tick(float dt)
+    {
+        if (Presenting)
+        {
+            Stop(dt);
+            PlayClip("idle");
+            return;
+        }
+        base.Tick(dt);
+    }
+
     protected virtual void OnPhase(int phase)
     {
+        Sfx.Play("crowd_gasp");
         Sfx.Play("honk_low", 0.7f, 2f);
         PopText.Spawn(Stage, GlobalPosition + new Vector3(0f, BodyHeight + 0.4f, 0f), phase == 3 ? "FURIOUS!" : "ANGRY!", new Color(1f, 0.4f, 0.3f), 1.1f, 0.9f);
         CameraShake.Request(this, 0.1f, 0.3f);
@@ -447,6 +468,7 @@ public partial class BossFighter : CastFighter, IBoss
     protected override void TickAlways(float dt)
     {
         base.TickAlways(dt);
+        if (_presenting > 0f) _presenting -= dt;
         Liven(dt);
         if (!IsDead && PhaseNumber > _shownPhase)
         {
@@ -461,7 +483,11 @@ public partial class BossFighter : CastFighter, IBoss
         CallDeferred(MethodName.Announce);
     }
 
-    private void Announce() => ClownSquad.UI.BossCard.Show(this, BossTitle, Tagline);
+    private void Announce()
+    {
+        // Acts of two are introduced once, by their lead.
+        if (PrimaryBoss) ClownSquad.UI.BossIntro.Play(this, BossTitle, Tagline, Signature, drumroll: Signature[0] != "ringmaster_fanfare");
+    }
 
     /// <summary>The line under the boss's name on the title card.</summary>
     protected virtual string Tagline => "";

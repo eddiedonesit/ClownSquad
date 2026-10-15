@@ -158,4 +158,8 @@ public sealed class CampaignState
     public string At { get; set; } = "1-1";
     /// <summary>Clears per world, which reseeds that world's shop stock.</summary>
     public Dictionary<string, int> ShopRestocks { get; set; } = new();
+    /// <summary>Kinds of enemy met so far (EnemyCatalog.KindOf): the act cards and the bestiary.</summary>
+    public List<string> Seen { get; set; } = new();
+    /// <summary>Best boss rush time in seconds (0 = never finished).</summary>
+    public double BossRushBest { get; set; }
 }

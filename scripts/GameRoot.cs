@@ -197,6 +197,14 @@ public partial class GameRoot : Node3D
             GD.Print($"Stage {st.Id}: {st.Waves.Length} wave(s), enemy level floor {st.EnemyLevel}, rank boost {st.RankBoost:F2}" +
                      (_secretWave > 0 ? $", secret shop before wave {_secretWave}" : ""));
         }
+        // "-- fight bossnow world 7": straight to a world's boss act in the ring, for checking bosses.
+        if (_stage is null && Has("bossnow"))
+        {
+            int w = Array.IndexOf(args, "world") is int wi && wi >= 0 && wi + 1 < args.Length && int.TryParse(args[wi + 1], out int wv) ? wv : 1;
+            _director.Waves = new[] { new WaveDef(0, true) };
+            _director.World = w;
+            _director.LevelFloor = Campaign.StageLevel(w, 5);
+        }
         AddChild(_director);
         _director.PhaseChanged += OnPhaseChanged;
         _director.EnemyDefeated += OnEnemyDefeated;
@@ -208,6 +216,14 @@ public partial class GameRoot : Node3D
         if (Has("tentshot")) StartTentShot();
         if (Has("stageshot")) StartStageShot();
         if (Has("demo")) StartDemo();
+
+        // "-- snaps 4,8.5,12": screenshots at those seconds into the fight (needs a window).
+        int snapsAt = Array.IndexOf(args, "snaps");
+        if (snapsAt >= 0 && snapsAt + 1 < args.Length && DisplayServer.GetName() != "headless")
+            foreach (string s in args[snapsAt + 1].Split(','))
+                if (double.TryParse(s, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out double t))
+                    GetTree().CreateTimer(t, true, false, true).Timeout += () =>
+                        GetViewport().GetTexture().GetImage().SavePng($"C:/Claude/ClownSquad/debug/snap_{s}.png");
     }
 
     /// <summary>
@@ -467,6 +483,8 @@ public partial class GameRoot : Node3D
     /// </summary>
     private void OnPlayerDied(Fighter f)
     {
+        // A clown taking a tumble: the crowd cannot help itself.
+        ClownSquad.Audio.Sfx.Play("crowd_laugh");
         Vector3 home = f is PlayerFighter p && _homes.TryGetValue(p, out Vector3 h) ? h : Vector3.Zero;
         if (_scrolling) home = new Vector3(_camX - 2f, 0f, home.Z);
 

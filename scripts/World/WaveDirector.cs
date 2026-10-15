@@ -1,6 +1,7 @@
 namespace ClownSquad.World;
 
 using System;
+using System.Collections.Generic;
 using Godot;
 using ClownSquad.Actors;
 using ClownSquad.Audio;
@@ -338,6 +339,18 @@ public partial class WaveDirector : Node
         enemy.GlobalPosition = at;
         enemy.Died += OnEnemyDied;
         EnemiesAlive++;
+        NoteAct(enemy);
+    }
+
+    /// <summary>The first time a kind of enemy appears, introduce it (and remember it for the bestiary).</summary>
+    private void NoteAct(Fighter enemy)
+    {
+        string kind = EnemyCatalog.KindOf(enemy);
+        List<string> seen = SaveSystem.Data.Campaign.Seen;
+        if (seen.Contains(kind)) return;
+        seen.Add(kind);
+        // Bosses and their partners have their own entrance; everyone else gets a card.
+        if (kind is not ("grunt" or "tiger") && enemy is not IBoss) ClownSquad.UI.ActCard.Show(_world, kind);
     }
 
     /// <summary>
@@ -354,6 +367,7 @@ public partial class WaveDirector : Node
         enemy.GlobalPosition = at;
         enemy.Died += OnEnemyDied;
         EnemiesAlive++;
+        NoteAct(enemy);
     }
 
     /// <summary>Easy and Hard scale each enemy as it arrives (GameSettings).</summary>

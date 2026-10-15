@@ -52,7 +52,6 @@ public partial class BossCard : CanvasLayer
         });
 
         Sfx.Play("kaboom", 1.2f, -6f);
-        Sfx.Play("crowd_cheer", 1f, -6f);
         Tween t = CreateTween();
         t.TweenProperty(root, "position:x", size.X * 0.1f, 0.35f).SetTrans(Tween.TransitionType.Back).SetEase(Tween.EaseType.Out);
         t.TweenInterval(1.8f);

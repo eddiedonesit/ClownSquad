@@ -20,6 +20,7 @@ public partial class BallRiderBoss : BossFighter
     public override float BodyHalfWidth => 0.85f * Big;
     protected override float ReachScale => 1.2f * Big;
     protected override string Tagline => "HE NEVER DROPS A PIN";
+    protected override string[] Signature => new[] { "ball_bounce", "squeak" };
     private MeshInstance3D _ball = null!;
     private float _lastX;
     private Vector3 _rollDir;
@@ -124,6 +125,7 @@ public partial class TrainerBoss : BossFighter
     protected override float ReachScale => 1.25f * Big;
     public override float BodyHeight => 1.9f * Big;
     protected override string Tagline => "AND RAJAH, THE TERROR OF THE BIG TOP";
+    protected override string[] Signature => new[] { "whip_crack", "tiger_roar" };
     public TigerFighter? Tiger;
     private bool _alone;
 
@@ -144,7 +146,7 @@ public partial class TrainerBoss : BossFighter
             PinClipFrame("attack", MoveTime < 0.25f ? 0 : MoveTime < 0.5f ? 1 : 2);
             if (MoveTime >= 0.5f && MoveTime - dt < 0.5f)
             {
-                Sfx.Play("crit", 1.3f);
+                Sfx.Play("whip_crack", 1.05f);
                 HitPlayers(f => Telegraph.InLane(f.GlobalPosition, GlobalPosition, Facing, 5f, 0.9f), 14f, 5f, 0f, 0.6f, 0.1f, Facing);
             }
             return MoveTime > 0.85f;
@@ -152,7 +154,7 @@ public partial class TrainerBoss : BossFighter
 
         AddMove("hup", 0f, 40f, 4.5f, () =>
         {
-            Sfx.Play("crit", 1.6f);
+            Sfx.Play("whip_crack", 1.25f);
             PopText.Spawn(Stage, GlobalPosition + new Vector3(0f, BodyHeight + 0.3f, 0f), "HUP!", new Color(1f, 0.85f, 0.3f), 0.8f, 0.6f);
             if (Tiger is not null && IsInstanceValid(Tiger) && !Tiger.IsDead) Tiger.Order(PhaseNumber >= 3 && GD.Randf() < 0.4f ? "roar" : "pounce");
         }, dt => { Stop(dt); PinClipFrame("special", 0); return MoveTime > 0.6f; }, weight: 2f).Allowed = () => !_alone;
@@ -200,6 +202,13 @@ public partial class TigerFighter : CastFighter
     public override string DeathSound => "wah_short";
     private Vector3 _aim;
 
+    // Rajah waits beside his trainer while she is introduced.
+    protected override void Tick(float dt)
+    {
+        if (Clock < ClownSquad.UI.BossIntro.Seconds) { Stop(dt); PlayClip("idle"); return; }
+        base.Tick(dt);
+    }
+
     public override void _Ready()
     {
         if (DisplayName.Length == 0) DisplayName = "RAJAH";
@@ -212,7 +221,7 @@ public partial class TigerFighter : CastFighter
         {
             _aim = Target()?.GlobalPosition ?? GlobalPosition + Facing * 4f;
             Track(Telegraph.Circle(Stage, _aim, 1.4f, 0.65f));
-            Sfx.Play("honk_low", 0.6f, 2f);
+            Sfx.Play("tiger_roar", 1.4f, -4f);
         }, dt =>
         {
             if (MoveTime < 0.65f) { Stop(dt); PinClipFrame("special", 0); return false; }
@@ -235,7 +244,7 @@ public partial class TigerFighter : CastFighter
             PinClipFrame(MoveTime < 0.55f ? "special" : "roar", 0);
             if (MoveTime >= 0.55f && MoveTime - dt < 0.55f)
             {
-                Sfx.Play("honk_low", 0.45f, 4f);
+                Sfx.Play("tiger_roar");
                 CameraShake.Request(this, 0.15f, 0.4f);
                 foreach (Fighter f in new List<Fighter>(Players()))
                     if (f.CanBeHit() && Telegraph.InCone(f.GlobalPosition, GlobalPosition, Facing, 4.2f, 75f)) f.Stagger(1.0f);
@@ -263,6 +272,7 @@ public partial class ClownCarBoss : BossFighter
     public override string AttackSound => "bonk";
     public override string HurtSound => "clack";
     protected override string Tagline => "ROOM FOR ONE MORE";
+    protected override string[] Signature => new[] { "car_horn", "engine" };
     private Vector3 _dir;
     private readonly HashSet<Fighter> _rammed = new();
     private readonly List<PlayerFighter> _passengers = new();
@@ -282,12 +292,12 @@ public partial class ClownCarBoss : BossFighter
             _rammed.Clear();
             Track(Telegraph.Lane(Stage, GlobalPosition - _dir * 1.5f, _dir, 15f, 2.0f));
             Sfx.Play("honk_low", 1.2f);
-            Sfx.Play("honk", 0.8f);
+            Sfx.Play("car_horn");
         }, dt =>
         {
             PinClipFrame("walk", (int)(MoveTime * 16f) % 6);
             if (MoveTime < 0.9f) { ApplyGroundMovement(-_dir * 1.5f, dt); return false; }      // revving back
-            if (MoveTime - dt < 0.9f) { ClearTelegraphs(); Sfx.Play("whirr", 0.5f); }
+            if (MoveTime - dt < 0.9f) { ClearTelegraphs(); Sfx.Play("engine", 1.2f); }
             Velocity = new Vector3(_dir.X * 12f, Velocity.Y, 0f);
             HitPlayers(f => Mathf.Abs(f.GlobalPosition.X - (GlobalPosition.X + _dir.X * 1.6f)) < 1.0f && Mathf.Abs(f.GlobalPosition.Z - GlobalPosition.Z) < 1.0f,
                        20f, 8f, 7f, 0.5f, 0.12f, _dir, _rammed);
@@ -324,7 +334,7 @@ public partial class ClownCarBoss : BossFighter
             PinClipFrame(MoveTime < 0.5f ? "idle" : "honk", 0);
             if (MoveTime >= 0.5f && MoveTime - dt < 0.5f)
             {
-                Sfx.Play("honk", 0.6f, 6f);
+                Sfx.Play("car_horn", 0.8f, 3f);
                 CameraShake.Request(this, 0.1f, 0.3f);
                 HitPlayers(f => Telegraph.InCone(f.GlobalPosition, GlobalPosition + Facing * 1.6f, Facing, 4f, 60f), 6f, 10f, 4f, 0.6f);
             }

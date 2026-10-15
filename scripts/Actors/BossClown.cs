@@ -99,7 +99,8 @@ public partial class BossClown : PlayerFighter, IBoss
     private void Announce()
     {
         // The sandbox respawns him forever; the card is for real fights.
-        if (ClownSquad.World.WaveDirector.Running is not null) ClownSquad.UI.BossCard.Show(this, DisplayName, "THE BELLY OF THE BIG TOP");
+        if (ClownSquad.World.WaveDirector.Running is not null)
+            ClownSquad.UI.BossIntro.Play(this, DisplayName, "THE BELLY OF THE BIG TOP", new[] { "belly_drum", "honk_low" });
     }
 
     protected override bool HasSpecial => true;

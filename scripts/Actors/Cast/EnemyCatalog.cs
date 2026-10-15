@@ -105,6 +105,57 @@ public static class EnemyCatalog
         return list;
     }
 
+    /// <summary>The kind name of an enemy, the key the bestiary and act cards use.</summary>
+    public static string KindOf(Fighter f) => f switch
+    {
+        JugglerEnemy => "juggler", UnicyclistEnemy => "unicyclist", WeightlifterEnemy => "weightlifter",
+        BalloonistEnemy => "balloonist", BalloonDog => "balloondog", StiltWalkerEnemy => "stiltwalker",
+        MimeEnemy => "mime", TigerFighter => "tiger", BallRiderBoss => "ballrider", TrainerBoss => "trainer",
+        ClownCarBoss => "clowncar", ElasticBoss => "elastic", TrapezeArtist => "trapeze", FireEaterBoss => "fireeater",
+        TotStackBoss => "tots", StrongmanBoss => "strongman", RingmasterBoss => "ringmaster", BossClown => "bertie",
+        _ => "grunt",
+    };
+
+    /// <summary>What every act is called, its sheet, and the one thing to know about fighting it.</summary>
+    public static (string title, string sheet, string tip) Info(string kind) => kind switch
+    {
+        "juggler" => ("THE JUGGLER", "juggler", "Keeps away and lobs pins where you stand. Watch the circles, then close in."),
+        "unicyclist" => ("THE UNICYCLIST", "unicyclist", "Charges down a lane. Step off it - he is dizzy after."),
+        "balloonist" => ("THE BALLOON ARTIST", "balloonist", "Twists balloon dogs. Reach the artist first."),
+        "balloondog" => ("BALLOON DOG", "balloondog", "Quick and nippy. Two good hits pop it."),
+        "mime" => ("THE MIME", "mime", "Throws an invisible rope down a lane - and walls you off. Leave the lane."),
+        "stiltwalker" => ("THE STILT-WALKER", "stiltwalker", "Hard to hurt standing. Four quick hits topple him."),
+        "weightlifter" => ("THE WEIGHTLIFTER", "weightlifter", "Blocks from the front and grabs. Hit him from behind."),
+        "tiger" => ("RAJAH", "tiger", "Pounces where the circle shows. Roars to stun - stay out of the cone."),
+        "grunt" => ("CLOWN GRUNT", "grunt", "The rank and file. Launch them and juggle."),
+        "bertie" => ("BELLYFLOP BERTIE", "boss", "Leaps, hangs, and flops. Get out of the red circle."),
+        "ballrider" => ("BOBO THE BALANCER", "ballrider", "Pins from above, a ball down the lane, three bounces."),
+        "trainer" => ("MADAME STRIPES", "trainer", "Her whip has reach and her tiger obeys. Beat Rajah and she loses her cool."),
+        "clowncar" => ("THE JALOPY", "clowncar", "Rams down the lane and lets out passengers. Stay off its line."),
+        "elastic" => ("STRETCH", "elastic", "Punches from across the ring. Leave the lane he lines up."),
+        "trapeze" => ("THE FLYING FRATELLI", "trapeze_a", "Out of reach on the bars. Hit them when they land."),
+        "fireeater" => ("PYRO PETE", "fireeater", "Fire, glass and rings of flame. Jump the rings; keep him off his glass."),
+        "tots" => ("THE TOTEM TOTS", "tot", "A tower that topples and a conga that chases. Every fifth, one quits."),
+        "strongman" => ("IRON IVAN", "strongman", "Nothing stops him mid-move. Dodge, then punish."),
+        "ringmaster" => ("THE RINGMASTER", "ringmaster", "Wreck the carriage, then the man. Spotlights follow you."),
+        _ => (kind.ToUpperInvariant(), kind, ""),
+    };
+
+    /// <summary>Every enemy kind, in the order they are met, then the bosses: the bestiary's pages.</summary>
+    public static readonly string[] Bestiary =
+    {
+        "grunt", "juggler", "unicyclist", "balloonist", "balloondog", "mime", "stiltwalker", "weightlifter", "tiger",
+        "bertie", "ballrider", "trainer", "clowncar", "elastic", "trapeze", "fireeater", "tots", "strongman", "ringmaster",
+    };
+
+    /// <summary>The sheet path for a kind (grunt and Bertie keep their original sheets).</summary>
+    public static string SheetOf(string kind) => Info(kind).sheet switch
+    {
+        "grunt" => "res://assets/sprites/grunt_hd.png",
+        "boss" => "res://assets/sprites/boss_hd.png",
+        string s => CastFighter.Folder + s + ".png",
+    };
+
     /// <summary>The boss of each world, for the map's labels.</summary>
     public static string BossName(int world) => Mathf.Clamp(world, 1, 10) switch
     {

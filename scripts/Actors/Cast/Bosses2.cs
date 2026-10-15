@@ -18,6 +18,7 @@ public partial class ElasticBoss : BossFighter
     public override float BodyHeight => 2.4f * Big;
     protected override float ReachScale => 1.3f * Big;
     protected override string Tagline => "HE GOES TO ANY LENGTH";
+    protected override string[] Signature => new[] { "twang", "boing" };
     private Node3D _arm = null!;
     private MeshInstance3D _sleeve = null!;
     private MeshInstance3D _glove = null!;
@@ -86,7 +87,7 @@ public partial class ElasticBoss : BossFighter
         _arm.Position = new Vector3(Facing.X * 0.4f * Big, 1.45f * Big, 0.06f);
         _arm.Scale = new Vector3(Facing.X, 1f, 1f);
         if (MoveTime < Wind) return false;
-        if (MoveTime - dt < Wind) { ClearTelegraphs(); Sfx.Play("slide_up", 1.4f); }
+        if (MoveTime - dt < Wind) { ClearTelegraphs(); Sfx.Play("twang", 1.1f); }
         float t = MoveTime - Wind;
         if (t < Out && _caught is null)
         {
@@ -190,6 +191,7 @@ public partial class TrapezeArtist : BossFighter
         }
     }
     protected override string Tagline => Primary ? "NO NET!" : "";
+    protected override string[] Signature => new[] { "tada", "whoosh" };
     public override float BodyHeight => 1.9f * Big;
     protected override float ReachScale => 1.15f * Big;
     public override float XpScale => 6f;
@@ -368,6 +370,7 @@ public partial class FireEaterBoss : BossFighter
     public override float BodyHeight => 2.0f * Big;
     protected override float ReachScale => 1.25f * Big;
     protected override string Tagline => "HOT STUFF - MIND THE GLASS";
+    protected override string[] Signature => new[] { "fire_roar", "glass_smash" };
     public override string AttackSound => "whoosh";
     private GpuParticles3D _flame = null!;
     private OmniLight3D _glow = null!;
@@ -422,7 +425,7 @@ public partial class FireEaterBoss : BossFighter
                 _flame.Position = new Vector3(Facing.X * 0.55f * Big, 1.7f * Big, 0.08f);
                 if (_flame.ProcessMaterial is ParticleProcessMaterial pm) pm.Direction = new Vector3(Facing.X, 0.05f, 0f);
                 _flame.Emitting = true;
-                Sfx.Play("kaboom", 0.6f, -6f);
+                Sfx.Play("fire_roar");
                 for (int i = 1; i <= 2; i++) Hazard.Fire(this, GlobalPosition + Facing * (1.6f * i + 0.4f), 0.9f, 3.5f, 4f, 0.5f);
             }
             _glow.LightEnergy = 3f;
@@ -484,7 +487,7 @@ public partial class FireEaterBoss : BossFighter
                 s.OnLand = at2 =>
                 {
                     GlassField.Scatter(this, at2, 0.9f, 7);
-                    Sfx.Play("ding", 1.8f);
+                    Sfx.Play("glass_smash", 1f + GD.Randf() * 0.2f);
                     Sfx.Play("clack", 1.6f);
                 };
             }
