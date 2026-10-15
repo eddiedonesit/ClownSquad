@@ -6,6 +6,92 @@ using ClownSquad.Actors;
 using ClownSquad.Visuals;
 
 /// <summary>
+/// Broken glass on the floor: a scatter of glinting shards that cut whoever
+/// walks over them (jumping clears them), until they are swept up by time or
+/// kicked back at you by the one who dropped them. Every live field is listed
+/// so a kicker can find the glass near its feet.
+/// </summary>
+public partial class GlassField : Node3D
+{
+    public static readonly List<GlassField> All = new();
+    public PlayerFighter Owner = null!;
+    public float Damage = 5f;
+    public float Seconds = 9f;
+    private readonly List<Node3D> _shards = new();
+    private readonly Dictionary<Fighter, float> _next = new();
+    private float _age;
+
+    public int Count => _shards.Count;
+
+    public static GlassField Scatter(PlayerFighter owner, Vector3 at, float radius, int count, float seconds = 9f)
+    {
+        var g = new GlassField { Owner = owner, Seconds = seconds };
+        owner.GetParent().AddChild(g);
+        g.GlobalPosition = new Vector3(at.X, 0f, at.Z);
+        var rng = new RandomNumberGenerator();
+        rng.Randomize();
+        for (int i = 0; i < count; i++)
+        {
+            float a = rng.Randf() * Mathf.Tau, r = Mathf.Sqrt(rng.Randf()) * radius;
+            Node3D s = EnemyShot.Shard(rng.RandfRange(1.3f, 1.9f));
+            s.Position = new Vector3(Mathf.Cos(a) * r, 0.04f, Mathf.Sin(a) * r * 0.8f);
+            s.RotationDegrees = new Vector3(rng.RandfRange(60f, 90f), rng.RandfRange(0f, 360f), 0f);
+            g.AddChild(s);
+            g._shards.Add(s);
+        }
+        return g;
+    }
+
+    public override void _EnterTree() => All.Add(this);
+    public override void _ExitTree() => All.Remove(this);
+
+    /// <summary>Take up to `n` shards nearest a point, removing them from the floor. Returns where they lay.</summary>
+    public List<Vector3> Take(Vector3 near, int n)
+    {
+        _shards.Sort((a, b) => a.GlobalPosition.DistanceSquaredTo(near).CompareTo(b.GlobalPosition.DistanceSquaredTo(near)));
+        var took = new List<Vector3>();
+        while (took.Count < n && _shards.Count > 0)
+        {
+            took.Add(_shards[0].GlobalPosition);
+            _shards[0].QueueFree();
+            _shards.RemoveAt(0);
+        }
+        if (_shards.Count == 0) QueueFree();
+        return took;
+    }
+
+    public override void _PhysicsProcess(double delta)
+    {
+        _age += (float)delta;
+        // A glint now and then, so the glass is seen before it is stepped in.
+        foreach (Node3D s in _shards) s.Scale = Vector3.One * (1f + 0.15f * Mathf.Max(0f, Mathf.Sin(_age * 5f + s.Position.X * 7f)));
+        if (_age > Seconds)
+        {
+            foreach (Node3D s in _shards) s.Scale *= Mathf.Max(0f, 1f - (_age - Seconds));
+            if (_age > Seconds + 1f) QueueFree();
+            return;
+        }
+        if (!IsInstanceValid(Owner)) return;
+        foreach (Node n in GetTree().GetNodesInGroup(Fighter.Group))
+        {
+            if (n is not Fighter f || f.Hostile || f.IsDead || !f.CanBeHit() || f.GlobalPosition.Y > 0.3f) continue;
+            if (_next.TryGetValue(f, out float when) && _age < when) continue;
+            foreach (Node3D s in _shards)
+            {
+                Vector3 d = f.GlobalPosition - s.GlobalPosition;
+                d.Y = 0f;
+                if (d.Length() > 0.4f) continue;
+                _next[f] = _age + 0.7f;
+                f.TakeDamage(new DamageInfo(Damage * Owner.DamageMultiplier, d.LengthSquared() > 0.01f ? d.Normalized() : Vector3.Right, 2f, 0.04f, Owner, 0f, 0.35f));
+                ClownSquad.Audio.Sfx.Play("ding", 2.2f, -6f);
+                PopText.Spawn(GetParent(), f.GlobalPosition + new Vector3(0f, f.BodyHeight + 0.2f, 0f), "OUCH!", new Color(0.7f, 0.9f, 1f), 0.6f, 0.5f);
+                break;
+            }
+        }
+    }
+}
+
+/// <summary>
 /// A patch of floor that hurts while it lasts: burning oil after a torch
 /// lands, the fire eater's ring of flame, the tiger's flaming hoop. It warms
 /// up for a moment (a telegraph), then burns anyone standing in it every

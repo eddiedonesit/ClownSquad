@@ -33,6 +33,8 @@ public partial class EnemyShot : Node3D
     public Action<Vector3>? OnLand;
     /// <summary>Steer toward the nearest player at this rate (0 = no homing).</summary>
     public float Homing;
+    /// <summary>Flies on through whoever it hits (a thrown ring of fire), instead of stopping.</summary>
+    public bool Pierce;
     public Telegraph? Marker;
 
     private readonly HashSet<Fighter> _hit = new();
@@ -90,7 +92,7 @@ public partial class EnemyShot : Node3D
             Vector3 dir = new(Mathf.Sign(Velocity.X == 0f ? 1f : Velocity.X), 0f, 0f);
             f.TakeDamage(new DamageInfo(Damage * Owner.DamageMultiplier, dir, Knockback, 0.06f, Owner, Launch, 0.35f));
             ImpactEffect.Spawn(GetParent(), GlobalPosition, 0.5f);
-            if (BurstRadius <= 0f && Gravity <= 0f) { Gone(); return; }
+            if (!Pierce && BurstRadius <= 0f && Gravity <= 0f) { Gone(); return; }
         }
 
         if (GlobalPosition.Y <= 0.05f && Velocity.Y < 0f)
@@ -179,6 +181,58 @@ public partial class EnemyShot : Node3D
         Kit3D.Put(n, Kit3D.Ball(0.05f, -1f, 6), Kit3D.Paint(new Color(1f, 0.8f, 0.3f), 0.3f, 0f, 5f), new Vector3(0f, 0.32f, 0f));
         return n;
     }
+
+    /// <summary>A sliver of broken glass: pale, sharp, glinting.</summary>
+    public static Node3D Shard(float scale = 1f)
+    {
+        var n = new Node3D { Scale = Vector3.One * scale };
+        Kit3D.Put(n, Kit3D.Prism(0.12f, 0.3f, 0.03f), GlassPaint, Vector3.Zero, new Vector3(0f, 0f, GD.Randf() * 360f));
+        return n;
+    }
+
+    /// <summary>A green glass bottle, thrown to smash.</summary>
+    public static Node3D Bottle(float scale = 1f)
+    {
+        var n = new Node3D { Scale = Vector3.One * scale };
+        Material green = Kit3D.Paint(new Color(0.3f, 0.75f, 0.45f), 0.1f, 0.3f, 0.3f);
+        Kit3D.Put(n, Kit3D.Cyl(0.09f, 0.1f, 0.3f, 10), green, Vector3.Zero);
+        Kit3D.Put(n, Kit3D.Cyl(0.035f, 0.08f, 0.14f, 10), green, new Vector3(0f, 0.21f, 0f));
+        return n;
+    }
+
+    /// <summary>A gob of fire, spat.</summary>
+    public static Node3D Fireball(float scale = 1f)
+    {
+        var n = new Node3D { Scale = Vector3.One * scale };
+        Kit3D.Put(n, Kit3D.Ball(0.22f, -1f, 10), Kit3D.Paint(new Color(1f, 0.5f, 0.12f), 0.3f, 0f, 4f), Vector3.Zero);
+        Kit3D.Put(n, Kit3D.Ball(0.13f, -1f, 8), Kit3D.Paint(new Color(1f, 0.95f, 0.5f), 0.3f, 0f, 6f), new Vector3(0.06f, 0.04f, 0.05f));
+        n.AddChild(new OmniLight3D { LightColor = new Color(1f, 0.55f, 0.2f), LightEnergy = 2f, OmniRange = 3.5f });
+        return n;
+    }
+
+    /// <summary>A hoop of fire, thrown rolling down the lane.</summary>
+    public static Node3D FireRing(float scale = 1f)
+    {
+        var n = new Node3D { Scale = Vector3.One * scale };
+        Kit3D.Put(n, Kit3D.Ring(0.5f, 0.62f, 24), Kit3D.Paint(Kit3D.Gold, 0.3f, 0.6f), Vector3.Zero, new Vector3(90f, 0f, 0f));
+        var flames = new List<Transform3D>();
+        for (int i = 0; i < 12; i++)
+        {
+            float a = Mathf.Tau * i / 12f;
+            flames.Add(new Transform3D(new Basis(Vector3.Back, a), new Vector3(Mathf.Sin(a) * 0.62f, Mathf.Cos(a) * 0.62f, 0f)));
+        }
+        Kit3D.Many(n, Kit3D.Cyl(0f, 0.1f, 0.3f, 6), Kit3D.Paint(new Color(1f, 0.6f, 0.15f), 0.3f, 0f, 5f), flames);
+        n.AddChild(new OmniLight3D { LightColor = new Color(1f, 0.55f, 0.2f), LightEnergy = 2.4f, OmniRange = 4f });
+        return n;
+    }
+
+    private static StandardMaterial3D? _glass;
+    public static StandardMaterial3D GlassPaint => _glass ??= new StandardMaterial3D
+    {
+        AlbedoColor = new Color(0.8f, 0.95f, 1f, 0.75f), Transparency = BaseMaterial3D.TransparencyEnum.Alpha,
+        Roughness = 0.05f, Metallic = 0.6f, EmissionEnabled = true, Emission = new Color(0.6f, 0.85f, 1f), EmissionEnergyMultiplier = 0.6f,
+        CullMode = BaseMaterial3D.CullModeEnum.Disabled,
+    };
 
     /// <summary>A white dove (a puff of white with wings), homing in to peck.</summary>
     public static Node3D Dove(float scale = 1f)

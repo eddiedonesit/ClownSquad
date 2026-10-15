@@ -2,7 +2,7 @@
  "frame_width": 286,
  "frame_height": 390,
  "baseline": 338,
- "count": 21,
+ "count": 25,
  "clips": {
   "idle": [
    0,
@@ -36,8 +36,16 @@
    18,
    19
   ],
+  "kick": [
+   20,
+   21
+  ],
+  "smash": [
+   22,
+   23
+  ],
   "down": [
-   20
+   24
   ]
  },
  "fps": {

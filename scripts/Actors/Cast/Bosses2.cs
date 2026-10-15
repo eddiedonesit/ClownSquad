@@ -367,7 +367,7 @@ public partial class FireEaterBoss : BossFighter
     protected override string Cast => "fireeater";
     public override float BodyHeight => 2.0f;
     protected override float ReachScale => 1.25f;
-    protected override string Tagline => "HOT STUFF";
+    protected override string Tagline => "HOT STUFF - MIND THE GLASS";
     public override string AttackSound => "whoosh";
     private GpuParticles3D _flame = null!;
     private OmniLight3D _glow = null!;
@@ -462,6 +462,115 @@ public partial class FireEaterBoss : BossFighter
             Hazard.Fire(this, GlobalPosition, 0.9f, 2.4f, 8f, 0.7f, thickness: 0.6f, grow: 3.2f);
             PopText.Spawn(Stage, GlobalPosition + new Vector3(0f, BodyHeight + 0.3f, 0f), "JUMP!", new Color(1f, 0.6f, 0.2f), 0.8f, 0.6f);
         }, dt => { Stop(dt); PinClipFrame("special", 2); return MoveTime > 1.0f; }).Allowed = () => PhaseNumber >= 2;
+
+        // Smash bottles: glass rains down on the floor around you, and at his
+        // own feet, ready to be kicked.
+        AddMove("bottles", 0f, 40f, 6f, () => Sfx.Play("whoosh", 1.2f), dt =>
+        {
+            Stop(dt);
+            PinClipFrame("smash", MoveTime < 0.35f ? 0 : 1);
+            int count = PhaseNumber == 1 ? 3 : 4;
+            for (int i = 0; i < count; i++)
+            {
+                float at = 0.35f + i * 0.15f;
+                if (MoveTime < at || MoveTime - dt >= at) continue;
+                Vector3 to = i == 0
+                    ? GlobalPosition + Facing * 1.4f
+                    : (Target()?.GlobalPosition ?? GlobalPosition) + new Vector3((i - 2) * 1.6f, 0f, (i % 2) * 1.2f - 0.6f);
+                var s = EnemyShot.Lob(this, EnemyShot.Bottle(1.4f), GlobalPosition + new Vector3(Facing.X * 0.3f, 2.3f, 0f), InView(to, 0f), 0.8f);
+                s.Damage = 6f;
+                s.OnLand = at2 =>
+                {
+                    GlassField.Scatter(this, at2, 0.9f, 7);
+                    Sfx.Play("ding", 1.8f);
+                    Sfx.Play("clack", 1.6f);
+                };
+            }
+            return MoveTime > 0.35f + count * 0.15f + 0.3f;
+        }, weight: 1.3f);
+
+        // Kick the glass back at you: a spray of shards down the lane.
+        AddMove("kick", 0f, 12f, 3.5f, () =>
+        {
+            Track(Telegraph.Cone(Stage, GlobalPosition, Facing, 7f, 36f, 0.45f, new Color(0.6f, 0.85f, 1f)));
+            Sfx.Play("whoosh", 0.9f);
+        }, dt =>
+        {
+            Stop(dt);
+            PinClipFrame("kick", MoveTime < 0.45f ? 0 : 1);
+            if (MoveTime >= 0.45f && MoveTime - dt < 0.45f)
+            {
+                var shards = new List<Vector3>();
+                foreach (GlassField g in new List<GlassField>(GlassField.All))
+                    if (g.Owner == this && Flat(g.GlobalPosition - GlobalPosition).Length() < 3f) shards.AddRange(g.Take(GlobalPosition, 7 - shards.Count));
+                Vector3 aim = Target() is Fighter t ? Flat(t.GlobalPosition - GlobalPosition).Normalized() : Facing;
+                for (int i = 0; i < shards.Count; i++)
+                {
+                    float spread = Mathf.DegToRad((i - (shards.Count - 1) * 0.5f) * 6f);
+                    Vector3 dir = aim.Rotated(Vector3.Up, spread) + new Vector3(0f, 0.12f, 0f);
+                    var s = EnemyShot.Fling(this, EnemyShot.Shard(1.4f), GlobalPosition + new Vector3(Facing.X * 0.6f, 0.5f, 0f), dir, 12f);
+                    s.Gravity = 2f;
+                    s.Damage = 7f;
+                    s.Knockback = 3f;
+                    s.SpinSpeed = 18f;
+                    s.Life = 1.2f;
+                }
+                Sfx.Play("ding", 2f);
+                Sfx.Play("whoosh", 1.4f);
+            }
+            return MoveTime > 0.85f;
+        }, weight: 2f).Allowed = GlassNearby;
+
+        // Spit fire: gobs of flame arcing in, leaving the floor alight.
+        AddMove("spit", 2f, 12f, 3f, () => Sfx.Play("whoosh", 0.6f), dt =>
+        {
+            Stop(dt);
+            PinClipFrame("special", MoveTime < 0.3f ? 0 : 1);
+            int shots = PhaseNumber == 3 ? 3 : 2;
+            for (int i = 0; i < shots; i++)
+            {
+                float at = 0.3f + i * 0.22f;
+                if (MoveTime < at || MoveTime - dt >= at || Target() is not Fighter t) continue;
+                Vector3 to = t.GlobalPosition + Flat(t.Velocity) * 0.3f + new Vector3(0f, 0f, (i - shots / 2) * 0.7f);
+                var s = EnemyShot.Lob(this, EnemyShot.Fireball(1.3f), GlobalPosition + new Vector3(Facing.X * 0.5f, 1.7f, 0f), InView(to, 0f), 0.55f, 12f);
+                s.Damage = 9f;
+                s.OnLand = at2 => Hazard.Fire(this, at2, 0.8f, 3f, 4f, 0.05f);
+                Sfx.Play("kaboom", 1.8f, -10f);
+            }
+            return MoveTime > 0.3f + shots * 0.22f + 0.2f;
+        }, weight: 1.4f);
+
+        // Throw rings of fire: flaming hoops rolling down the lanes, through anyone in the way.
+        AddMove("hoops", 2f, 40f, 5f, () =>
+        {
+            foreach (Fighter f in Players())
+                Track(Telegraph.Lane(Stage, new Vector3(GlobalPosition.X, 0f, f.GlobalPosition.Z), Facing, 12f, 1f, 0.5f, new Color(1f, 0.5f, 0.1f)));
+            Sfx.Play("whoosh", 0.7f);
+        }, dt =>
+        {
+            Stop(dt);
+            PinClipFrame("special", MoveTime < 0.5f ? 0 : 2);
+            if (MoveTime >= 0.5f && MoveTime - dt < 0.5f)
+                foreach (Fighter f in Players())
+                {
+                    var s = EnemyShot.Fling(this, EnemyShot.FireRing(1.3f), new Vector3(GlobalPosition.X + Facing.X * 0.8f, 0.85f, f.GlobalPosition.Z), Facing, 8f);
+                    s.Pierce = true;
+                    s.Damage = 10f;
+                    s.Launch = 4f;
+                    s.SpinSpeed = 9f;
+                    s.HitRadius = 0.7f;
+                    s.Life = 2.2f;
+                    Sfx.Play("whirr", 0.8f);
+                }
+            return MoveTime > 0.9f;
+        });
+    }
+
+    private bool GlassNearby()
+    {
+        foreach (GlassField g in GlassField.All)
+            if (g.Owner == this && g.Count > 0 && Flat(g.GlobalPosition - GlobalPosition).Length() < 3f) return true;
+        return false;
     }
 
     protected override void OnMoveEnded()

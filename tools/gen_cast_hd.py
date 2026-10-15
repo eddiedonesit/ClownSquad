@@ -1010,6 +1010,10 @@ def humanoid_clips(name):
         special["special"] = [dict(head_dy=-2, na=150, ne=40, fa=40, fe=60, item_n="torch", lean=-6, mouth="o"),
                               dict(head_dy=0, na=100, ne=20, fa=40, fe=60, item_n="torch", lean=6, mouth="open", flame=0.5),
                               dict(head_dy=0, na=100, ne=20, fa=40, fe=60, item_n="torch", lean=8, mouth="open", flame=1.0)]
+        special["kick"] = [dict(nf=6, nfl=6, lean=-8, na=-40, ne=40, fa=60, fe=40, item_n="torch", mouth="flat", eyes="angry"),
+                           dict(nf=22, nfl=26, lean=-14, na=-60, ne=30, fa=80, fe=30, item_n="torch", mouth="open", eyes="angry")]
+        special["smash"] = [dict(na=170, ne=10, item_n=None, fa=40, fe=60, mouth="grin"),
+                            dict(na=60, ne=10, item_n=None, fa=40, fe=60, lean=8, mouth="open", eyes="angry")]
     if name == "strongman":
         special["special"] = [dict(na=100, ne=60, fa=100, fe=60, crouch=10, item_n="barbell", mouth="flat", eyes="angry"),
                               dict(na=175, ne=0, fa=175, fe=0, item_n="barbell", mouth="open", eyes="angry", by=-2),
