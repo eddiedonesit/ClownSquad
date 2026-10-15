@@ -160,7 +160,13 @@ public partial class GameRoot : Node3D
 
         SpawnPlayers();
         BuildHud();
-        ClownSquad.Audio.Sfx.PlayMusic("music_march");
+        ClownSquad.Audio.Sfx.PlayMusic(_stage switch
+        {
+            StageDef { Kind: StageKind.Boss } => "music_boss",
+            StageDef { Kind: StageKind.Bonus } => "music_bonus",
+            StageDef song => $"music_world{song.World}",
+            _ => "music_world1",
+        });
 
         if (Has("sandbox") || _aiProbe)
         {

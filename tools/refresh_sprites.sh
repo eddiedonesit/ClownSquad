@@ -16,5 +16,7 @@ python tools/gen_arena.py
 python tools/gen_map.py
 python tools/gen_stage.py
 python tools/gen_audio.py >/dev/null
+# The soundtrack takes a couple of minutes; skip it with SKIP_MUSIC=1.
+[ -n "$SKIP_MUSIC" ] || python tools/gen_music.py
 "$GODOT" --headless --path . --import >/dev/null 2>&1
 echo "sprites regenerated and reimported"

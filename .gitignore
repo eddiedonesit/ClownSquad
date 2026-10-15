@@ -37,6 +37,11 @@ desktop.ini
 .DS_Store
 debug/
 
+# The soundtrack is generated (tools/gen_music.py, about 240 MB of WAV);
+# its loop points (music_loops.json) and import settings are kept.
+assets/audio/music_*.wav
+!assets/audio/music_march.wav
+
 # C# build output
 *.sln
 .vs/

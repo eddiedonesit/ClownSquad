@@ -121,19 +121,42 @@ public partial class Sfx : Node
         return v;
     }
 
-    /// <summary>Start a looping track, replacing whatever is playing.</summary>
+    /// <summary>
+    /// Start a song, replacing whatever is playing; asking for the song already
+    /// playing leaves it alone. Songs (tools/gen_music.py) open with an intro
+    /// that plays once, then loop from the frame named in music_loops.json.
+    /// A song that has not been generated falls back to the old march.
+    /// </summary>
     public static void PlayMusic(string bank)
     {
-        if (Instance is not Sfx s || !s._banks.TryGetValue(bank, out List<AudioStream>? streams)) return;
+        if (Instance is not Sfx s) return;
+        if (!s._banks.ContainsKey(bank)) bank = "music_march";
+        if (!s._banks.TryGetValue(bank, out List<AudioStream>? streams)) return;
+        if (s._music.Playing && s._musicBank == bank) return;
         if (streams[0] is AudioStreamWav wav)
         {
             wav.LoopMode = AudioStreamWav.LoopModeEnum.Forward;
-            wav.LoopBegin = 0;
-            wav.LoopEnd = wav.Data.Length / 2;   // 16-bit mono: two bytes a frame
+            wav.LoopBegin = LoopStart(bank);
+            wav.LoopEnd = (int)(wav.GetLength() * wav.MixRate);
         }
+        s._musicBank = bank;
         s._music.Stream = streams[0];
-        s._music.VolumeDb = -13f;
+        s._music.VolumeDb = MusicDb;
         s._music.Play();
+    }
+
+    private const float MusicDb = -11f;
+    private string _musicBank = "";
+    private static Godot.Collections.Dictionary? _loops;
+
+    private static int LoopStart(string bank)
+    {
+        if (_loops is null)
+        {
+            using var f = FileAccess.Open($"{Folder}/music_loops.json", FileAccess.ModeFlags.Read);
+            _loops = f is not null && Json.ParseString(f.GetAsText()).Obj is Godot.Collections.Dictionary d ? d : new();
+        }
+        return _loops.TryGetValue(bank, out Variant v) ? (int)v : 0;
     }
 
     public static void StopMusic(float fadeSeconds = 0.6f)
@@ -142,5 +165,6 @@ public partial class Sfx : Node
         Tween t = s.CreateTween();
         t.TweenProperty(s._music, "volume_db", -60f, fadeSeconds);
         t.TweenCallback(Callable.From(s._music.Stop));
+        s._musicBank = "";
     }
 }

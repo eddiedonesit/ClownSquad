@@ -71,7 +71,7 @@ public partial class TitleScreen : Node3D
         _pads.Add(new MapPad(LocalDeviceInput.Keyboard));
         foreach (int pad in Godot.Input.GetConnectedJoypads()) _pads.Add(new MapPad(pad));
         ShowMain();
-        Sfx.PlayMusic("music_march");
+        Sfx.PlayMusic("music_title");
 
         if (Array.IndexOf(args, "titleshot") >= 0)
             GetTree().CreateTimer(2.0).Timeout += () =>

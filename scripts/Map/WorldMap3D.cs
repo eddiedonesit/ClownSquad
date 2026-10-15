@@ -83,7 +83,7 @@ public partial class WorldMap3D : Node3D
 
         _focus = Place(_world, _mapPos);
         PlaceCamera(1f);
-        Sfx.PlayMusic("music_march");
+        Sfx.PlayMusic("music_map");
         RefreshInfo();
         GD.Print($"World map (3D): world {_world}, standing on {_at.Id}; {_state.Cleared.Count} node(s) cleared.");
 
