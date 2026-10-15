@@ -12,6 +12,7 @@ using ClownSquad.Progression;
 using ClownSquad.UI;
 using ClownSquad.Visuals;
 using ClownSquad.World;
+using ClownSquad.Net;
 
 /// <summary>
 /// Players joining, dying and respawning, and the old sandbox room.
@@ -100,7 +101,7 @@ public partial class GameRoot
     private void OnPlayerDied(Fighter f)
     {
         // A clown taking a tumble: the crowd cannot help itself.
-        ClownSquad.Audio.Sfx.Play("crowd_laugh");
+        Fx.Sound("crowd_laugh");
         Vector3 home = f is PlayerFighter p && _homes.TryGetValue(p, out Vector3 h) ? h : Vector3.Zero;
         if (_scrolling) home = new Vector3(_camX - 2f, 0f, home.Z);
 

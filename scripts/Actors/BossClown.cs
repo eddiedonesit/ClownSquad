@@ -3,6 +3,7 @@ namespace ClownSquad.Actors;
 using Godot;
 using ClownSquad.Audio;
 using ClownSquad.Visuals;
+using ClownSquad.Net;
 
 /// <summary>
 /// The first enemy: a big, fat, grinning clown. Reuses the input-driven fighter
@@ -112,7 +113,7 @@ public partial class BossClown : PlayerFighter, IBoss
         _peakY = 0f;
         _hung = 0f;
         // An audible tell as well as a visual one: hear the flop coming.
-        Sfx.Play("honk_low", 0.75f, 2f);
+        Fx.Sound("honk_low", 0.75f, 2f);
     }
 
     private void Next(Flop f)
@@ -142,8 +143,8 @@ public partial class BossClown : PlayerFighter, IBoss
                 if (_phase >= Crouch)
                 {
                     Jump(Mathf.Sqrt(2f * Gravity * ApexHere()));
-                    Sfx.Play("boing", 0.55f, 2f);
-                    Sfx.Play("slide_up", 0.5f);
+                    Fx.Sound("boing", 0.55f, 2f);
+                    Fx.Sound("slide_up", 0.5f);
                     Dust(1.0f);
                     ShowMarker();
                     Next(Flop.Rise);
@@ -168,7 +169,7 @@ public partial class BossClown : PlayerFighter, IBoss
                 if (_phase >= HangTime)
                 {
                     Velocity = new Vector3(0f, -DropSpeed, 0f);
-                    Sfx.Play("slide_down", 0.6f);
+                    Fx.Sound("slide_down", 0.6f);
                     Next(Flop.Drop);
                 }
                 return false;
@@ -225,9 +226,9 @@ public partial class BossClown : PlayerFighter, IBoss
         // Anyone caught is thrown into the air and floored on landing.
         int hits = DamageInRadius(SlamRadius, SlamDamage, SlamKnockback, 0.16f, SlamLaunch, 0.4f);
         ApplyHitstop(0.16f);
-        ImpactEffect.Spawn(GetParent(), GlobalPosition + new Vector3(0f, 0.12f, 0f), 2.4f);
-        CameraShake.Request(this, 0.2f, 0.4f);
-        Sfx.Play("kaboom");
+        Fx.Impact(GetParent(), GlobalPosition + new Vector3(0f, 0.12f, 0f), 2.4f);
+        Fx.Shake(this, 0.2f, 0.4f);
+        Fx.Sound("kaboom");
         GD.Print($"Boss belly flop: {hits} hit(s), peak y={_peakY:F2}, hung {_hung:F2}s.");
     }
 
@@ -381,7 +382,7 @@ public partial class BossClown : PlayerFighter, IBoss
             if (t >= windEnd && _whooshedSwing != index)
             {
                 _whooshedSwing = index;
-                Sfx.Play("whoosh", 0.65f, -4f);
+                Fx.Sound("whoosh", 0.65f, -4f);
             }
         }
         if (!TryGetSwing(out _, out _, out _, out _, out _)) _whooshedSwing = -1;

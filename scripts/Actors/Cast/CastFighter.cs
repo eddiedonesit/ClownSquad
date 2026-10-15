@@ -8,6 +8,7 @@ using ClownSquad.Combat;
 using ClownSquad.Input;
 using ClownSquad.Visuals;
 using ClownSquad.World;
+using ClownSquad.Net;
 
 /// <summary>
 /// A boss, or one half of a boss act. The HUD shows the primary's bar; acts
@@ -252,7 +253,7 @@ public partial class CastFighter : PlayerFighter
             Vector3 d = dir ?? Flat(f.GlobalPosition - GlobalPosition);
             if (d.LengthSquared() < 0.01f) d = Facing;
             f.TakeDamage(new DamageInfo(damage * DamageMultiplier, d.Normalized(), knockback, hitstop, this, launch, stun));
-            ImpactEffect.Spawn(Stage, f.GlobalPosition + new Vector3(0f, f.BodyHeight * 0.55f, 0f), 0.45f);
+            Fx.Impact(Stage, f.GlobalPosition + new Vector3(0f, f.BodyHeight * 0.55f, 0f), 0.45f);
             hits++;
         }
         if (hits > 0) ApplyHitstop(hitstop);
@@ -341,8 +342,8 @@ public partial class CastFighter : PlayerFighter
         if (Guarding && front && CanBeHit())
         {
             var reduced = new DamageInfo(info.Amount * GuardFactor, info.KnockbackDirection, info.KnockbackForce * 0.3f, info.Hitstop, info.Source, 0f, 0f);
-            Sfx.Play("clack", 0.7f);
-            PopText.Spawn(Stage, GlobalPosition + new Vector3(0f, BodyHeight + 0.2f, 0f), "BLOCK!", new Color(0.7f, 0.85f, 1f), 0.6f, 0.5f);
+            Fx.Sound("clack", 0.7f);
+            Fx.Pop(Stage, GlobalPosition + new Vector3(0f, BodyHeight + 0.2f, 0f), "BLOCK!", new Color(0.7f, 0.85f, 1f), 0.6f, 0.5f);
             base.TakeDamage(reduced);
             return;
         }
@@ -459,10 +460,10 @@ public partial class BossFighter : CastFighter, IBoss
 
     protected virtual void OnPhase(int phase)
     {
-        Sfx.Play("crowd_gasp");
-        Sfx.Play("honk_low", 0.7f, 2f);
-        PopText.Spawn(Stage, GlobalPosition + new Vector3(0f, BodyHeight + 0.4f, 0f), phase == 3 ? "FURIOUS!" : "ANGRY!", new Color(1f, 0.4f, 0.3f), 1.1f, 0.9f);
-        CameraShake.Request(this, 0.1f, 0.3f);
+        Fx.Sound("crowd_gasp");
+        Fx.Sound("honk_low", 0.7f, 2f);
+        Fx.Pop(Stage, GlobalPosition + new Vector3(0f, BodyHeight + 0.4f, 0f), phase == 3 ? "FURIOUS!" : "ANGRY!", new Color(1f, 0.4f, 0.3f), 1.1f, 0.9f);
+        Fx.Shake(this, 0.1f, 0.3f);
     }
 
     protected override void TickAlways(float dt)

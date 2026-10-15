@@ -7,6 +7,7 @@ using ClownSquad.Actors;
 using ClownSquad.Audio;
 using ClownSquad.Visuals;
 using ClownSquad.World;
+using ClownSquad.Net;
 
 /// <summary>
 /// Anything an enemy throws: juggling pins, flaming torches, dumbbells, a
@@ -17,6 +18,9 @@ using ClownSquad.World;
 /// </summary>
 public partial class EnemyShot : Node3D
 {
+    // Numbered for the network (NetRegistry) while in the scene.
+    public override void _Notification(int what) => ClownSquad.Net.NetRegistry.Notify(this, what);
+
     public PlayerFighter Shooter = null!;
     public Vector3 Velocity;
     public float Gravity;
@@ -97,7 +101,7 @@ public partial class EnemyShot : Node3D
             _hit.Add(f);
             Vector3 dir = new(Mathf.Sign(Velocity.X == 0f ? 1f : Velocity.X), 0f, 0f);
             f.TakeDamage(new DamageInfo(Damage * Shooter.DamageMultiplier, dir, Knockback, 0.06f, Shooter, Launch, 0.35f));
-            ImpactEffect.Spawn(GetParent(), GlobalPosition, 0.5f);
+            Fx.Impact(GetParent(), GlobalPosition, 0.5f);
             if (!Pierce && BurstRadius <= 0f && Gravity <= 0f) { Gone(); return; }
         }
 
@@ -106,9 +110,9 @@ public partial class EnemyShot : Node3D
             Vector3 at = new(GlobalPosition.X, 0f, GlobalPosition.Z);
             if (BurstRadius > 0f)
             {
-                ImpactEffect.Spawn(GetParent(), at + new Vector3(0f, 0.2f, 0f), BurstRadius * 0.9f);
-                Sfx.Play("kaboom", 1.3f, -6f);
-                CameraShake.Request(this, 0.06f, 0.2f);
+                Fx.Impact(GetParent(), at + new Vector3(0f, 0.2f, 0f), BurstRadius * 0.9f);
+                Fx.Sound("kaboom", 1.3f, -6f);
+                Fx.Shake(this, 0.06f, 0.2f);
                 foreach (Node n in Fighter.Live)
                 {
                     if (n is not Fighter f || f.Hostile || f.IsDead || !f.CanBeHit()) continue;
@@ -120,7 +124,7 @@ public partial class EnemyShot : Node3D
             }
             else
             {
-                Sfx.Play("clack", 0.8f, -4f);
+                Fx.Sound("clack", 0.8f, -4f);
             }
             OnLand?.Invoke(at);
             Gone();

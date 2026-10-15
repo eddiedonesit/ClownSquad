@@ -6,6 +6,7 @@ using ClownSquad.Actors;
 using ClownSquad.Audio;
 using ClownSquad.Visuals;
 using ClownSquad.World;
+using ClownSquad.Net;
 
 /// <summary>
 /// Anything a player fires that does not come back: corks from the pop gun,
@@ -17,6 +18,9 @@ using ClownSquad.World;
 /// </summary>
 public partial class PlayerShot : Node3D
 {
+    // Numbered for the network (NetRegistry) while in the scene.
+    public override void _Notification(int what) => ClownSquad.Net.NetRegistry.Notify(this, what);
+
     public PlayerFighter Shooter = null!;
     public Vector3 Velocity;
     public float Gravity;
@@ -112,10 +116,10 @@ public partial class PlayerShot : Node3D
     private void Splash(float radius, float damage, string sound, float pitch, Color tint)
     {
         Vector3 at = new(GlobalPosition.X, 0f, GlobalPosition.Z);
-        ImpactEffect.Spawn(GetParent(), at + new Vector3(0f, 0.3f, 0f), radius);
-        PopText.Spawn(GetParent(), at + new Vector3(0f, 1.2f, 0f), sound == "splat" ? "SPLAT!" : "POP!", tint, 0.8f, 0.5f);
-        Sfx.Play(sound, pitch, -2f);
-        CameraShake.Request(this, 0.05f, 0.18f);
+        Fx.Impact(GetParent(), at + new Vector3(0f, 0.3f, 0f), radius);
+        Fx.Pop(GetParent(), at + new Vector3(0f, 1.2f, 0f), sound == "splat" ? "SPLAT!" : "POP!", tint, 0.8f, 0.5f);
+        Fx.Sound(sound, pitch, -2f);
+        Fx.Shake(this, 0.05f, 0.18f);
         foreach (Node n in Fighter.Live)
         {
             if (n is not Fighter f || f.Hostile == Shooter.Hostile || f.IsDead || !f.CanBeHit()) continue;

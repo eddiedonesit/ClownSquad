@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using Godot;
 using ClownSquad.Actors;
 using ClownSquad.Visuals;
+using ClownSquad.Net;
 
 /// <summary>
 /// Broken glass on the floor: a scatter of glinting shards that cut whoever
@@ -13,6 +14,9 @@ using ClownSquad.Visuals;
 /// </summary>
 public partial class GlassField : Node3D
 {
+    // Numbered for the network (NetRegistry) while in the scene.
+    public override void _Notification(int what) => ClownSquad.Net.NetRegistry.Notify(this, what);
+
     public static readonly List<GlassField> All = new();
     public PlayerFighter Shooter = null!;
     public float Damage = 5f;
@@ -91,8 +95,8 @@ public partial class GlassField : Node3D
                 if (d.Length() > 0.4f) continue;
                 _next[f] = _age + 0.7f;
                 f.TakeDamage(new DamageInfo(Damage * Shooter.DamageMultiplier, d.LengthSquared() > 0.01f ? d.Normalized() : Vector3.Right, 2f, 0.04f, Shooter, 0f, 0.35f));
-                ClownSquad.Audio.Sfx.Play("ding", 2.2f, -6f);
-                PopText.Spawn(GetParent(), f.GlobalPosition + new Vector3(0f, f.BodyHeight + 0.2f, 0f), "OUCH!", new Color(0.7f, 0.9f, 1f), 0.6f, 0.5f);
+                Fx.Sound("ding", 2.2f, -6f);
+                Fx.Pop(GetParent(), f.GlobalPosition + new Vector3(0f, f.BodyHeight + 0.2f, 0f), "OUCH!", new Color(0.7f, 0.9f, 1f), 0.6f, 0.5f);
                 break;
             }
         }
@@ -107,6 +111,9 @@ public partial class GlassField : Node3D
 /// </summary>
 public partial class Hazard : Node3D
 {
+    // Numbered for the network (NetRegistry) while in the scene.
+    public override void _Notification(int what) => ClownSquad.Net.NetRegistry.Notify(this, what);
+
     public PlayerFighter Shooter = null!;
     public float Radius = 1f;
     public float Damage = 4f;

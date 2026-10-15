@@ -9,6 +9,7 @@ using ClownSquad.Input;
 using ClownSquad.Map;
 using ClownSquad.Progression;
 using ClownSquad.Visuals;
+using ClownSquad.Net;
 
 /// <summary>
 /// Runs the fight: waves of enemies in from the screen edges, a shared pool of
@@ -132,9 +133,9 @@ public partial class WaveDirector : Node
         Current = phase;
         switch (phase)
         {
-            case Phase.Fighting: Sfx.Play("fanfare"); break;
-            case Phase.Victory: Sfx.StopMusic(); Sfx.Play("victory"); break;
-            case Phase.Defeat: Sfx.StopMusic(); Sfx.Play("sad_trombone"); break;
+            case Phase.Fighting: Fx.Sound("fanfare"); break;
+            case Phase.Victory: Sfx.StopMusic(); Fx.Sound("victory"); break;
+            case Phase.Defeat: Sfx.StopMusic(); Fx.Sound("sad_trombone"); break;
         }
         PhaseChanged?.Invoke(phase);
     }
@@ -391,7 +392,7 @@ public partial class WaveDirector : Node
         EnemiesAlive = Mathf.Max(0, EnemiesAlive - 1);
         enemy.Stagger(5f);
         enemy.BeginDespawn(0.4f);
-        PopText.Spawn(_world, enemy.GlobalPosition + new Vector3(0f, enemy.BodyHeight + 0.2f, 0f), "RUN AWAY!", Colors.White, 0.7f, 0.6f);
+        Fx.Pop(_world, enemy.GlobalPosition + new Vector3(0f, enemy.BodyHeight + 0.2f, 0f), "RUN AWAY!", Colors.White, 0.7f, 0.6f);
         CheckFinalBlow();
     }
 

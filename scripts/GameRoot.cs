@@ -138,6 +138,7 @@ public partial class GameRoot : Node3D
 
         GameClock.Reset();
         AttackTokens.Reset();
+        ClownSquad.Net.NetRegistry.Reset();
         Engine.TimeScale = GameClock.Speed;
         AddChild(new ClownSquad.Audio.Sfx());
 

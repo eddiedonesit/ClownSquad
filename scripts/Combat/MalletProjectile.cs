@@ -6,6 +6,7 @@ using ClownSquad.Actors;
 using ClownSquad.Audio;
 using ClownSquad.Visuals;
 using ClownSquad.World;
+using ClownSquad.Net;
 
 /// <summary>
 /// The thrown mallet. Flies out along the lane spinning, hits each enemy once
@@ -17,6 +18,9 @@ using ClownSquad.World;
 /// </summary>
 public partial class MalletProjectile : Node3D
 {
+    // Numbered for the network (NetRegistry) while in the scene.
+    public override void _Notification(int what) => ClownSquad.Net.NetRegistry.Notify(this, what);
+
     /// <summary>What was thrown and how the skill tree has changed it.</summary>
     public readonly record struct Throw(string SpinSheet, float Damage, float Range, bool Explodes, bool Launches)
     {
@@ -52,7 +56,7 @@ public partial class MalletProjectile : Node3D
         owner.GetParent().AddChild(mallet);
         Vector3 p = owner.GlobalPosition;
         mallet.GlobalPosition = new Vector3(p.X + mallet._dir.X * 0.8f, 0f, p.Z);
-        Sfx.Play("whirr");
+        Fx.Sound("whirr");
     }
 
     public override void _Ready()
@@ -151,9 +155,9 @@ public partial class MalletProjectile : Node3D
     /// <summary>EGGSPLOSIVE: it goes off where it turns.</summary>
     private void Explode()
     {
-        ImpactEffect.Spawn(GetParent(), GlobalPosition, 1.8f);
-        Sfx.Play("kaboom", 1.3f, -5f);
-        CameraShake.Request(this, 0.1f, 0.22f);
+        Fx.Impact(GetParent(), GlobalPosition, 1.8f);
+        Fx.Sound("kaboom", 1.3f, -5f);
+        Fx.Shake(this, 0.1f, 0.22f);
         foreach (Node node in Fighter.Live)
         {
             if (node is not Fighter f || f.Hostile == _owner.Hostile || !f.CanBeHit()) continue;

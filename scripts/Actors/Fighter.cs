@@ -7,6 +7,7 @@ using ClownSquad.Audio;
 using ClownSquad.Combat;
 using ClownSquad.Visuals;
 using ClownSquad.World;
+using ClownSquad.Net;
 
 /// <summary>
 /// Anything that can fight: players, enemies, dummies. Owns health, movement,
@@ -56,6 +57,7 @@ public partial class Fighter : CharacterBody3D
     // Notifications rather than _EnterTree/_ExitTree, which subclasses override.
     public override void _Notification(int what)
     {
+        ClownSquad.Net.NetRegistry.Notify(this, what);
         if (what == NotificationExitTree) LeaveFight();
         else if (what == NotificationEnterTree && IsInGroup(Group)) JoinFight();
     }
@@ -202,7 +204,7 @@ public partial class Fighter : CharacterBody3D
         if (_despawnIn > 0f)
         {
             _despawnIn -= dt;
-            if (_despawnIn <= 0f) { Sfx.Play("pop"); QueueFree(); return; }
+            if (_despawnIn <= 0f) { Fx.Sound("pop"); QueueFree(); return; }
             // Blink out over the last moments, the way arcade bodies always have.
             if (_despawnIn < 0.7f) Visual.Visible = (int)(_despawnIn / 0.07f) % 2 == 0;
         }
@@ -347,7 +349,7 @@ public partial class Fighter : CharacterBody3D
         if (!Launched) return;
 
         Dust(0.5f);
-        Sfx.Play("thump", 0.9f);
+        Fx.Sound("thump", 0.9f);
         if (!_groundBounced && fallSpeed > 6.5f && !IsDead)
         {
             // One bounce off the floor: a last chance to extend the juggle.
@@ -385,9 +387,9 @@ public partial class Fighter : CharacterBody3D
             Grounded = false;
             Visual?.Flash();
             Visual?.Squash(0.4f);
-            ImpactEffect.Spawn(GetParent(), GlobalPosition + new Vector3(0f, BodyHeight * 0.5f, 0f), 0.6f);
-            CameraShake.Request(this, 0.05f, 0.18f);
-            Sfx.Play("boing");
+            Fx.Impact(GetParent(), GlobalPosition + new Vector3(0f, BodyHeight * 0.5f, 0f), 0.6f);
+            Fx.Shake(this, 0.05f, 0.18f);
+            Fx.Sound("boing");
             if (!IsDead)
             {
                 Health = Mathf.Max(0f, Health - WallBounceDamage);
@@ -402,7 +404,7 @@ public partial class Fighter : CharacterBody3D
     }
 
     protected void Dust(float scale) =>
-        ImpactEffect.Spawn(GetParent(), GlobalPosition + new Vector3(0f, 0.1f, 0f), scale, glow: false);
+        Fx.Impact(GetParent(), GlobalPosition + new Vector3(0f, 0.1f, 0f), scale, glow: false);
 
     // ---- contact shadow ----
     // A soft dark ellipse on the floor under every fighter. It is what plants a
@@ -474,8 +476,8 @@ public partial class Fighter : CharacterBody3D
         Visual?.Flash();
         Visual?.Squash(0.35f);
         PlayClip("hit", restart: true);
-        if (info.Source is Fighter attacker) Sfx.Play(attacker.AttackSound, attacker.AttackPitch);
-        Sfx.Play(HurtSound);
+        if (info.Source is Fighter attacker) Fx.Sound(attacker.AttackSound, attacker.AttackPitch);
+        Fx.Sound(HurtSound);
 
         if (!HasPoise || IsDead)
         {
@@ -494,7 +496,7 @@ public partial class Fighter : CharacterBody3D
                 _pendingLaunch = launch;
                 _juggleCount++;
                 // Each extra juggle hit whistles a little higher.
-                Sfx.Play("slide_up", 1f + 0.1f * _juggleCount);
+                Fx.Sound("slide_up", 1f + 0.1f * _juggleCount);
                 Launched = true;
                 _groundBounced = false;
             }
@@ -504,7 +506,7 @@ public partial class Fighter : CharacterBody3D
         }
 
         HitLanded?.Invoke(info.Source as Fighter, this, info.Amount);
-        if (IsDead) Sfx.Play(DeathSound);
+        if (IsDead) Fx.Sound(DeathSound);
         if (IsDead) Died?.Invoke(this);
     }
 
@@ -554,7 +556,7 @@ public partial class Fighter : CharacterBody3D
     {
         Velocity = new Vector3(Velocity.X, speed, Velocity.Z);
         Grounded = false;
-        Sfx.Play("boing_small", 1.2f);
+        Fx.Sound("boing_small", 1.2f);
     }
 
     /// <summary>Restore to full and place at a position. Used for respawns.</summary>
@@ -576,7 +578,7 @@ public partial class Fighter : CharacterBody3D
         _invulnerable = 1.0f;
         _deadTime = 0f;
         Visual.Visible = true;
-        if (BlinkWhileDown) Sfx.Play("ding");
+        if (BlinkWhileDown) Fx.Sound("ding");
         OnRevived();
         PlayClip("idle", restart: true);
     }

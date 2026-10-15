@@ -7,6 +7,7 @@ using ClownSquad.Combat;
 using ClownSquad.Input;
 using ClownSquad.Progression;
 using ClownSquad.Visuals;
+using ClownSquad.Net;
 
 /// <summary>
 /// A fighter driven by an <see cref="IInputSource"/>. Knows nothing about where
@@ -367,7 +368,7 @@ public partial class PlayerFighter : Fighter
             if (HasMalletMoves && Armed && !_chargeLock && _heldTime >= ChargeStart)
             {
                 _state = State.Charging;
-                _chargeVoice = Sfx.Play("kazoo_rise");
+                _chargeVoice = Fx.Sound("kazoo_rise");
                 return;
             }
 
@@ -415,7 +416,7 @@ public partial class PlayerFighter : Fighter
         _kaboomed = false;
         _sinceCombo = 0f;
         AssistLane();
-        Sfx.Play("whoosh", 1f + 0.12f * _comboIndex);
+        Fx.Sound("whoosh", 1f + 0.12f * _comboIndex);
     }
 
     /// <summary>
@@ -466,9 +467,9 @@ public partial class PlayerFighter : Fighter
             if (HasMalletMoves && heft > 0f)   // only something heavy strikes the ground
             {
                 Vector3 at = GlobalPosition + Facing * MalletForward + new Vector3(0f, MalletHeight, 0f);
-                ImpactEffect.Spawn(GetParent(), at, (0.7f + _comboIndex * 0.25f) * heft);
-                Sfx.Play("thump", Weapon == WeaponKind.Hammer ? 0.8f : 1.1f, -4f);
-                CameraShake.Request(this, (0.035f + _comboIndex * 0.03f) * heft, 0.16f + _comboIndex * 0.04f);
+                Fx.Impact(GetParent(), at, (0.7f + _comboIndex * 0.25f) * heft);
+                Fx.Sound("thump", Weapon == WeaponKind.Hammer ? 0.8f : 1.1f, -4f);
+                Fx.Shake(this, (0.035f + _comboIndex * 0.03f) * heft, 0.16f + _comboIndex * 0.04f);
             }
         }
 
@@ -549,9 +550,9 @@ public partial class PlayerFighter : Fighter
         {
             _kaboomed = true;
             Vector3 at = GlobalPosition + Facing * (step.Range * ReachScale * 0.7f);
-            ImpactEffect.Spawn(GetParent(), at + new Vector3(0f, 0.3f, 0f), 1.8f);
-            Sfx.Play("kaboom", 1.4f, -6f);
-            CameraShake.Request(this, 0.12f, 0.25f);
+            Fx.Impact(GetParent(), at + new Vector3(0f, 0.3f, 0f), 1.8f);
+            Fx.Sound("kaboom", 1.4f, -6f);
+            Fx.Shake(this, 0.12f, 0.25f);
             foreach (Fighter other in Opponents())
             {
                 Vector3 d = other.GlobalPosition - at;
@@ -574,11 +575,11 @@ public partial class PlayerFighter : Fighter
         _dodgeTime = 0f;
         _bufferedAttack = false;
         Dust(0.3f);
-        Sfx.Play("zip");
+        Fx.Sound("zip");
         if (_perks.SquawkDodge)
         {
             // SQUAWK: the slide goes off like a startled hen; anyone close is frozen to the spot.
-            Sfx.Play("squawk", 1.1f);
+            Fx.Sound("squawk", 1.1f);
             foreach (Fighter other in Opponents())
             {
                 Vector3 to = other.GlobalPosition - GlobalPosition;
@@ -679,7 +680,7 @@ public partial class PlayerFighter : Fighter
         Visual.Tint = BaseTint;
         Sfx.Stop(_chargeVoice);
         _chargeVoice = null;
-        Sfx.Play("whirr", 1.15f);
+        Fx.Sound("whirr", 1.15f);
         _spinDir = Facing;
         _spinTime = 0f;
         _spinHitTimer = 0f;
@@ -753,8 +754,8 @@ public partial class PlayerFighter : Fighter
                     _perks.ThrowDamage,
                     _perks.ThrowRange * (Weapon == WeaponKind.Chicken ? 1.5f : 1f),
                     _perks.ThrowExplodes, _perks.ThrowLaunches));
-                Sfx.Play(_weapon.ThrowSound);
-                CameraShake.Request(this, 0.04f, 0.12f);
+                Fx.Sound(_weapon.ThrowSound);
+                Fx.Shake(this, 0.04f, 0.12f);
             }
         }
         else
@@ -771,8 +772,8 @@ public partial class PlayerFighter : Fighter
     private void Toss()
     {
         int extra = _perks.ExtraShots;
-        CameraShake.Request(this, 0.04f, 0.12f);
-        Sfx.Play(_weapon.ThrowSound, _weapon.Charge == ChargeMove.BigShot ? 0.6f : 1f);
+        Fx.Shake(this, 0.04f, 0.12f);
+        Fx.Sound(_weapon.ThrowSound, _weapon.Charge == ChargeMove.BigShot ? 0.6f : 1f);
         switch (_weapon.Charge)
         {
             case ChargeMove.Lob:
@@ -831,8 +832,8 @@ public partial class PlayerFighter : Fighter
             cork.Launch = step.Launch * _launchMultiplier;
             cork.Pierce = _perks.Pierce;
         }
-        Sfx.Play("pop", 1.3f + 0.08f * _comboIndex);
-        CameraShake.Request(this, 0.02f, 0.08f);
+        Fx.Sound("pop", 1.3f + 0.08f * _comboIndex);
+        Fx.Shake(this, 0.02f, 0.08f);
     }
 
     /// <summary>The balloon sword's charge: coil, then dash forward running everyone through.</summary>
@@ -860,7 +861,7 @@ public partial class PlayerFighter : Fighter
         PinClipFrame("attack", 3);
         if (t < dash)
         {
-            if (t - dt < 0f) { Sfx.Play("whoosh", 1.3f); Dust(0.4f); }
+            if (t - dt < 0f) { Fx.Sound("whoosh", 1.3f); Dust(0.4f); }
             Velocity = new Vector3(Facing.X * LungeSpeed, Velocity.Y, 0f);
             foreach (Fighter other in Opponents())
             {
@@ -886,7 +887,7 @@ public partial class PlayerFighter : Fighter
         _quakeTime = 0f;
         _quakeHits = 0;
         _state = State.Quaking;
-        Sfx.Play("whoosh", 0.7f);
+        Fx.Sound("whoosh", 0.7f);
     }
 
     private void TickQuake(float dt)
@@ -906,13 +907,13 @@ public partial class PlayerFighter : Fighter
             float radius = QuakeRadius * _perks.QuakeRadius * (first ? 1f : 1.2f);
             float damage = QuakeDamage * _perks.QuakeDamage * (first ? 1f : 0.6f);
             Vector3 at = GlobalPosition + Facing * MalletForward + new Vector3(0f, MalletHeight, 0f);
-            ImpactEffect.Spawn(GetParent(), at, first ? 2.2f : 1.6f);
+            Fx.Impact(GetParent(), at, first ? 2.2f : 1.6f);
             Dust(first ? 1.2f : 0.9f);
-            Sfx.Play("kaboom", first ? 0.7f : 0.55f, -3f);
-            CameraShake.Request(this, first ? 0.2f : 0.13f, 0.35f);
+            Fx.Sound("kaboom", first ? 0.7f : 0.55f, -3f);
+            Fx.Shake(this, first ? 0.2f : 0.13f, 0.35f);
             bool crit = RollCrit();
             DamageInRadius(radius, Scaled(damage, crit), 6f * _perks.Knockback, 0.1f, first ? 5.5f * _perks.Launch : 3.5f, 0.6f);
-            if (crit) Sfx.Play("crit");
+            if (crit) Fx.Sound("crit");
         }
 
         if (_quakeTime >= (_perks.Aftershock ? AftershockAt + 0.2f : 0.55f)) EndMalletMove();
@@ -925,11 +926,11 @@ public partial class PlayerFighter : Fighter
         {
             _quakeHits = 1;
             float reach = 3.4f * _perks.QuakeRadius;
-            ImpactEffect.Spawn(GetParent(), GlobalPosition + Facing * 1.3f + new Vector3(0f, 0.9f, 0f), 1.6f);
-            PopText.Spawn(GetParent(), GlobalPosition + Facing * 1.6f + new Vector3(0f, 1.9f, 0f), "CLAP!", new Color(1f, 0.85f, 0.3f), 1f, 0.6f);
-            Sfx.Play("slap", 0.55f, 2f);
-            Sfx.Play("whip_crack", 0.8f, -4f);
-            CameraShake.Request(this, 0.14f, 0.3f);
+            Fx.Impact(GetParent(), GlobalPosition + Facing * 1.3f + new Vector3(0f, 0.9f, 0f), 1.6f);
+            Fx.Pop(GetParent(), GlobalPosition + Facing * 1.6f + new Vector3(0f, 1.9f, 0f), "CLAP!", new Color(1f, 0.85f, 0.3f), 1f, 0.6f);
+            Fx.Sound("slap", 0.55f, 2f);
+            Fx.Sound("whip_crack", 0.8f, -4f);
+            Fx.Shake(this, 0.14f, 0.3f);
             foreach (Fighter other in Opponents())
             {
                 Vector3 to = other.GlobalPosition - GlobalPosition;
@@ -949,7 +950,7 @@ public partial class PlayerFighter : Fighter
         Visual.ClipPrefix = "";
         Visual.Squash(0.25f);
         _chargeLock = true;
-        Sfx.Play("clack");
+        Fx.Sound("clack");
     }
 
     private void StartFlip()
@@ -958,7 +959,7 @@ public partial class PlayerFighter : Fighter
         _flipTime = 0f;
         _hitThisSwing.Clear();
         _state = State.Flipping;
-        Sfx.Play("whoosh", 1.4f);
+        Fx.Sound("whoosh", 1.4f);
         // A little lift, so a flip started at the top of a jump still completes.
         Velocity = new Vector3(Facing.X * FlipForward, Mathf.Max(Velocity.Y, 3.5f), Velocity.Z * 0.5f);
     }
@@ -981,9 +982,9 @@ public partial class PlayerFighter : Fighter
 
         if (Grounded && _flipTime > 0.08f)
         {
-            ImpactEffect.Spawn(GetParent(), GlobalPosition + Facing * 0.7f + new Vector3(0f, 0.15f, 0f), 0.9f);
-            CameraShake.Request(this, 0.06f, 0.2f);
-            Sfx.Play("thump");
+            Fx.Impact(GetParent(), GlobalPosition + Facing * 0.7f + new Vector3(0f, 0.15f, 0f), 0.9f);
+            Fx.Shake(this, 0.06f, 0.2f);
+            Fx.Sound("thump");
             Visual.Squash(0.3f);
             EndMalletMove();
         }
@@ -1035,10 +1036,10 @@ public partial class PlayerFighter : Fighter
     private void Spark(Fighter other, bool crit = false)
     {
         Vector3 at = other.GlobalPosition + new Vector3(0f, other.BodyHeight * 0.55f, 0f);
-        ImpactEffect.Spawn(GetParent(), at, crit ? 0.7f : 0.34f);
+        Fx.Impact(GetParent(), at, crit ? 0.7f : 0.34f);
         if (!crit) return;
-        PopText.Spawn(GetParent(), at + new Vector3(0f, 0.5f, 0f), "CRIT!", new Color(1f, 0.45f, 0.3f), 0.8f, 0.6f);
-        Sfx.Play("crit");
+        Fx.Pop(GetParent(), at + new Vector3(0f, 0.5f, 0f), "CRIT!", new Color(1f, 0.45f, 0.3f), 0.8f, 0.6f);
+        Fx.Sound("crit");
     }
 
     // -------------------------------------------------------------- hooks
@@ -1080,8 +1081,8 @@ public partial class PlayerFighter : Fighter
         {
             _secondWindUsed = true;
             Heal(MaxHealth * 0.3f);
-            PopText.Spawn(GetParent(), GlobalPosition + new Vector3(0f, BodyHeight + 0.4f, 0f), "SECOND WIND!", new Color(0.5f, 1f, 0.6f), 0.8f, 0.8f);
-            Sfx.Play("level_up", 1.2f, -6f);
+            Fx.Pop(GetParent(), GlobalPosition + new Vector3(0f, BodyHeight + 0.4f, 0f), "SECOND WIND!", new Color(0.5f, 1f, 0.6f), 0.8f, 0.8f);
+            Fx.Sound("level_up", 1.2f, -6f);
         }
     }
 

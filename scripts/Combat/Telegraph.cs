@@ -11,6 +11,9 @@ using Godot;
 /// </summary>
 public partial class Telegraph : Node3D
 {
+    // Numbered for the network (NetRegistry) while in the scene.
+    public override void _Notification(int what) => ClownSquad.Net.NetRegistry.Notify(this, what);
+
     private static readonly Color Warn = new(0.95f, 0.15f, 0.2f);
 
     private StandardMaterial3D _mat = null!;

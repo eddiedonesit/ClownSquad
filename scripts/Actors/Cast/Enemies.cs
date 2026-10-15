@@ -7,6 +7,7 @@ using ClownSquad.Combat;
 using ClownSquad.Input;
 using ClownSquad.Visuals;
 using ClownSquad.World;
+using ClownSquad.Net;
 
 // The rank and file beyond the grunt. Each brings one idea to the fight:
 // a thrower to chase down, a charger to sidestep, a blocker to get behind,
@@ -27,7 +28,7 @@ public partial class JugglerEnemy : CastFighter
         DamageMultiplier = 0.6f;
         base._Ready();
         AddMove("toss", 2.5f, 10f, 2.6f,
-            () => Sfx.Play("whoosh", 1.4f, -6f),
+            () => Fx.Sound("whoosh", 1.4f, -6f),
             dt =>
             {
                 Stop(dt);
@@ -37,7 +38,7 @@ public partial class JugglerEnemy : CastFighter
                     Vector3 lead = t.GlobalPosition + Flat(t.Velocity) * 0.35f;
                     var shot = EnemyShot.Lob(this, EnemyShot.Pin(1.3f), GlobalPosition + new Vector3(Facing.X * 0.3f, 1.5f, 0f), InView(lead, 0f), 0.75f);
                     shot.Damage = 7f;
-                    Sfx.Play("fwee", 1.3f, -4f);
+                    Fx.Sound("fwee", 1.3f, -4f);
                 }
                 return MoveTime > 0.65f;
             });
@@ -68,7 +69,7 @@ public partial class UnicyclistEnemy : CastFighter
                 _dir = Facing;
                 _run.Clear();
                 Track(Telegraph.Lane(Stage, GlobalPosition, _dir, 8f, 1.3f));
-                Sfx.Play("whirr", 1.3f, -4f);
+                Fx.Sound("whirr", 1.3f, -4f);
             },
             dt =>
             {
@@ -76,7 +77,7 @@ public partial class UnicyclistEnemy : CastFighter
                 if (MoveTime < 0.55f) { Stop(dt); return false; }
                 if (MoveTime < 1.25f)
                 {
-                    if (MoveTime - dt < 0.55f) { ClearTelegraphs(); Sfx.Play("zip", 0.9f); }
+                    if (MoveTime - dt < 0.55f) { ClearTelegraphs(); Fx.Sound("zip", 0.9f); }
                     Velocity = new Vector3(_dir.X * 11f, Velocity.Y, 0f);
                     HitPlayers(f => Mathf.Abs(f.GlobalPosition.X - GlobalPosition.X) < 0.8f && Mathf.Abs(f.GlobalPosition.Z - GlobalPosition.Z) < 0.65f,
                                14f, 6f, 5.5f, 0.4f, 0.08f, _dir, _run);
@@ -118,7 +119,7 @@ public partial class WeightlifterEnemy : CastFighter
             {
                 // Telegraphed like every special: the reach of the lunge, a beat before it.
                 Track(Telegraph.Lane(Stage, GlobalPosition, Facing, 2.4f, 1.2f, 0.45f));
-                Sfx.Play("honk_low", 1.1f, -4f);
+                Fx.Sound("honk_low", 1.1f, -4f);
             },
             dt =>
             {
@@ -137,7 +138,7 @@ public partial class WeightlifterEnemy : CastFighter
                                 _held = f;
                                 f.Stagger(2f);
                                 f.Hold = () => GlobalPosition + new Vector3(Facing.X * 0.15f, Mathf.Min(1f, (MoveTime - 0.75f) * 3f) * BodyHeight * 1.05f, 0.05f);
-                                Sfx.Play("boing", 0.8f);
+                                Fx.Sound("boing", 0.8f);
                                 break;
                             }
                         }
@@ -159,9 +160,9 @@ public partial class WeightlifterEnemy : CastFighter
         f.Hold = null;
         f.GlobalPosition = GlobalPosition + new Vector3(Facing.X * 1.0f, 0f, 0f);
         f.TakeDamage(new DamageInfo(16f * DamageMultiplier, Facing, 6f, 0.14f, this, 7f, 0.5f));
-        ImpactEffect.Spawn(Stage, f.GlobalPosition + new Vector3(0f, 0.2f, 0f), 1.2f);
-        CameraShake.Request(this, 0.12f, 0.25f);
-        Sfx.Play("thump");
+        Fx.Impact(Stage, f.GlobalPosition + new Vector3(0f, 0.2f, 0f), 1.2f);
+        Fx.Shake(this, 0.12f, 0.25f);
+        Fx.Sound("thump");
     }
 
     protected override void OnMoveEnded()
@@ -186,19 +187,19 @@ public partial class BalloonistEnemy : CastFighter
         DamageMultiplier = 0.55f;
         base._Ready();
         var twist = AddMove("twist", 0f, 12f, 4.5f,
-            () => Sfx.Play("squeak", 1.4f),
+            () => Fx.Sound("squeak", 1.4f),
             dt =>
             {
                 Stop(dt);
                 PinClipFrame("special", Mathf.Min(2, (int)(MoveTime / 0.35f)));
-                if ((int)(MoveTime * 10f) != (int)((MoveTime - dt) * 10f)) Sfx.Play("squeak", 1.2f + MoveTime * 0.6f, -8f);
+                if ((int)(MoveTime * 10f) != (int)((MoveTime - dt) * 10f)) Fx.Sound("squeak", 1.2f + MoveTime * 0.6f, -8f);
                 if (MoveTime >= 1.0f)
                 {
                     var dog = new BalloonDog { Name = "BalloonDog", DisplayName = "BALLOON DOG" };
                     Vector3 at = InView(GlobalPosition + new Vector3(Facing.X * 0.8f, 0f, 0.3f));
                     if (WaveDirector.Running is WaveDirector d) d.Summon(dog, at);
                     _dogs.Add(dog);
-                    Sfx.Play("pop", 1.4f);
+                    Fx.Sound("pop", 1.4f);
                     return true;
                 }
                 return false;
@@ -264,9 +265,9 @@ public partial class StiltWalkerEnemy : CastFighter
                 if (MoveTime >= 0.6f && MoveTime - dt < 0.6f)
                 {
                     HitPlayers(f => Near(f, _foot, 1.3f), 16f, 5f, 5f, 0.4f, 0.1f);
-                    ImpactEffect.Spawn(Stage, _foot + new Vector3(0f, 0.1f, 0f), 1.3f);
-                    CameraShake.Request(this, 0.08f, 0.2f);
-                    Sfx.Play("thump", 0.8f);
+                    Fx.Impact(Stage, _foot + new Vector3(0f, 0.1f, 0f), 1.3f);
+                    Fx.Shake(this, 0.08f, 0.2f);
+                    Fx.Sound("thump", 0.8f);
                 }
                 return MoveTime > 1.0f;
             });
@@ -293,9 +294,9 @@ public partial class StiltWalkerEnemy : CastFighter
             _hits.Clear();
             _toppled = 2.6f;
             Stagger(2.6f);
-            Sfx.Play("slide_down", 0.7f);
-            Sfx.Play("thump", 0.7f);
-            PopText.Spawn(Stage, GlobalPosition + new Vector3(0f, 1.2f, 0f), "TIMBER!", new Color(1f, 0.8f, 0.3f), 0.9f, 0.8f);
+            Fx.Sound("slide_down", 0.7f);
+            Fx.Sound("thump", 0.7f);
+            Fx.Pop(Stage, GlobalPosition + new Vector3(0f, 1.2f, 0f), "TIMBER!", new Color(1f, 0.8f, 0.3f), 0.9f, 0.8f);
         }
     }
 }
@@ -330,7 +331,7 @@ public partial class MimeEnemy : CastFighter
                 _ropeDir = to.Normalized();
                 _ropeLen = to.Length() + 0.8f;
                 Track(Telegraph.Lane(Stage, GlobalPosition, _ropeDir, _ropeLen, 1.0f, 0.55f, new Color(0.85f, 0.9f, 1f)));
-                Sfx.Play("whoosh", 0.7f, -6f);
+                Fx.Sound("whoosh", 0.7f, -6f);
             },
             dt =>
             {
@@ -348,7 +349,7 @@ public partial class MimeEnemy : CastFighter
                     _pulled = t;
                     _from = t.GlobalPosition;
                     t.Stagger(1.4f);
-                    PopText.Spawn(Stage, t.GlobalPosition + new Vector3(0f, t.BodyHeight + 0.3f, 0f), "?!", Colors.White, 0.8f, 0.5f);
+                    Fx.Pop(Stage, t.GlobalPosition + new Vector3(0f, t.BodyHeight + 0.3f, 0f), "?!", Colors.White, 0.8f, 0.5f);
                 }
                 float k = Mathf.Clamp((MoveTime - 0.55f) / 0.7f, 0f, 1f);
                 Vector3 to = GlobalPosition + new Vector3(Facing.X * 1.1f, 0f, 0f);
@@ -361,7 +362,7 @@ public partial class MimeEnemy : CastFighter
                     f.Hold = null;
                     PinClipFrame("attack", 2);
                     f.TakeDamage(new DamageInfo(11f * DamageMultiplier, Facing, 5f, 0.1f, this, 4f, 0.45f));
-                    Sfx.Play("slap", 0.9f);
+                    Fx.Sound("slap", 0.9f);
                     return true;
                 }
                 return false;
@@ -399,7 +400,7 @@ public partial class InvisibleWall : Node3D
         var w = new InvisibleWall { _x = x, _side = playerSide, _left = seconds };
         parent.AddChild(w);
         w.GlobalPosition = new Vector3(x, 0f, 0f);
-        Sfx.Play("ding", 1.6f, -8f);
+        Fx.Sound("ding", 1.6f, -8f);
     }
 
     public override void _Ready()

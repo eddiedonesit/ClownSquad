@@ -12,6 +12,7 @@ using ClownSquad.Progression;
 using ClownSquad.UI;
 using ClownSquad.Visuals;
 using ClownSquad.World;
+using ClownSquad.Net;
 
 /// <summary>
 /// What a stage pays: XP, loot drops and bags, gold, banking on a win and losing on a loss.
@@ -34,8 +35,8 @@ public partial class GameRoot
         float worth = boss ? BossXp : GruntXp * (enemy is CastFighter cast ? cast.XpScale : 1f);
         int xp = (int)Mathf.Round(worth * Leveling.EnemyXpScale(level) * Leveling.RankXp(rank));
         CrowdCheer(boss ? 4f : rank != EnemyRank.Common ? 2f : 0.9f, boss ? 14 : 1 + (int)rank * 3);
-        CameraShake.RequestPunch(this, boss ? 1.3f : 0.35f + 0.25f * (int)rank);
-        PopText.Spawn(this, enemy.GlobalPosition + new Vector3(0f, enemy.BodyHeight + 0.2f, 0f),
+        Fx.Punch(this, boss ? 1.3f : 0.35f + 0.25f * (int)rank);
+        Fx.Pop(this, enemy.GlobalPosition + new Vector3(0f, enemy.BodyHeight + 0.2f, 0f),
                       $"+{xp} XP", new Color(1f, 0.85f, 0.3f), boss ? 1.3f : 0.8f);
 
         // Gear that heals on a knockout pays the one who landed it.
@@ -61,9 +62,9 @@ public partial class GameRoot
             // A level-up is a full heal: the classic reward for surviving.
             p.ApplyProgression(r);
             if (!p.IsDead) p.Heal(p.MaxHealth);
-            PopText.Spawn(this, p.GlobalPosition + new Vector3(0f, p.BodyHeight + 0.35f, 0f),
+            Fx.Pop(this, p.GlobalPosition + new Vector3(0f, p.BodyHeight + 0.35f, 0f),
                           "LEVEL UP!", new Color(0.5f, 0.9f, 1f), 1.2f, 1.3f);
-            ClownSquad.Audio.Sfx.Play("level_up");
+            Fx.Sound("level_up");
             GD.Print($"{r.Name} reached level {r.Level} ({r.StatPoints} stat point(s) to spend).");
         }
         SaveSystem.Save();
@@ -107,7 +108,7 @@ public partial class GameRoot
         drop.PickedUp += OnPickedUp;
         _drops.Add(drop);
         _dropsSpawned++;
-        if (item.Rarity >= ItemRarity.Rare) ClownSquad.Audio.Sfx.Play("ding", 1.3f + 0.1f * (int)item.Rarity);
+        if (item.Rarity >= ItemRarity.Rare) Fx.Sound("ding", 1.3f + 0.1f * (int)item.Rarity);
         GD.Print($"Drop: {item.Rarity} {item.Name} (level {item.Level}).");
     }
 
@@ -117,9 +118,9 @@ public partial class GameRoot
         ItemData item = drop.Item;
         // Swept items were already counted into a bag at the stage clear.
         if (!_swept.Contains(item.Id)) { Bag(p).Add(item); _itemsFound++; }
-        PopText.Spawn(this, p.GlobalPosition + new Vector3(0f, p.BodyHeight + 0.25f, 0f), item.Name,
+        Fx.Pop(this, p.GlobalPosition + new Vector3(0f, p.BodyHeight + 0.25f, 0f), item.Name,
                       Loot.RarityColor(item.Rarity), 0.7f, 0.9f);
-        ClownSquad.Audio.Sfx.Play("coin", 0.9f + 0.08f * (int)item.Rarity);
+        Fx.Sound("coin", 0.9f + 0.08f * (int)item.Rarity);
     }
 
     /// <summary>Gold for a knockout, to whoever landed it, into the stage bag like loot.</summary>
@@ -132,9 +133,9 @@ public partial class GameRoot
         int gold = Mathf.Max(1, (int)Mathf.Round(amount));
         _goldEarned += gold;
         _bagGold[to] = (_bagGold.TryGetValue(to, out int had) ? had : 0) + gold;
-        PopText.Spawn(this, enemy.GlobalPosition + new Vector3(0.4f, enemy.BodyHeight, 0f), $"+{gold} G",
+        Fx.Pop(this, enemy.GlobalPosition + new Vector3(0.4f, enemy.BodyHeight, 0f), $"+{gold} G",
                       new Color(1f, 0.9f, 0.4f), 0.7f, 0.8f);
-        ClownSquad.Audio.Sfx.Play("coin", 1.3f, -8f);
+        Fx.Sound("coin", 1.3f, -8f);
     }
 
     public string BagText(PlayerFighter p)
@@ -196,7 +197,7 @@ public partial class GameRoot
             }
             _itemsBanked += bag.Count;
             p.ApplyProgression(r);
-            PopText.Spawn(this, p.GlobalPosition + new Vector3(0f, p.BodyHeight + 0.6f, 0f),
+            Fx.Pop(this, p.GlobalPosition + new Vector3(0f, p.BodyHeight + 0.6f, 0f),
                           $"LOOT BANKED x{bag.Count}", new Color(1f, 0.85f, 0.3f), 1.1f, 1.2f);
             GD.Print($"{r.Name} banked {bag.Count} item(s); wearing {r.Equipped.Count}, stash {r.Stash.Count}.");
             bag.Clear();
@@ -213,7 +214,7 @@ public partial class GameRoot
             Bag(p).Clear();
             _bagGold[p] = 0;
             if (lost == 0) continue;
-            PopText.Spawn(this, p.GlobalPosition + new Vector3(0f, p.BodyHeight + 0.6f, 0f),
+            Fx.Pop(this, p.GlobalPosition + new Vector3(0f, p.BodyHeight + 0.6f, 0f),
                           $"LOOT LOST x{lost}", new Color(0.7f, 0.7f, 0.75f), 1.0f, 1.0f);
             GD.Print($"{p.DisplayName} lost {lost} item(s) with the stage.");
         }

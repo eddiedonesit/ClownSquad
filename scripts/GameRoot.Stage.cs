@@ -12,6 +12,7 @@ using ClownSquad.Progression;
 using ClownSquad.UI;
 using ClownSquad.Visuals;
 using ClownSquad.World;
+using ClownSquad.Net;
 
 /// <summary>
 /// The stage itself: wave phases, the scrolling road and its camera, the secret shop.
@@ -163,9 +164,9 @@ public partial class GameRoot
         node.AddChild(sprite);
         node.AddChild(new OmniLight3D { LightColor = new Color(0.8f, 0.4f, 1f), LightEnergy = 3f, OmniRange = 3f, Position = new Vector3(0f, 0.8f, 0.6f) });
         _secretCurtain = node;
-        PopText.Spawn(this, node.GlobalPosition + new Vector3(0f, 1.8f, 0f), "SECRET SHOP!?", new Color(0.85f, 0.55f, 1f), 1.2f, 1.2f);
-        ClownSquad.Audio.Sfx.Play("ding", 0.6f);
-        ClownSquad.Audio.Sfx.Play("kazoo_rise", 1.3f, -6f);
+        Fx.Pop(this, node.GlobalPosition + new Vector3(0f, 1.8f, 0f), "SECRET SHOP!?", new Color(0.85f, 0.55f, 1f), 1.2f, 1.2f);
+        Fx.Sound("ding", 0.6f);
+        Fx.Sound("kazoo_rise", 1.3f, -6f);
         GD.Print("The secret shop has appeared.");
         if (_outcomeProbe.Length > 0 && !DisplayServer.GetName().Contains("headless"))
             GetTree().CreateTimer(0.8).Timeout += () =>
@@ -198,7 +199,7 @@ public partial class GameRoot
         _shop.Closed += () =>
         {
             if (_secretCurtain is not null && IsInstanceValid(_secretCurtain)) _secretCurtain.QueueFree();
-            ClownSquad.Audio.Sfx.Play("pop");
+            Fx.Sound("pop");
         };
         AddChild(_shop);
     }
@@ -207,6 +208,6 @@ public partial class GameRoot
     {
         if (_circus is null) return;
         _circus.Cheer(seconds, flashes);
-        if (seconds >= 1.3f) ClownSquad.Audio.Sfx.Play("crowd_cheer", 1f, seconds >= 3f ? 0f : -5f);
+        if (seconds >= 1.3f) Fx.Sound("crowd_cheer", 1f, seconds >= 3f ? 0f : -5f);
     }
 }

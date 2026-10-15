@@ -6,6 +6,7 @@ using ClownSquad.Audio;
 using ClownSquad.Combat;
 using ClownSquad.Visuals;
 using ClownSquad.World;
+using ClownSquad.Net;
 
 /// <summary>
 /// STRETCH (world 5): the elastic man. Punches from across the screen with an
@@ -49,15 +50,15 @@ public partial class ElasticBoss : BossFighter
                 _leapPending = false;
                 float air = StartLeap(Target()?.GlobalPosition ?? GlobalPosition, 2.4f);
                 Track(Telegraph.Circle(Stage, LeapTarget, 1.7f, air));
-                Sfx.Play("boing", 0.7f);
+                Fx.Sound("boing", 0.7f);
             }
             PinClipFrame("air", 0);
             if (!TickLeap(dt)) return false;
             ClearTelegraphs();
             HitPlayers(f => Near(f, GlobalPosition, 1.7f), 18f, 6f, 6f, 0.45f, 0.12f);
-            ImpactEffect.Spawn(Stage, GlobalPosition + new Vector3(0f, 0.1f, 0f), 1.8f);
-            CameraShake.Request(this, 0.12f, 0.25f);
-            Sfx.Play("boing", 0.5f);
+            Fx.Impact(Stage, GlobalPosition + new Vector3(0f, 0.1f, 0f), 1.8f);
+            Fx.Shake(this, 0.12f, 0.25f);
+            Fx.Sound("boing", 0.5f);
             _punches++;
             if (PhaseNumber == 3 && _punches < 2) { _leapPending = true; return false; }
             return true;
@@ -75,7 +76,7 @@ public partial class ElasticBoss : BossFighter
         // Step onto the target's lane first: a lane punch must line up.
         GlobalPosition = new Vector3(GlobalPosition.X, GlobalPosition.Y, Mathf.MoveToward(GlobalPosition.Z, _laneZ, 0.9f));
         Track(Telegraph.Lane(Stage, GlobalPosition + Facing * 0.4f, Facing, MaxReach, 0.8f));
-        Sfx.Play("slide_up", 0.6f);
+        Fx.Sound("slide_up", 0.6f);
     }
 
     private bool TickArm(float dt, bool grab)
@@ -87,7 +88,7 @@ public partial class ElasticBoss : BossFighter
         _arm.Position = new Vector3(Facing.X * 0.4f * Big, 1.45f * Big, 0.06f);
         _arm.Scale = new Vector3(Facing.X, 1f, 1f);
         if (MoveTime < Wind) return false;
-        if (MoveTime - dt < Wind) { ClearTelegraphs(); Sfx.Play("twang", 1.1f); }
+        if (MoveTime - dt < Wind) { ClearTelegraphs(); Fx.Sound("twang", 1.1f); }
         float t = MoveTime - Wind;
         if (t < Out && _caught is null)
         {
@@ -101,13 +102,13 @@ public partial class ElasticBoss : BossFighter
                 {
                     _caught = f;
                     f.Stagger(2f);
-                    Sfx.Play("boing", 1.2f);
+                    Fx.Sound("boing", 1.2f);
                 }
                 else
                 {
                     f.TakeDamage(new DamageInfo(18f * DamageMultiplier, Facing, 9f, 0.12f, this, 3f, 0.4f));
-                    ImpactEffect.Spawn(Stage, f.GlobalPosition + new Vector3(0f, 1f, 0f), 0.8f);
-                    Sfx.Play("bonk", 0.7f);
+                    Fx.Impact(Stage, f.GlobalPosition + new Vector3(0f, 1f, 0f), 0.8f);
+                    Fx.Sound("bonk", 0.7f);
                 }
                 break;
             }
@@ -132,7 +133,7 @@ public partial class ElasticBoss : BossFighter
                     f.Hold = null;
                     PinClipFrame("attack", 2);
                     f.TakeDamage(new DamageInfo(16f * DamageMultiplier, Facing, 4f, 0.14f, this, 9f, 0.5f));
-                    Sfx.Play("crit");
+                    Fx.Sound("crit");
                 }
                 if (!grab && PhaseNumber >= 2 && ++_punches < 2) { BeginPunch(); _rewind = true; return false; }
                 _punches = 0;
@@ -252,7 +253,7 @@ public partial class TrapezeArtist : BossFighter
                     _diveTo = InView(Target()?.GlobalPosition ?? GlobalPosition with { Y = 0f });
                     _mark = Telegraph.Circle(Stage, _diveTo, 1.6f, 0f);
                     _timer = 0.9f;
-                    Sfx.Play("slide_down", 1.3f);
+                    Fx.Sound("slide_down", 1.3f);
                     break;
                 }
                 // Let go of the bar and come down on the mark.
@@ -261,7 +262,7 @@ public partial class TrapezeArtist : BossFighter
                 const float T = 0.5f;
                 Vector3 p = GlobalPosition;
                 Velocity = new Vector3((_diveTo.X - p.X) / T, (-p.Y + 0.5f * Gravity * T * T) / T, (_diveTo.Z - p.Z) / T);
-                Sfx.Play("whoosh", 0.8f);
+                Fx.Sound("whoosh", 0.8f);
                 break;
             case Act.Ground:
                 if (_timer <= 0f && !InSpecial && Grounded)
@@ -286,9 +287,9 @@ public partial class TrapezeArtist : BossFighter
                     _mark?.Clear();
                     _mark = null;
                     HitPlayers(f => Near(f, GlobalPosition, 1.6f), 18f, 6f, 6f, 0.4f, 0.12f);
-                    ImpactEffect.Spawn(Stage, GlobalPosition + new Vector3(0f, 0.1f, 0f), 1.8f);
-                    CameraShake.Request(this, 0.12f, 0.25f);
-                    Sfx.Play("thump");
+                    Fx.Impact(Stage, GlobalPosition + new Vector3(0f, 0.1f, 0f), 1.8f);
+                    Fx.Shake(this, 0.12f, 0.25f);
+                    Fx.Sound("thump");
                     _act = Act.Ground;
                     _timer = Alone ? 3f : 4.5f;
                 }
@@ -411,7 +412,7 @@ public partial class FireEaterBoss : BossFighter
         {
             _burned.Clear();
             Track(Telegraph.Cone(Stage, GlobalPosition, Facing, 4.8f, 50f, 0.7f, new Color(1f, 0.5f, 0.1f)));
-            Sfx.Play("whoosh", 0.5f);
+            Fx.Sound("whoosh", 0.5f);
         }, dt =>
         {
             Stop(dt);
@@ -425,7 +426,7 @@ public partial class FireEaterBoss : BossFighter
                 _flame.Position = new Vector3(Facing.X * 0.55f * Big, 1.7f * Big, 0.08f);
                 if (_flame.ProcessMaterial is ParticleProcessMaterial pm) pm.Direction = new Vector3(Facing.X, 0.05f, 0f);
                 _flame.Emitting = true;
-                Sfx.Play("fire_roar");
+                Fx.Sound("fire_roar");
                 for (int i = 1; i <= 2; i++) Hazard.Fire(this, GlobalPosition + Facing * (1.6f * i + 0.4f), 0.9f, 3.5f, 4f, 0.5f);
             }
             _glow.LightEnergy = 3f;
@@ -441,7 +442,7 @@ public partial class FireEaterBoss : BossFighter
             return false;
         }, weight: 1.6f);
 
-        AddMove("torches", 2f, 40f, 4.5f, () => Sfx.Play("whoosh", 1.1f), dt =>
+        AddMove("torches", 2f, 40f, 4.5f, () => Fx.Sound("whoosh", 1.1f), dt =>
         {
             Stop(dt);
             int count = PhaseNumber == 3 ? 5 : 3;
@@ -455,7 +456,7 @@ public partial class FireEaterBoss : BossFighter
                     var s = EnemyShot.Lob(this, EnemyShot.Torch(1.4f), GlobalPosition + new Vector3(Facing.X * 0.4f, 2.4f, 0f), InView(to, 0f), 0.95f);
                     s.Damage = 8f;
                     s.OnLand = at2 => Hazard.Fire(this, at2, 1.0f, 3.5f, 4f, 0.1f);
-                    Sfx.Play("fwee", 0.9f, -6f);
+                    Fx.Sound("fwee", 0.9f, -6f);
                 }
             }
             return MoveTime > 0.35f + count * 0.2f + 0.3f;
@@ -463,14 +464,14 @@ public partial class FireEaterBoss : BossFighter
 
         AddMove("ring", 0f, 40f, 9f, () =>
         {
-            Sfx.Play("kaboom", 0.5f);
+            Fx.Sound("kaboom", 0.5f);
             Hazard.Fire(this, GlobalPosition, 0.9f, 2.4f, 8f, 0.7f, thickness: 0.6f, grow: 3.2f);
-            PopText.Spawn(Stage, GlobalPosition + new Vector3(0f, BodyHeight + 0.3f, 0f), "JUMP!", new Color(1f, 0.6f, 0.2f), 0.8f, 0.6f);
+            Fx.Pop(Stage, GlobalPosition + new Vector3(0f, BodyHeight + 0.3f, 0f), "JUMP!", new Color(1f, 0.6f, 0.2f), 0.8f, 0.6f);
         }, dt => { Stop(dt); PinClipFrame("special", 2); return MoveTime > 1.0f; }).Allowed = () => PhaseNumber >= 2;
 
         // Smash bottles: glass rains down on the floor around you, and at his
         // own feet, ready to be kicked.
-        AddMove("bottles", 0f, 40f, 6f, () => Sfx.Play("whoosh", 1.2f), dt =>
+        AddMove("bottles", 0f, 40f, 6f, () => Fx.Sound("whoosh", 1.2f), dt =>
         {
             Stop(dt);
             PinClipFrame("smash", MoveTime < 0.35f ? 0 : 1);
@@ -487,8 +488,8 @@ public partial class FireEaterBoss : BossFighter
                 s.OnLand = at2 =>
                 {
                     GlassField.Scatter(this, at2, 0.9f, 7);
-                    Sfx.Play("glass_smash", 1f + GD.Randf() * 0.2f);
-                    Sfx.Play("clack", 1.6f);
+                    Fx.Sound("glass_smash", 1f + GD.Randf() * 0.2f);
+                    Fx.Sound("clack", 1.6f);
                 };
             }
             return MoveTime > 0.35f + count * 0.15f + 0.3f;
@@ -498,7 +499,7 @@ public partial class FireEaterBoss : BossFighter
         AddMove("kick", 0f, 12f, 3.5f, () =>
         {
             Track(Telegraph.Cone(Stage, GlobalPosition, Facing, 7f, 36f, 0.45f, new Color(0.6f, 0.85f, 1f)));
-            Sfx.Play("whoosh", 0.9f);
+            Fx.Sound("whoosh", 0.9f);
         }, dt =>
         {
             Stop(dt);
@@ -520,14 +521,14 @@ public partial class FireEaterBoss : BossFighter
                     s.SpinSpeed = 18f;
                     s.Life = 1.2f;
                 }
-                Sfx.Play("ding", 2f);
-                Sfx.Play("whoosh", 1.4f);
+                Fx.Sound("ding", 2f);
+                Fx.Sound("whoosh", 1.4f);
             }
             return MoveTime > 0.85f;
         }, weight: 2f).Allowed = GlassNearby;
 
         // Spit fire: gobs of flame arcing in, leaving the floor alight.
-        AddMove("spit", 2f, 12f, 3f, () => Sfx.Play("whoosh", 0.6f), dt =>
+        AddMove("spit", 2f, 12f, 3f, () => Fx.Sound("whoosh", 0.6f), dt =>
         {
             Stop(dt);
             PinClipFrame("special", MoveTime < 0.3f ? 0 : 1);
@@ -540,7 +541,7 @@ public partial class FireEaterBoss : BossFighter
                 var s = EnemyShot.Lob(this, EnemyShot.Fireball(1.3f), GlobalPosition + new Vector3(Facing.X * 0.5f, 1.7f, 0f), InView(to, 0f), 0.55f, 12f);
                 s.Damage = 9f;
                 s.OnLand = at2 => Hazard.Fire(this, at2, 0.8f, 3f, 4f, 0.05f);
-                Sfx.Play("kaboom", 1.8f, -10f);
+                Fx.Sound("kaboom", 1.8f, -10f);
             }
             return MoveTime > 0.3f + shots * 0.22f + 0.2f;
         }, weight: 1.4f);
@@ -550,7 +551,7 @@ public partial class FireEaterBoss : BossFighter
         {
             foreach (Fighter f in Players())
                 Track(Telegraph.Lane(Stage, new Vector3(GlobalPosition.X, 0f, f.GlobalPosition.Z), Facing, 12f, 1f, 0.5f, new Color(1f, 0.5f, 0.1f)));
-            Sfx.Play("whoosh", 0.7f);
+            Fx.Sound("whoosh", 0.7f);
         }, dt =>
         {
             Stop(dt);
@@ -565,7 +566,7 @@ public partial class FireEaterBoss : BossFighter
                     s.SpinSpeed = 9f;
                     s.HitRadius = 0.7f;
                     s.Life = 2.2f;
-                    Sfx.Play("whirr", 0.8f);
+                    Fx.Sound("whirr", 0.8f);
                 }
             return MoveTime > 0.9f;
         });

@@ -6,6 +6,7 @@ using ClownSquad.Audio;
 using ClownSquad.Combat;
 using ClownSquad.Visuals;
 using ClownSquad.World;
+using ClownSquad.Net;
 
 /// <summary>
 /// THE TOTEM TOTS (world 8): five little clowns standing on each other's
@@ -76,7 +77,7 @@ public partial class TotStackBoss : BossFighter
         {
             _laneDir = Facing;
             Track(Telegraph.Lane(Stage, GlobalPosition, _laneDir, _count * Step + 0.9f, 1.2f, 0.8f));
-            Sfx.Play("giggle", 0.9f);
+            Fx.Sound("giggle", 0.9f);
         }, dt =>
         {
             Stop(dt);
@@ -90,15 +91,15 @@ public partial class TotStackBoss : BossFighter
             {
                 _lying = true;
                 HitPlayers(f => Telegraph.InLane(f.GlobalPosition, GlobalPosition, _laneDir, _count * Step + 0.9f, 1.2f), 16f, 6f, 5f, 0.45f, 0.1f);
-                CameraShake.Request(this, 0.12f, 0.25f);
-                Sfx.Play("thump", 0.8f);
+                Fx.Shake(this, 0.12f, 0.25f);
+                Fx.Sound("thump", 0.8f);
                 Dust(1.5f);
             }
             if (MoveTime > 2.5f) _lying = false;
             return MoveTime > 3.0f;
         }, weight: 1.4f);
 
-        AddMove("toss", 2.5f, 40f, 5f, () => Sfx.Play("whoosh", 1.3f), dt =>
+        AddMove("toss", 2.5f, 40f, 5f, () => Fx.Sound("whoosh", 1.3f), dt =>
         {
             Stop(dt);
             if (MoveTime >= 0.35f && MoveTime - dt < 0.35f && _count > 1 && Target() is Fighter t)
@@ -116,7 +117,7 @@ public partial class TotStackBoss : BossFighter
                 s.BurstRadius = 1.3f;
                 s.BurstDamage = 12f;
                 s.SpinSpeed = 7f;
-                Sfx.Play("fwee", 1.4f);
+                Fx.Sound("fwee", 1.4f);
             }
             return MoveTime > 0.8f;
         }).Allowed = () => _count > 1 && !_tossed;
@@ -126,8 +127,8 @@ public partial class TotStackBoss : BossFighter
             _conga = true;
             _trail.Clear();
             _bumped.Clear();
-            Sfx.Play("kazoo_rise", 1.2f);
-            PopText.Spawn(Stage, GlobalPosition + new Vector3(0f, BodyHeight + 0.3f, 0f), "CONGA!", new Color(1f, 0.85f, 0.3f), 0.9f, 0.7f);
+            Fx.Sound("kazoo_rise", 1.2f);
+            Fx.Pop(Stage, GlobalPosition + new Vector3(0f, BodyHeight + 0.3f, 0f), "CONGA!", new Color(1f, 0.85f, 0.3f), 0.9f, 0.7f);
         }, dt =>
         {
             Fighter? t = Target();
@@ -218,8 +219,8 @@ public partial class TotStackBoss : BossFighter
         tw.TweenProperty(tot, "global_position", new Vector3(at.X + dir * 0.6f, 0.45f, at.Z), 0.25f);
         tw.TweenProperty(tot, "global_position", new Vector3(at.X + dir * 12f, 0.45f, at.Z), 2.2f);
         tw.TweenCallback(Callable.From(tot.QueueFree));
-        Sfx.Play("slide_down", 1.5f);
-        PopText.Spawn(Stage, at + new Vector3(0f, 0.6f, 0f), "I QUIT!", Colors.White, 0.6f, 0.6f);
+        Fx.Sound("slide_down", 1.5f);
+        Fx.Pop(Stage, at + new Vector3(0f, 0.6f, 0f), "I QUIT!", Colors.White, 0.6f, 0.6f);
     }
 }
 
@@ -257,7 +258,7 @@ public partial class StrongmanBoss : BossFighter
             _waved.Clear();
             Track(Telegraph.Circle(Stage, GlobalPosition + Facing * 1.4f, 1.7f, 0.9f));
             Track(Telegraph.Lane(Stage, GlobalPosition + Facing * 1.4f, Facing, 7f, 1.4f, 0.9f));
-            Sfx.Play("honk_low", 0.6f);
+            Fx.Sound("honk_low", 0.6f);
         }, dt =>
         {
             Stop(dt);
@@ -266,17 +267,17 @@ public partial class StrongmanBoss : BossFighter
             if (MoveTime >= 0.9f && MoveTime - dt < 0.9f)
             {
                 HitPlayers(f => Near(f, at, 1.7f), 22f, 7f, 7f, 0.5f, 0.15f);
-                ImpactEffect.Spawn(Stage, at + new Vector3(0f, 0.1f, 0f), 2.2f);
-                CameraShake.Request(this, 0.2f, 0.35f);
-                Sfx.Play("kaboom", 0.6f);
-                Sfx.Play("clang");
+                Fx.Impact(Stage, at + new Vector3(0f, 0.1f, 0f), 2.2f);
+                Fx.Shake(this, 0.2f, 0.35f);
+                Fx.Sound("kaboom", 0.6f);
+                Fx.Sound("clang");
             }
             if (MoveTime > 0.9f && MoveTime < 1.4f)
             {
                 // The shockwave runs down the lane.
                 float front = (MoveTime - 0.9f) / 0.5f * 7f;
                 if ((int)(front * 2f) != (int)((front - dt / 0.5f * 7f) * 2f))
-                    ImpactEffect.Spawn(Stage, at + Facing * front + new Vector3(0f, 0.1f, 0f), 0.9f, glow: false);
+                    Fx.Impact(Stage, at + Facing * front + new Vector3(0f, 0.1f, 0f), 0.9f, glow: false);
                 HitPlayers(f => Telegraph.InLane(f.GlobalPosition, at, Facing, front, 1.4f), 14f, 5f, 5f, 0.4f, 0.06f, Facing, _waved);
             }
             return MoveTime > 1.8f;
@@ -285,7 +286,7 @@ public partial class StrongmanBoss : BossFighter
         AddMove("grab", 0f, 2.6f, 5f, () =>
         {
             Track(Telegraph.Lane(Stage, GlobalPosition, Facing, 3.4f * Big * 0.8f, 1.4f, 0.45f));
-            Sfx.Play("honk_low", 0.9f);
+            Fx.Sound("honk_low", 0.9f);
         }, dt =>
         {
             if (_held is null)
@@ -302,7 +303,7 @@ public partial class StrongmanBoss : BossFighter
                         _held = f;
                         f.Stagger(2.5f);
                         f.Hold = () => GlobalPosition + new Vector3(0f, BodyHeight + 0.1f, 0.05f);
-                        Sfx.Play("boing", 0.7f);
+                        Fx.Sound("boing", 0.7f);
                         break;
                     }
                 }
@@ -317,8 +318,8 @@ public partial class StrongmanBoss : BossFighter
                 _held = null;
                 f.Hold = null;
                 f.TakeDamage(new DamageInfo(18f * DamageMultiplier, Facing, 14f, 0.15f, this, 9f, 0.6f));
-                Sfx.Play("whoosh", 0.6f);
-                CameraShake.Request(this, 0.15f, 0.3f);
+                Fx.Sound("whoosh", 0.6f);
+                Fx.Shake(this, 0.15f, 0.3f);
                 return true;
             }
             return false;
@@ -334,7 +335,7 @@ public partial class StrongmanBoss : BossFighter
                 s.Damage = 10f;
                 s.BurstRadius = 1.3f;
                 s.BurstDamage = 14f;
-                Sfx.Play("fwee", 0.7f);
+                Fx.Sound("fwee", 0.7f);
             }
             return MoveTime > 0.8f;
         });
@@ -342,8 +343,8 @@ public partial class StrongmanBoss : BossFighter
         AddMove("flex", 0f, 40f, 9f, () =>
         {
             _flex = true;
-            Sfx.Play("crowd_cheer", 1.1f, -6f);
-            PopText.Spawn(Stage, GlobalPosition + new Vector3(0f, BodyHeight + 0.3f, 0f), "FLEX!", new Color(1f, 0.85f, 0.3f), 1f, 0.8f);
+            Fx.Sound("crowd_cheer", 1.1f, -6f);
+            Fx.Pop(Stage, GlobalPosition + new Vector3(0f, BodyHeight + 0.3f, 0f), "FLEX!", new Color(1f, 0.85f, 0.3f), 1f, 0.8f);
         }, dt => { Stop(dt); PinClipFrame("special", 1); return MoveTime > 1.8f; }).Allowed = () => PhaseNumber >= 2;
     }
 
@@ -351,7 +352,7 @@ public partial class StrongmanBoss : BossFighter
     {
         if (_flex && CanBeHit())
         {
-            Sfx.Play("clack", 0.6f);
+            Fx.Sound("clack", 0.6f);
             base.TakeDamage(new DamageInfo(info.Amount * 0.2f, info.KnockbackDirection, 0f, info.Hitstop, info.Source, 0f, 0f));
             return;
         }
@@ -415,12 +416,12 @@ public partial class RingmasterBoss : BossFighter
             _dir = Facing;
             _run.Clear();
             Track(Telegraph.Lane(Stage, GlobalPosition, _dir, 15f, 2.0f));
-            Sfx.Play("crit", 1.2f);
-            PopText.Spawn(Stage, GlobalPosition + new Vector3(0f, BodyHeight + 0.3f, 0f), "HYAH!", new Color(1f, 0.85f, 0.3f), 0.8f, 0.5f);
+            Fx.Sound("crit", 1.2f);
+            Fx.Pop(Stage, GlobalPosition + new Vector3(0f, BodyHeight + 0.3f, 0f), "HYAH!", new Color(1f, 0.85f, 0.3f), 0.8f, 0.5f);
         }, dt =>
         {
             if (MoveTime < 0.85f) { Stop(dt); return false; }
-            if (MoveTime - dt < 0.85f) { ClearTelegraphs(); Sfx.Play("whirr", 0.6f); }
+            if (MoveTime - dt < 0.85f) { ClearTelegraphs(); Fx.Sound("whirr", 0.6f); }
             Velocity = new Vector3(_dir.X * 11.5f, Velocity.Y, 0f);
             HitPlayers(f => Mathf.Abs(f.GlobalPosition.X - (GlobalPosition.X + _dir.X * 1.2f)) < 1.1f && Mathf.Abs(f.GlobalPosition.Z - GlobalPosition.Z) < 0.9f,
                        20f, 8f, 7f, 0.5f, 0.12f, _dir, _run);
@@ -430,14 +431,14 @@ public partial class RingmasterBoss : BossFighter
         AddMove("crack", 1.2f, 6f, 2.2f, () =>
         {
             Track(Telegraph.Lane(Stage, GlobalPosition, Facing, 5.5f, 0.9f, 0.5f));
-            Sfx.Play("whoosh", 0.8f);
+            Fx.Sound("whoosh", 0.8f);
         }, dt =>
         {
             Stop(dt);
             PinClipFrame("attack", MoveTime < 0.25f ? 0 : MoveTime < 0.5f ? 1 : 2);
             if (MoveTime >= 0.5f && MoveTime - dt < 0.5f)
             {
-                Sfx.Play("whip_crack", 0.95f);
+                Fx.Sound("whip_crack", 0.95f);
                 HitPlayers(f => Telegraph.InLane(f.GlobalPosition, GlobalPosition, Facing, 5.5f, 0.9f), 16f, 6f, 0f, 0.6f, 0.1f, Facing);
             }
             if (PhaseNumber == 3 && MoveTime > 0.85f && MoveTime - dt <= 0.85f)
@@ -450,8 +451,8 @@ public partial class RingmasterBoss : BossFighter
 
         AddMove("clowns", 0f, 40f, 11f, () =>
         {
-            PopText.Spawn(Stage, GlobalPosition + new Vector3(0f, BodyHeight + 0.4f, 0f), "BRING ON THE CLOWNS!", new Color(1f, 0.85f, 0.3f), 1f, 1f);
-            Sfx.Play("fanfare", 1.1f, -4f);
+            Fx.Pop(Stage, GlobalPosition + new Vector3(0f, BodyHeight + 0.4f, 0f), "BRING ON THE CLOWNS!", new Color(1f, 0.85f, 0.3f), 1f, 1f);
+            Fx.Sound("fanfare", 1.1f, -4f);
         }, dt =>
         {
             Stop(dt);
@@ -472,7 +473,7 @@ public partial class RingmasterBoss : BossFighter
             return MoveTime > 1.1f;
         }).Allowed = () => { _acts.RemoveAll(p => !IsInstanceValid(p) || p.IsDead); return _acts.Count < 2; };
 
-        AddMove("hat", 0f, 40f, 5f, () => Sfx.Play("pop", 0.8f), dt =>
+        AddMove("hat", 0f, 40f, 5f, () => Fx.Sound("pop", 0.8f), dt =>
         {
             Stop(dt);
             PinClipFrame("special", 0);
@@ -487,7 +488,7 @@ public partial class RingmasterBoss : BossFighter
                     s.Damage = 0f;
                     s.BurstRadius = 1.3f;
                     s.BurstDamage = 14f;
-                    Sfx.Play("fwee", 1f + i * 0.08f, -6f);
+                    Fx.Sound("fwee", 1f + i * 0.08f, -6f);
                 }
             }
             if (PhaseNumber == 3 && MoveTime >= 1.2f && MoveTime - dt < 1.2f)
@@ -510,7 +511,7 @@ public partial class RingmasterBoss : BossFighter
                 _spots.Add(f.GlobalPosition);
                 Track(Telegraph.Circle(Stage, f.GlobalPosition, 1.3f, 1.0f, new Color(1f, 0.9f, 0.4f)));
             }
-            Sfx.Play("ding", 0.6f);
+            Fx.Sound("ding", 0.6f);
         }, dt =>
         {
             Stop(dt);
@@ -527,8 +528,8 @@ public partial class RingmasterBoss : BossFighter
                     tw.TweenCallback(Callable.From(beam.QueueFree));
                     HitPlayers(f => Near(f, at, 1.3f), 16f, 4f, 6f, 0.4f, 0.1f);
                 }
-                Sfx.Play("kaboom", 1.3f, -4f);
-                CameraShake.Request(this, 0.1f, 0.25f);
+                Fx.Sound("kaboom", 1.3f, -4f);
+                Fx.Shake(this, 0.1f, 0.25f);
             }
             return MoveTime > 1.4f;
         }).Allowed = () => !_mounted;
@@ -573,10 +574,10 @@ public partial class RingmasterBoss : BossFighter
         tw.TweenProperty(_cart, "modulate:a", 0f, 1f);
         tw.TweenCallback(Callable.From(_cart.QueueFree));
         VisualBase = Vector3.Zero;
-        ImpactEffect.Spawn(Stage, at + new Vector3(0f, 0.8f, 0f), 2.6f);
-        Sfx.Play("kaboom");
-        CameraShake.Request(this, 0.2f, 0.4f);
-        PopText.Spawn(Stage, GlobalPosition + new Vector3(0f, 2.6f, 0f), "MY CARRIAGE!", new Color(1f, 0.4f, 0.3f), 1.2f, 1f);
+        Fx.Impact(Stage, at + new Vector3(0f, 0.8f, 0f), 2.6f);
+        Fx.Sound("kaboom");
+        Fx.Shake(this, 0.2f, 0.4f);
+        Fx.Pop(Stage, GlobalPosition + new Vector3(0f, 2.6f, 0f), "MY CARRIAGE!", new Color(1f, 0.4f, 0.3f), 1.2f, 1f);
         Stagger(0.9f);
         MoveSpeed = 3.6f;
     }

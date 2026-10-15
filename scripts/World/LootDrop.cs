@@ -5,6 +5,7 @@ using Godot;
 using ClownSquad.Actors;
 using ClownSquad.Audio;
 using ClownSquad.Progression;
+using ClownSquad.Net;
 
 /// <summary>
 /// An item lying in the ring. It pops out of the enemy in a little arc, then
@@ -14,6 +15,9 @@ using ClownSquad.Progression;
 /// </summary>
 public partial class LootDrop : Node3D
 {
+    // Numbered for the network (NetRegistry) while in the scene.
+    public override void _Notification(int what) => ClownSquad.Net.NetRegistry.Notify(this, what);
+
     private const string Icons = "res://assets/arena/loot_icons.png";
     private const float Magnet = 1.7f;
     private const float Touch = 0.45f;
@@ -114,7 +118,7 @@ public partial class LootDrop : Node3D
             {
                 GlobalPosition = new Vector3(GlobalPosition.X, 0f, GlobalPosition.Z);
                 _landed = true;
-                Sfx.Play("clack", 1.6f, -8f);
+                Fx.Sound("clack", 1.6f, -8f);
             }
             if (Arena.Current is Arena arena) GlobalPosition = arena.Clamp(GlobalPosition, 0.8f, 0.3f, out _);
             return;

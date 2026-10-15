@@ -4,6 +4,7 @@ using Godot;
 using ClownSquad.Actors;
 using ClownSquad.Audio;
 using ClownSquad.Visuals;
+using ClownSquad.Net;
 
 /// <summary>
 /// A crate standing along the walkway. Players can smash it like an enemy
@@ -31,8 +32,8 @@ public partial class Crate : Fighter
         base._Ready();
         Died += _ =>
         {
-            Sfx.Play("thump", 1.3f);
-            ImpactEffect.Spawn(GetParent(), GlobalPosition + new Vector3(0f, 0.4f, 0f), 1.0f, glow: false);
+            Fx.Sound("thump", 1.3f);
+            Fx.Impact(GetParent(), GlobalPosition + new Vector3(0f, 0.4f, 0f), 1.0f, glow: false);
             var food = new Food((int)(GetInstanceId() % 4));
             GetParent().AddChild(food);
             food.GlobalPosition = GlobalPosition;
@@ -81,10 +82,10 @@ public partial class Food : Node3D
             if (new Vector2(d.X, d.Z).Length() > 0.6f) continue;
             float heal = p.MaxHealth / 3f;
             p.Heal(heal);
-            PopText.Spawn(GetParent(), p.GlobalPosition + new Vector3(0f, p.BodyHeight + 0.3f, 0f),
+            Fx.Pop(GetParent(), p.GlobalPosition + new Vector3(0f, p.BodyHeight + 0.3f, 0f),
                           $"{Names[_kind]} +{heal:F0}", new Color(0.6f, 1f, 0.6f), 0.8f, 1f);
-            Sfx.Play("coin", 1.5f);
-            Sfx.Play("boing_small", 1.6f, -6f);
+            Fx.Sound("coin", 1.5f);
+            Fx.Sound("boing_small", 1.6f, -6f);
             QueueFree();
             return;
         }
