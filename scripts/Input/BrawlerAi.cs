@@ -32,11 +32,15 @@ public sealed class BrawlerAi : IInputSource
     private ulong _nextAttackMs;
     private ulong _nextSpecialMs;
 
+    /// <summary>Above zero, this fighter prefers to stay this far away (throwers), only closing in when it has to.</summary>
+    private readonly float _keepAway;
+
     public BrawlerAi(Fighter self, float attackRange = 1.8f, float backoffRange = 1.1f,
                      ulong attackCooldownMs = 800, ulong specialCooldownMs = 0,
-                     float specialRange = 5.5f, float depthTolerance = 0.55f)
+                     float specialRange = 5.5f, float depthTolerance = 0.55f, float keepAway = 0f)
     {
         _self = self;
+        _keepAway = keepAway;
         _attackRange = attackRange;
         _backoffRange = backoffRange;
         _specialCooldownMs = specialCooldownMs;
@@ -83,6 +87,18 @@ public sealed class BrawlerAi : IInputSource
 
         Vector2 move = Vector2.Zero;
         bool attack = false;
+
+        // Throwers back off when crowded and hover at their range, lined up
+        // roughly on the target's lane, so their throws come down the lane.
+        if (_keepAway > 0f && dist < _keepAway * 1.3f)
+        {
+            if (dist < _keepAway * 0.65f)
+                move = new Vector2(-dir.X, -dir.Z);
+            else
+                move = new Vector2(0f, Mathf.Clamp(delta.Z, -1f, 1f) * 0.6f);
+            move += Separation();
+            return new InputCommand(move, false, false, false);
+        }
 
         // Player-side AI (used by tests) is never rationed; enemies need a token.
         bool rested = now >= _nextAttackMs;

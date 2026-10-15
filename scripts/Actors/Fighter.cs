@@ -174,6 +174,19 @@ public partial class Fighter : CharacterBody3D
             return;
         }
 
+        // Grabbed: carried wherever the grabber says, helpless, until let go.
+        if (Hold is Func<Vector3> anchor)
+        {
+            GlobalPosition = anchor();
+            Velocity = Vector3.Zero;
+            Grounded = GlobalPosition.Y <= 0.01f;
+            PinClipFrame(HoldClip, 0);
+            Visual?.SetFacing(Facing);
+            Visual?.Tick(dt);
+            UpdateShadow();
+            return;
+        }
+
         if (_hitAnimRemaining > 0f) _hitAnimRemaining -= dt;
         if (_stunRemaining > 0f) _stunRemaining -= dt;
         if (_invulnerable > 0f) _invulnerable -= dt;
@@ -224,6 +237,26 @@ public partial class Fighter : CharacterBody3D
         UpdateShadow();
     }
 
+    /// <summary>
+    /// While set, this fighter is held by another (a strongman's grab, a
+    /// stretchy arm reeling in): it goes where the anchor says and does nothing.
+    /// The holder sets it and clears it.
+    /// </summary>
+    public Func<Vector3>? Hold { get; set; }
+
+    /// <summary>The pose shown while held. A trapeze artist on the bar is "held" by it, hanging.</summary>
+    public string HoldClip { get; set; } = "hit";
+
+    /// <summary>The pose held while stunned on the ground. A toppled stilt-walker lies flat.</summary>
+    protected virtual string StunClip => "hit";
+
+    /// <summary>Stun for a while without a hit: a topple, a dizzy spell, a grab.</summary>
+    public void Stagger(float seconds)
+    {
+        _stunRemaining = Mathf.Max(_stunRemaining, seconds);
+        OnInterrupted();
+    }
+
     /// <summary>Per-frame logic for a fighter able to act.</summary>
     protected virtual void Tick(float dt) { }
 
@@ -247,7 +280,7 @@ public partial class Fighter : CharacterBody3D
             _deadTime += dt;
             Visual.Visible = (int)(_deadTime / BlinkPeriod) % 2 == 0;
         }
-        PinClipFrame(floored && hasFlooredArt ? "down" : "hit", 0);
+        PinClipFrame(floored && hasFlooredArt ? "down" : Down || IsDead || Launched ? "hit" : StunClip, 0);
 
         if (Down || IsDead)
         {

@@ -103,7 +103,7 @@ public partial class GameRoot : Node3D
         ClownSquad.Visuals.ArtStyle.Classic = Has("classic");
 
         // Tests run against a throwaway save, so they never read or touch a real one.
-        bool probe = Has("animtest") || Has("movetest") || Has("aitest") || Has("wavetest") || Has("losetest") || Has("tentshot");
+        bool probe = Has("animtest") || Has("movetest") || Has("aitest") || Has("wavetest") || Has("losetest") || Has("tentshot") || Has("castshot");
         if (probe)
         {
             SaveSystem.Path = "user://probe_save.json";
@@ -153,6 +153,7 @@ public partial class GameRoot : Node3D
 
         if (Has("animtest")) { AddChild(new ClownSquad.Debug.AnimationProbe()); return; }
         if (Has("movetest")) { AddChild(new ClownSquad.Debug.MovesProbe()); return; }
+        if (Has("castshot")) { SpawnPlayers(); AddChild(new ClownSquad.Debug.CastLineup()); return; }
 
         _aiProbe = Has("aitest");
         if (Has("wavetest")) _outcomeProbe = "win";
@@ -180,6 +181,8 @@ public partial class GameRoot : Node3D
             _director.Waves = st.Waves.Length > 0 ? st.Waves : _director.Waves;
             _director.LevelFloor = st.EnemyLevel;
             _director.RankBoost = st.RankBoost;
+            _director.World = st.World;
+            _director.Pool = EnemyCatalog.Pool(st.World);
             _director.GruntCooldownMs = st.GruntCooldownMs;
             _director.BonusSeconds = st.BonusSeconds;
             int clears = SaveSystem.Data.Campaign.Cleared.Count;
@@ -676,11 +679,12 @@ public partial class GameRoot : Node3D
     private void OnEnemyDefeated(Fighter enemy)
     {
         _kos++;
-        bool boss = enemy is BossClown;
+        bool boss = enemy is IBoss { PrimaryBoss: true };
         var foe = enemy as PlayerFighter;
         int level = foe?.EnemyLevel ?? 1;
         EnemyRank rank = foe?.Rank ?? EnemyRank.Common;
-        int xp = (int)Mathf.Round((boss ? BossXp : GruntXp) * Leveling.EnemyXpScale(level) * Leveling.RankXp(rank));
+        float worth = boss ? BossXp : GruntXp * (enemy is CastFighter cast ? cast.XpScale : 1f);
+        int xp = (int)Mathf.Round(worth * Leveling.EnemyXpScale(level) * Leveling.RankXp(rank));
         CrowdCheer(boss ? 4f : rank != EnemyRank.Common ? 2f : 0.9f, boss ? 14 : 1 + (int)rank * 3);
         CameraShake.RequestPunch(this, boss ? 1.3f : 0.35f + 0.25f * (int)rank);
         PopText.Spawn(this, enemy.GlobalPosition + new Vector3(0f, enemy.BodyHeight + 0.2f, 0f),
@@ -1216,6 +1220,20 @@ public partial class GameRoot : Node3D
         PlayerFighter p = _players[0];
         p.Source = new BrawlerAi(p, attackRange: 1.7f, backoffRange: 0.8f, attackCooldownMs: 350) { AdvanceWhenIdle = true };
         p.ExtraDamageMultiplier = 2.5f;
+
+        // "-- level 20": play the probe as a squad of a fitting level, points
+        // spent evenly on POW and GUTS, so late worlds and bosses can be tested.
+        string[] args = OS.GetCmdlineUserArgs();
+        int at = Array.IndexOf(args, "level");
+        if (at >= 0 && at + 1 < args.Length && int.TryParse(args[at + 1], out int want) && p.Record is CharacterRecord rec)
+        {
+            while (rec.Level < want && Leveling.XpToNext(rec.Level) > 0) Leveling.Grant(rec, Leveling.XpToNext(rec.Level));
+            bool pow = true;
+            while (rec.StatPoints > 0) { if (pow) rec.Pow++; else rec.Guts++; rec.StatPoints--; pow = !pow; }
+            p.ApplyProgression(rec);
+            p.Heal(p.MaxHealth);
+            GD.Print($"Probe squad at level {rec.Level}: POW {rec.Pow}, GUTS {rec.Guts}, {p.MaxHealth:F0} hp.");
+        }
         // Every grunt ranked Rare, so the run is certain to drop loot and to
         // exercise the ranked-enemy path.
         _director!.ForceRank = EnemyRank.Rare;
@@ -1311,6 +1329,10 @@ public partial class GameRoot : Node3D
         string got = d.Current == WaveDirector.Phase.Victory ? "win"
                    : d.Current == WaveDirector.Phase.Defeat ? "lose" : "timeout";
         bool ok = got == _outcomeProbe;
+        if (got == "timeout")
+            foreach (Node n in GetTree().GetNodesInGroup(Fighter.Group))
+                if (n is Fighter f && f.Hostile)
+                    GD.Print($"  still standing: {f.Name} '{f.DisplayName}' hp {f.Health:F0}/{f.MaxHealth:F0} at {f.GlobalPosition.X:F1},{f.GlobalPosition.Y:F1},{f.GlobalPosition.Z:F1}");
         var heard = new List<string>();
         foreach (var kv in ClownSquad.Audio.Sfx.Played) heard.Add($"{kv.Key}x{kv.Value}");
         heard.Sort();

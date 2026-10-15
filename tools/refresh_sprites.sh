@@ -13,6 +13,7 @@ python tools/gen_enemy.py
 python tools/gen_sprite_hd.py
 python tools/gen_portrait.py
 python tools/gen_enemy_hd.py
+python tools/gen_cast_hd.py
 python tools/gen_arena.py
 python tools/gen_map.py
 python tools/gen_stage.py

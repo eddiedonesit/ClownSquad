@@ -1,0 +1,39 @@
+{
+ "frame_width": 110,
+ "frame_height": 100,
+ "baseline": 86,
+ "count": 15,
+ "clips": {
+  "idle": [
+   0,
+   1,
+   2,
+   3
+  ],
+  "walk": [
+   4,
+   5,
+   6,
+   7
+  ],
+  "attack": [
+   8,
+   9,
+   10,
+   11
+  ],
+  "hit": [
+   12
+  ],
+  "air": [
+   13
+  ],
+  "down": [
+   14
+  ]
+ },
+ "fps": {
+  "idle": 5,
+  "walk": 10
+ }
+}

@@ -33,6 +33,8 @@ bash tools/refresh_sprites.sh
 #   -- titleshot              intro panels, intro logo, title, load slots, squad select
 #   -- stageshot stage 3-1    a stage's 3D scenery, twice along the road
 #   -- mapshot mapall mapat 6-3   the world map on any island, all of them lit
+#   -- castshot / castshot bosses the new enemies or bosses lined up, idle and mid-move
+# probes at a level: add  level 20  to wavetest (e.g. -- wavetest stage 7-B level 21)
 ```
 
 In PowerShell, launch with the call operator: `& "C:/Tools/Godot/4.7.2/Godot_v4.7.2-stable_mono_win64.exe" --path C:/Claude/ClownSquad`.
@@ -88,6 +90,8 @@ immediately; pads join by pressing a button.
 | Effects | Ground impact burst and camera shake, scaled by combo step |
 | Enemy AI | `BrawlerAi` as an IInputSource: closes distance, holds swing range, attacks on cooldown |
 | Boss clown | Big fat grinning enemy, 320 hp, slow, own sprite sheet and larger scale |
+| Enemy cast | Six enemies beyond the grunt, one new per world (EnemyCatalog): juggler (keeps away, lobs pins), unicyclist (lane charge, dizzy after), balloon artist (twists balloon dogs), mime (invisible rope pull and wall), stilt-walker (hard to hurt until 4 quick hits topple him), weightlifter (blocks from the front, grab and slam). Art by tools/gen_cast_hd.py; ADR 0008 |
+| Bosses | One per world: 1 Bellyflop Bertie, 2 Bobo the Balancer (on a 3D beach ball: pin volleys, ball roll, bounces), 3 Madame Stripes and Rajah the tiger (whip, commanded pounce and roar, flaming hoop), 4 the Jalopy (clown car: rams, unloads passengers, honk, backfire), 5 Stretch (stretching lane punch, grab-and-reel, spring leaps), 6 the Flying Fratelli (two acrobats on 3D trapezes taking turns to dive), 7 Pyro Pete (fire breath cone, torches, ring of fire), 8 the Totem Tots (a tower of five that topples, throws a tot, and congas; one quits every fifth of its health), 9 Iron Ivan (barbell slam with a lane shockwave, grab-and-throw, dumbbells, flex), 10 the Ringmaster (carriage charges and whip, then on foot: hat bombs, doves, spotlights, calling in acts). Phases at 2/3 and 1/3 health, comic title card on arrival, telegraphs for every big move |
 | Specials | `HasSpecial` / `OnSpecialStart` / `TickSpecialMove` hooks; boss belly slam with a radial shockwave |
 | Factions | `Fighter.Hostile` gates attacks, so there is no friendly fire |
 | Tooling | Procedural sprite/effect/enemy generators, animation probe, AI probe, variant renderer |

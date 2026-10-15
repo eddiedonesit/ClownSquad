@@ -7,6 +7,7 @@ using ClownSquad.Audio;
 using ClownSquad.Input;
 using ClownSquad.Map;
 using ClownSquad.Progression;
+using ClownSquad.Visuals;
 
 /// <summary>
 /// Runs the fight: waves of enemies in from the screen edges, a shared pool of
@@ -258,20 +259,66 @@ public partial class WaveDirector : Node
         }
     }
 
+    /// <summary>The running director, for enemies that bring others into the fight.</summary>
+    public static WaveDirector? Running { get; private set; }
+
+    /// <summary>The world being fought in: picks the boss act. Set by whoever runs the stage.</summary>
+    public int World { get; set; } = 1;
+
+    /// <summary>The enemy mix: kinds and weights (EnemyCatalog). Grunts only when unset.</summary>
+    public (string kind, int weight)[] Pool { get; set; } = { ("grunt", 1) };
+
+    public override void _EnterTree() => Running = this;
+
+    private string PickKind()
+    {
+        int total = 0;
+        foreach ((_, int w) in Pool) total += w;
+        int roll = _rng.RandiRange(1, Mathf.Max(1, total));
+        foreach ((string kind, int w) in Pool)
+        {
+            roll -= w;
+            if (roll <= 0) return kind;
+        }
+        return "grunt";
+    }
+
     private void Spawn(bool boss, bool harmless = false)
     {
-        PlayerFighter enemy = boss ? new BossClown { Name = "BossClown" } : new GruntClown { Name = "Grunt" };
-        if (!boss) enemy.DisplayName = harmless ? "PINATA" : GruntNames[_rng.RandiRange(0, GruntNames.Length - 1)];
-        enemy.Source = boss
-            ? new BrawlerAi(enemy, attackRange: 2.2f, backoffRange: 1.2f, attackCooldownMs: 700,
-                            specialCooldownMs: 5000, specialRange: 6.0f)
-            : new BrawlerAi(enemy, attackRange: 1.35f, backoffRange: 0.7f,
-                            attackCooldownMs: harmless ? 99999999UL : (ulong)GruntCooldownMs);
+        if (boss)
+        {
+            // A boss act: the boss and any partner, in from opposite sides.
+            foreach (PlayerFighter b in EnemyCatalog.Boss(World))
+            {
+                b.Name = b is BossClown ? "BossClown" : b.GetType().Name;
+                b.Source = b is BossClown
+                    ? new BrawlerAi(b, attackRange: 2.2f, backoffRange: 1.2f, attackCooldownMs: 700, specialCooldownMs: 5000, specialRange: 6.0f)
+                    : EnemyCatalog.Brain(b, GruntCooldownMs);
+                Place(b, EnemyRank.Common);
+            }
+            return;
+        }
 
+        string kind = harmless ? "grunt" : PickKind();
+        PlayerFighter enemy = EnemyCatalog.Create(kind);
+        enemy.Name = kind;
+        enemy.DisplayName = harmless ? "PINATA" : EnemyCatalog.NameFor(kind, _rng, GruntNames);
+        enemy.Source = harmless
+            ? new BrawlerAi(enemy, attackRange: 1.35f, backoffRange: 0.7f, attackCooldownMs: 99999999UL)
+            : EnemyCatalog.Brain(enemy, GruntCooldownMs);
+        bool ranks = !harmless && (enemy is not CastFighter cf || cf.RollsRank);
+        // A forced rank (tests) applies to grunts; the rest of the cast rolls normally.
+        bool forcedOff = ForceRank is not null && enemy is not GruntClown;
+        Place(enemy, !ranks ? EnemyRank.Common : forcedOff ? EnemyRank.Common : RollRank());
+        if (harmless) enemy.DamageMultiplier = 0f;
+    }
+
+    /// <summary>Add an enemy at the screen edge, scaled to the stage, counted for the wave.</summary>
+    private void Place(PlayerFighter enemy, EnemyRank rank)
+    {
         _world.AddChild(enemy);
         int level = Mathf.Max(LevelFloor, HostLevel());
-        enemy.ApplyEnemyRank(level, boss || harmless ? EnemyRank.Common : RollRank());
-        if (harmless) enemy.DamageMultiplier = 0f;
+        enemy.ApplyEnemyRank(level, rank);
         if (enemy.Rank != EnemyRank.Common)
             GD.Print($"{enemy.DisplayName} appears (level {enemy.EnemyLevel}).");
 
@@ -280,15 +327,42 @@ public partial class WaveDirector : Node
         if (Arena.Current is Arena arena)
         {
             (float far, float near) = arena.DepthRange(enemy.BodyHeight);
-            float z = _rng.RandfRange(far + 0.4f, near - 0.6f);
+            float z = _rng.RandfRange(far + 0.4f, Mathf.Max(far + 0.5f, near - 0.6f));
             float cx = CameraLock ?? arena.CameraX;
-            float x = cx + _side * (arena.HalfWidthAt(z, enemy.BodyHeight) - enemy.BodyHalfWidth);
+            float x = cx + _side * Mathf.Max(0.5f, arena.HalfWidthAt(z, enemy.BodyHeight) - enemy.BodyHalfWidth);
             at = new Vector3(x, 0f, z);
         }
         _side = -_side;
         enemy.GlobalPosition = at;
         enemy.Died += OnEnemyDied;
         EnemiesAlive++;
+    }
+
+    /// <summary>
+    /// An enemy called up mid-fight (a balloon dog, the clown car's passengers,
+    /// the Ringmaster's acts): scaled like the rest, counted for the wave.
+    /// </summary>
+    public void Summon(PlayerFighter enemy, Vector3 at)
+    {
+        if (enemy.Source is null) enemy.Source = EnemyCatalog.Brain(enemy, GruntCooldownMs);
+        if (enemy.DisplayName.Length == 0) enemy.DisplayName = EnemyCatalog.NameFor(enemy.Name, _rng, GruntNames);
+        _world.AddChild(enemy);
+        enemy.ApplyEnemyRank(Mathf.Max(LevelFloor, HostLevel()), EnemyRank.Common);
+        enemy.GlobalPosition = at;
+        enemy.Died += OnEnemyDied;
+        EnemiesAlive++;
+    }
+
+    /// <summary>Send an enemy away without a fight (no XP): a tiger whose trainer has fallen.</summary>
+    public void Dismiss(PlayerFighter enemy)
+    {
+        if (!IsInstanceValid(enemy) || enemy.IsDead) return;
+        enemy.Died -= OnEnemyDied;
+        EnemiesAlive = Mathf.Max(0, EnemiesAlive - 1);
+        enemy.Stagger(5f);
+        enemy.BeginDespawn(0.4f);
+        PopText.Spawn(_world, enemy.GlobalPosition + new Vector3(0f, enemy.BodyHeight + 0.2f, 0f), "RUN AWAY!", Colors.White, 0.7f, 0.6f);
+        CheckFinalBlow();
     }
 
     private EnemyRank RollRank()
@@ -311,7 +385,11 @@ public partial class WaveDirector : Node
         EnemiesAlive--;
         enemy.BeginDespawn();
         EnemyDefeated?.Invoke(enemy);
+        CheckFinalBlow();
+    }
 
+    private void CheckFinalBlow()
+    {
         // The last blow of the fight lands in slow motion.
         bool finalBlow = !IsBonus && WaveNumber >= WaveCount && EnemiesAlive == 0 && _gruntsToSpawn == 0 && !_bossToSpawn;
         if (finalBlow && Engine.TimeScale <= 1.01)
@@ -335,5 +413,9 @@ public partial class WaveDirector : Node
         Set(Phase.Defeat);
     }
 
-    public override void _ExitTree() => Engine.TimeScale = _normalTimeScale;
+    public override void _ExitTree()
+    {
+        Engine.TimeScale = _normalTimeScale;
+        if (Running == this) Running = null;
+    }
 }

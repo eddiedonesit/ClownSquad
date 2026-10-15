@@ -12,8 +12,11 @@ using ClownSquad.Visuals;
 /// Signature move: the belly slam. Rears back, launches forward, and crashes
 /// down with a radial shockwave that outreaches any normal swing.
 /// </summary>
-public partial class BossClown : PlayerFighter
+public partial class BossClown : PlayerFighter, IBoss
 {
+    public string BossTitle => DisplayName;
+    public float BossFraction => Health / MaxHealth;
+    public bool PrimaryBoss => true;
     protected override string SheetPath =>
         ArtStyle.Sheet("res://assets/sprites/boss_clown.png", "res://assets/sprites/boss_hd.png");
 
@@ -84,9 +87,16 @@ public partial class BossClown : PlayerFighter
         Friction = 26f;
         base._Ready();
         BuildFists();
+        CallDeferred(MethodName.Announce);
     }
 
     public override void _ExitTree() => HideMarker();
+
+    private void Announce()
+    {
+        // The sandbox respawns him forever; the card is for real fights.
+        if (ClownSquad.World.WaveDirector.Running is not null) ClownSquad.UI.BossCard.Show(this, DisplayName, "THE BELLY OF THE BIG TOP");
+    }
 
     protected override bool HasSpecial => true;
 

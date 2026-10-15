@@ -920,7 +920,7 @@ public partial class WorldMap3D : Node3D
         _nodeTitle.Text = s.Kind switch
         {
             StageKind.Normal => $"STAGE {s.Id}" + (done ? "   - CLEARED -" : ""),
-            StageKind.Boss => $"BOSS: {Campaign.WorldNames[s.World - 1]}" + (done ? "   - CLEARED -" : ""),
+            StageKind.Boss => $"BOSS: {ClownSquad.Actors.EnemyCatalog.BossName(s.World)}" + (done ? "   - CLEARED -" : ""),
             _ => s.Title,
         };
         _nodeInfo.Text = s.Kind switch

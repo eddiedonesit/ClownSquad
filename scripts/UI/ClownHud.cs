@@ -54,6 +54,29 @@ public partial class ClownHud : CanvasLayer
     private BalloonRow _balloons = null!;
 
     private Control _bossRoot = null!;
+    private TextureRect _bossFace = null!;
+    private static readonly Dictionary<string, Rect2> FaceCache = new();
+
+    /// <summary>
+    /// The head in a cast sheet's first frame: the top of the drawn figure,
+    /// found from the pixels once and remembered, so any new character gets a
+    /// portrait without anyone measuring it.
+    /// </summary>
+    private static Rect2 FaceOf(string sheet)
+    {
+        if (FaceCache.TryGetValue(sheet, out Rect2 r)) return r;
+        Image img = GD.Load<Texture2D>(sheet).GetImage();
+        if (img.IsCompressed()) img.Decompress();
+        FrameLibrary.SheetInfo info = FrameLibrary.Info(sheet);
+        int x0 = info.FrameWidth, x1 = 0, y0 = info.FrameHeight, y1 = 0;
+        for (int y = 0; y < info.FrameHeight; y += 2)
+            for (int x = 0; x < info.FrameWidth; x += 2)
+                if (img.GetPixel(x, y).A > 0.5f) { x0 = Math.Min(x0, x); x1 = Math.Max(x1, x); y0 = Math.Min(y0, y); y1 = Math.Max(y1, y); }
+        float side = Math.Min(x1 - x0, (y1 - y0) * 0.45f);
+        r = new Rect2((x0 + x1) * 0.5f - side * 0.5f, y0, side, side);
+        FaceCache[sheet] = r;
+        return r;
+    }
     private CandyBar _bossBar = null!;
     private Label _bossName = null!;
 
@@ -253,6 +276,7 @@ public partial class ClownHud : CanvasLayer
         AddChild(_bossRoot);
 
         var face = Face(BossSheet, BossHead);
+        _bossFace = face;
         face.Size = new Vector2(60, 56);
         _bossRoot.AddChild(face);
         _bossName = new Label { Position = new Vector2(66, -2), LabelSettings = Style(20, new Color(1f, 0.6f, 0.9f), 6) };
@@ -338,7 +362,7 @@ public partial class ClownHud : CanvasLayer
 
     private void OnHit(Fighter? attacker, Fighter victim, float amount)
     {
-        if (attacker is null || attacker.Hostile || !victim.Hostile || victim is BossClown) return;
+        if (attacker is null || attacker.Hostile || !victim.Hostile || victim is IBoss { PrimaryBoss: true }) return;
         _targetFighter = victim;
         _targetUntil = _clock + 2.5;
     }
@@ -410,7 +434,18 @@ public partial class ClownHud : CanvasLayer
         _targetName.Text = t!.IsDead ? $"{t.DisplayName}  K.O.!" : t.DisplayName;
         _targetBar.Value = t.Health / t.MaxHealth;
         if (_targetFace.Texture is AtlasTexture at)
-            at.Atlas = GD.Load<Texture2D>(t is GruntClown ? GruntSheet : PlayerSheet);
+        {
+            if (t is CastFighter cf)
+            {
+                at.Atlas = GD.Load<Texture2D>(cf.SheetFile);
+                at.Region = FaceOf(cf.SheetFile);
+            }
+            else
+            {
+                at.Atlas = GD.Load<Texture2D>(t is GruntClown ? GruntSheet : PlayerSheet);
+                at.Region = ClownHead;
+            }
+        }
     }
 
     private void UpdateTicketAndBoss()
@@ -428,13 +463,18 @@ public partial class ClownHud : CanvasLayer
             _balloons.Count = d.Lives;
         }
 
-        BossClown? boss = null;
+        IBoss? boss = null;
         foreach (Node n in GetTree().GetNodesInGroup(Fighter.Group))
-            if (n is BossClown b) { boss = b; break; }
+            if (n is IBoss { PrimaryBoss: true } b) { boss = b; break; }
         _bossRoot.Visible = boss is not null;
         if (boss is null) return;
-        _bossName.Text = boss.DisplayName;
-        _bossBar.Value = boss.Health / boss.MaxHealth;
+        _bossName.Text = boss.BossTitle;
+        _bossBar.Value = Mathf.Max(0f, boss.BossFraction);
+        if (_bossFace.Texture is AtlasTexture bt)
+        {
+            if (boss is CastFighter cf) { bt.Atlas = GD.Load<Texture2D>(cf.SheetFile); bt.Region = FaceOf(cf.SheetFile); }
+            else { bt.Atlas = GD.Load<Texture2D>(BossSheet); bt.Region = BossHead; }
+        }
     }
 
     private void UpdateCombo()
