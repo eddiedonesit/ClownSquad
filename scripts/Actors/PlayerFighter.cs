@@ -15,7 +15,7 @@ using ClownSquad.Visuals;
 /// </summary>
 public partial class PlayerFighter : Fighter
 {
-    private enum State { Free, Attacking, Dodging, Special, Charging, Spinning, Throwing, Flipping, Quaking }
+    private enum State { Free, Attacking, Dodging, Special, Charging, Spinning, Throwing, Flipping, Quaking, Lunging }
 
     // The combo comes from the weapon in hand (Weapons.cs): an escalating chain
     // where only the finisher launches, so a full string is what opens a juggle.
@@ -34,6 +34,15 @@ public partial class PlayerFighter : Fighter
     private const float AftershockAt = 0.62f;
     private float _quakeTime;
     private int _quakeHits;
+
+    // The balloon sword's charge: a short coil, then a dash that runs everyone through.
+    private const float LungeWind = 0.14f;
+    private const float LungeDash = 0.26f;
+    private const float LungeSpeed = 15f;
+    private float _lungeTime;
+
+    // A ranged weapon fires once per combo step.
+    private bool _fired;
 
     private const float ComboWindow = 0.45f;
     private const float DodgeDuration = 0.35f;
@@ -76,8 +85,8 @@ public partial class PlayerFighter : Fighter
     // Players blink while floored and while invulnerable after respawning.
     protected override bool BlinkWhileDown => !Hostile;
 
-    public override string AttackSound => !HasMalletMoves ? "slap" : Weapon == WeaponKind.Chicken ? "squeak" : "bonk";
-    public override float AttackPitch => Weapon switch { WeaponKind.Hammer => 0.7f, WeaponKind.Chicken => 1.3f, _ => 1f };
+    public override string AttackSound => !HasMalletMoves ? "slap" : _weapon.HitSound;
+    public override float AttackPitch => HasMalletMoves ? _weapon.HitPitch : 1f;
     public override string HurtSound => Hostile ? "squeak" : "honk";
     public override string DeathSound => Hostile ? "slide_down" : "wah_short";
 
@@ -141,7 +150,8 @@ public partial class PlayerFighter : Fighter
         State.Spinning => "SPIN",
         State.Throwing => "THROW",
         State.Flipping => "FLIP",
-        State.Quaking => "QUAKE",
+        State.Quaking => _weapon.Charge == ChargeMove.Clap ? "CLAP" : "QUAKE",
+        State.Lunging => "LUNGE",
         _ => Armed ? "free" : "free (unarmed)",
     };
 
@@ -304,6 +314,7 @@ public partial class PlayerFighter : Fighter
             case State.Throwing: TickThrowing(dt); break;
             case State.Flipping: TickFlipping(dt); break;
             case State.Quaking: TickQuake(dt); break;
+            case State.Lunging: TickLunge(dt); break;
         }
     }
 
@@ -400,6 +411,7 @@ public partial class PlayerFighter : Fighter
         _phaseTime = 0f;
         _hitThisSwing.Clear();
         _impactSpawned = false;
+        _fired = false;
         _kaboomed = false;
         _sinceCombo = 0f;
         AssistLane();
@@ -450,10 +462,10 @@ public partial class PlayerFighter : Fighter
         if (!_impactSpawned && _phaseTime >= activeStart + step.Active * 0.5f)
         {
             _impactSpawned = true;
-            if (HasMalletMoves)   // only a mallet strikes the ground
+            float heft = _weapon.Heft;
+            if (HasMalletMoves && heft > 0f)   // only something heavy strikes the ground
             {
                 Vector3 at = GlobalPosition + Facing * MalletForward + new Vector3(0f, MalletHeight, 0f);
-                float heft = Weapon switch { WeaponKind.Hammer => 1.45f, WeaponKind.Chicken => 0.6f, _ => 1f };
                 ImpactEffect.Spawn(GetParent(), at, (0.7f + _comboIndex * 0.25f) * heft);
                 Sfx.Play("thump", Weapon == WeaponKind.Hammer ? 0.8f : 1.1f, -4f);
                 CameraShake.Request(this, (0.035f + _comboIndex * 0.03f) * heft, 0.16f + _comboIndex * 0.04f);
@@ -470,7 +482,11 @@ public partial class PlayerFighter : Fighter
             PinClipFrame("attack", frame);
         }
 
-        if (_phaseTime > activeStart && prev < activeEnd)
+        if (_weapon.Ranged && HasMalletMoves)
+        {
+            if (!_fired && _phaseTime >= activeStart) { _fired = true; FireCork(step); }
+        }
+        else if (_phaseTime > activeStart && prev < activeEnd)
             ResolveSwing(step);
 
         // Recovery can be cancelled into a dodge. An attack you cannot get out
@@ -521,10 +537,15 @@ public partial class PlayerFighter : Fighter
             // Knock straight along the facing, so hits shove down the lane
             // instead of scattering sideways.
             Strike(other, step.Damage, Facing, step.Knockback, step.Hitstop, step.Launch * _launchMultiplier);
+            // A pie in the face: the finisher leaves them reeling.
+            if (_weapon.FinisherStagger > 0f && _comboIndex == Combo.Length - 1 && !other.IsDead)
+                other.Stagger(_weapon.FinisherStagger * _perks.Blind);
         }
 
-        // KABOOM gear: the finisher goes off like a firework, once per swing.
-        if (_kaboom > 0f && _comboIndex == Combo.Length - 1 && _hitThisSwing.Count > 0 && !_kaboomed)
+        // KABOOM gear, or POP GOES THE... on a balloon sword: the finisher goes
+        // off like a firework, once per swing.
+        float boom = _kaboom + (_perks.PopFinisher ? 14f : 0f);
+        if (boom > 0f && _comboIndex == Combo.Length - 1 && _hitThisSwing.Count > 0 && !_kaboomed)
         {
             _kaboomed = true;
             Vector3 at = GlobalPosition + Facing * (step.Range * ReachScale * 0.7f);
@@ -536,7 +557,7 @@ public partial class PlayerFighter : Fighter
                 Vector3 d = other.GlobalPosition - at;
                 d.Y = 0f;
                 if (d.Length() > 1.8f) continue;
-                other.TakeDamage(new DamageInfo(_kaboom * DamageMultiplier, d.LengthSquared() > 0.01f ? d.Normalized() : Facing, 5f, 0.08f, this, 4f, 0.35f));
+                other.TakeDamage(new DamageInfo(boom * DamageMultiplier, d.LengthSquared() > 0.01f ? d.Normalized() : Facing, 5f, 0.08f, this, 4f, 0.35f));
             }
         }
     }
@@ -625,7 +646,13 @@ public partial class PlayerFighter : Fighter
 
         if (_heldTime >= FullCharge)
         {
-            if (_weapon.Charge == ChargeMove.Quake) StartQuake(); else StartThrow();
+            switch (_weapon.Charge)
+            {
+                case ChargeMove.Quake:
+                case ChargeMove.Clap: StartQuake(); break;
+                case ChargeMove.Lunge: StartLunge(); break;
+                default: StartThrow(); break;
+            }
             return;
         }
 
@@ -705,10 +732,18 @@ public partial class PlayerFighter : Fighter
         _throwTime += dt;
         ApplyGroundMovement(Vector3.Zero, dt);
 
+        // The pop gun fires from the shoulder; everything else is thrown.
+        bool gun = _weapon.Charge == ChargeMove.BigShot;
         if (!_thrown)
         {
-            PinClipFrame("throw", 0);
-            if (_throwTime >= 0.14f)
+            PinClipFrame(gun ? "attack" : "throw", gun ? 1 : 0);
+            if (_throwTime >= 0.14f && _weapon.Charge != ChargeMove.Throw)
+            {
+                // Pies, pins and corks do not come back: there are always more in the pockets.
+                _thrown = true;
+                Toss();
+            }
+            else if (_throwTime >= 0.14f)
             {
                 _thrown = true;
                 Armed = false;
@@ -724,10 +759,122 @@ public partial class PlayerFighter : Fighter
         }
         else
         {
-            PinClipFrame("throw", 1);
+            PinClipFrame(gun ? "attack" : "throw", gun ? 2 : 1);
         }
 
         if (_throwTime >= 0.38f) EndMalletMove();
+    }
+
+    private Vector3 Hand => GlobalPosition + new Vector3(Facing.X * 0.55f, 1.05f, 0f);
+
+    /// <summary>The charge throws that do not come back: a lobbed pie, a fan of pins, the big cork.</summary>
+    private void Toss()
+    {
+        int extra = _perks.ExtraShots;
+        CameraShake.Request(this, 0.04f, 0.12f);
+        Sfx.Play(_weapon.ThrowSound, _weapon.Charge == ChargeMove.BigShot ? 0.6f : 1f);
+        switch (_weapon.Charge)
+        {
+            case ChargeMove.Lob:
+                for (int i = 0; i <= extra; i++)
+                {
+                    Vector3 to = GlobalPosition + Facing * (4.6f + 1.3f * i) + new Vector3(0f, 0f, (i % 2 == 0 ? 1f : -1f) * 0.6f * ((i + 1) / 2));
+                    if (ClownSquad.World.Arena.Current is ClownSquad.World.Arena arena) to = arena.Clamp(to, 0f, 0.6f, out _);
+                    var pie = PlayerShot.Lob(this, PlayerShot.Pie(1.5f), Hand, new Vector3(to.X, 0f, to.Z), 0.55f + 0.08f * i);
+                    pie.Damage = 16f * _perks.ThrowDamage;
+                    pie.Splat = 1.5f * _perks.SplatRadius;
+                    pie.Blind = 1.4f * _perks.Blind;
+                    pie.Knockback = 3f;
+                    pie.SpinSpeed = 4f;
+                }
+                break;
+            case ChargeMove.Fan:
+                int n = 3 + extra;
+                for (int i = 0; i < n; i++)
+                {
+                    float z = (i - (n - 1) * 0.5f) * 0.16f;
+                    var pin = PlayerShot.Fire(this, EnemyShot.Pin(1.4f), Hand, new Vector3(Facing.X, 0f, z), 15f);
+                    pin.Damage = 12f * _perks.ThrowDamage;
+                    pin.Range = 9f * _perks.ThrowRange;
+                    pin.Pierce = _perks.Pierce;
+                    pin.Launch = _perks.ThrowLaunches ? 5f : 0f;
+                    pin.Knockback = 4f;
+                }
+                break;
+            case ChargeMove.BigShot:
+                var cork = PlayerShot.Fire(this, PlayerShot.Cork(2.8f), GlobalPosition + new Vector3(Facing.X * 0.1f, 1.05f, 0f), Facing, 17f);
+                cork.Damage = 30f * _perks.ThrowDamage;
+                cork.Range = 10f * _perks.ThrowRange;
+                cork.Pierce = true;
+                cork.Knockback = 9f;
+                cork.Launch = 3f;
+                cork.HitRadius = 0.7f;
+                cork.Burst = _perks.ThrowExplodes;
+                Visual.Squash(0.3f);
+                break;
+        }
+    }
+
+    /// <summary>A pop-gun shot: one cork (two with DOUBLE BARREL) straight down the lane.</summary>
+    private void FireCork(in AttackStep step)
+    {
+        int n = 1 + _perks.ExtraShots;
+        for (int i = 0; i < n; i++)
+        {
+            float z = n == 1 ? 0f : (i - (n - 1) * 0.5f) * 0.12f;
+            // Fired from the body, not the muzzle, so a shot at point blank still lands.
+            Vector3 from = GlobalPosition + new Vector3(Facing.X * 0.1f, 1.05f, 0f);
+            var cork = PlayerShot.Fire(this, PlayerShot.Cork(1.3f), from, new Vector3(Facing.X, 0f, z), 18f);
+            cork.Damage = step.Damage * (n > 1 ? 0.65f : 1f);
+            cork.Range = step.Range * _perks.ThrowRange;
+            cork.Knockback = step.Knockback;
+            cork.Launch = step.Launch * _launchMultiplier;
+            cork.Pierce = _perks.Pierce;
+        }
+        Sfx.Play("pop", 1.3f + 0.08f * _comboIndex);
+        CameraShake.Request(this, 0.02f, 0.08f);
+    }
+
+    /// <summary>The balloon sword's charge: coil, then dash forward running everyone through.</summary>
+    private void StartLunge()
+    {
+        Visual.Tint = BaseTint;
+        Sfx.Stop(_chargeVoice);
+        _chargeVoice = null;
+        _lungeTime = 0f;
+        _hitThisSwing.Clear();
+        _state = State.Lunging;
+    }
+
+    private void TickLunge(float dt)
+    {
+        _lungeTime += dt;
+        if (_lungeTime < LungeWind)
+        {
+            ApplyGroundMovement(Vector3.Zero, dt);
+            PinClipFrame("charge", 0);
+            return;
+        }
+        float t = _lungeTime - LungeWind;
+        float dash = LungeDash * _perks.Lunge;
+        PinClipFrame("attack", 3);
+        if (t < dash)
+        {
+            if (t - dt < 0f) { Sfx.Play("whoosh", 1.3f); Dust(0.4f); }
+            Velocity = new Vector3(Facing.X * LungeSpeed, Velocity.Y, 0f);
+            foreach (Fighter other in Opponents())
+            {
+                if (_hitThisSwing.Contains(other)) continue;
+                Vector3 to = other.GlobalPosition - GlobalPosition;
+                float forward = to.X * Facing.X;
+                if (forward < -0.4f || forward > 2.6f || Mathf.Abs(to.Z) > 0.9f || Mathf.Abs(to.Y) > 1.9f) continue;
+                _hitThisSwing.Add(other);
+                Strike(other, 20f * _perks.Lunge, Facing, 5f, 0.06f, 4f, 0.4f);
+            }
+            return;
+        }
+        ApplyGroundMovement(Vector3.Zero, dt);
+        if (t > dash + 0.18f) EndMalletMove();
     }
 
     /// <summary>Big Bertha's charge: a ground pound that hits everyone around.</summary>
@@ -748,6 +895,8 @@ public partial class PlayerFighter : Fighter
         ApplyGroundMovement(Vector3.Zero, dt);
         PinClipFrame("attack", _quakeTime < QuakeImpact * 0.6f ? 1 : _quakeTime < QuakeImpact ? 2 : 3);
 
+        if (_weapon.Charge == ChargeMove.Clap) { TickClap(); return; }
+
         int due = _quakeTime >= QuakeImpact ? 1 : 0;
         if (_perks.Aftershock && _quakeTime >= AftershockAt) due = 2;
         while (_quakeHits < due)
@@ -767,6 +916,29 @@ public partial class PlayerFighter : Fighter
         }
 
         if (_quakeTime >= (_perks.Aftershock ? AftershockAt + 0.2f : 0.55f)) EndMalletMove();
+    }
+
+    /// <summary>The slapstick's charge: one enormous clap that stuns everything in front.</summary>
+    private void TickClap()
+    {
+        if (_quakeHits == 0 && _quakeTime >= QuakeImpact)
+        {
+            _quakeHits = 1;
+            float reach = 3.4f * _perks.QuakeRadius;
+            ImpactEffect.Spawn(GetParent(), GlobalPosition + Facing * 1.3f + new Vector3(0f, 0.9f, 0f), 1.6f);
+            PopText.Spawn(GetParent(), GlobalPosition + Facing * 1.6f + new Vector3(0f, 1.9f, 0f), "CLAP!", new Color(1f, 0.85f, 0.3f), 1f, 0.6f);
+            Sfx.Play("slap", 0.55f, 2f);
+            Sfx.Play("whip_crack", 0.8f, -4f);
+            CameraShake.Request(this, 0.14f, 0.3f);
+            foreach (Fighter other in Opponents())
+            {
+                Vector3 to = other.GlobalPosition - GlobalPosition;
+                float forward = to.X * Facing.X;
+                if (forward <= -0.2f || forward > reach || Mathf.Abs(to.Z) > 1.4f || Mathf.Abs(to.Y) > 2f) continue;
+                Strike(other, 18f * _perks.QuakeDamage, Facing, 7f * _perks.Knockback, 0.08f, 2f, 1.0f);
+            }
+        }
+        if (_quakeTime >= 0.45f) EndMalletMove();
     }
 
     /// <summary>The boomerang came home.</summary>
@@ -832,6 +1004,7 @@ public partial class PlayerFighter : Fighter
                         float hitstop, float launch = 0f, float stun = 0.26f)
     {
         bool crit = RollCrit();
+        stun *= _weapon.StunScale * _perks.StunTime;
         other.TakeDamage(new DamageInfo(Scaled(damage, crit), dir, knockback, crit ? hitstop * 1.6f : hitstop, this, launch, stun));
         ApplyHitstop(crit ? hitstop * 1.6f : hitstop);
         Spark(other, crit);
@@ -895,7 +1068,7 @@ public partial class PlayerFighter : Fighter
     }
 
     // UNSTOPPABLE: a hit lands but does not stop the swing.
-    protected override bool HasPoise => _perks.Unstoppable && _state is State.Attacking or State.Quaking;
+    protected override bool HasPoise => _perks.Unstoppable && _state is State.Attacking or State.Quaking or State.Lunging;
 
     /// <summary>THICK SKIN softens hits; SECOND WIND catches a player about to go down.</summary>
     public override void TakeDamage(in DamageInfo info)

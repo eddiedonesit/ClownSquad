@@ -106,7 +106,7 @@ public partial class GameRoot : Node3D
         ClownSquad.Visuals.ArtStyle.Classic = Has("classic");
 
         // Tests run against a throwaway save, so they never read or touch a real one.
-        bool probe = Has("animtest") || Has("movetest") || Has("aitest") || Has("wavetest") || Has("losetest") || Has("tentshot") || Has("skillshot") || Has("castshot") || Has("demo");
+        bool probe = Has("animtest") || Has("movetest") || Has("aitest") || Has("wavetest") || Has("losetest") || Has("tentshot") || Has("skillshot") || Has("weapontest") || Has("castshot") || Has("demo");
         if (Has("bossrush")) BossRush.Active = true;
         _rush = BossRush.Active;
         if (probe)
@@ -166,6 +166,7 @@ public partial class GameRoot : Node3D
 
         if (Has("animtest")) { AddChild(new ClownSquad.Debug.AnimationProbe()); return; }
         if (Has("movetest")) { AddChild(new ClownSquad.Debug.MovesProbe()); return; }
+        if (Has("weapontest")) { AddChild(new ClownSquad.Debug.WeaponProbe()); return; }
         if (Has("castshot")) { SpawnPlayers(); AddChild(new ClownSquad.Debug.CastLineup()); return; }
 
         _aiProbe = Has("aitest");
@@ -1283,7 +1284,7 @@ public partial class GameRoot : Node3D
 
         sb.AppendLine();
         sb.AppendLine("WASD move | J attack | Space jump | K dodge      pad: stick | X | A | B");
-        sb.AppendLine("hold attack 3s: throw mallet or chicken, hammer pounds the ground | hold attack + left/right: spin | attack in air: flip");
+        sb.AppendLine("hold attack: the weapon's charge move (throw, quake, pie lob, pin fan, clap, big cork, lunge) | hold attack + left/right: spin | attack in air: flip");
         _hud.Text = sb.ToString();
     }
 

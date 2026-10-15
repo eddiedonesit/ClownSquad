@@ -82,8 +82,15 @@ public sealed class SmartBot : IInputSource
         float side = me.X >= t.X ? 1f : -1f;
         // A blocker is hit from behind: go round to the side it is not facing.
         if (target is CastFighter cf && cf.IsGuarding) side = -cf.Facing.X;
-        float reach = AttackRange + target.BodyHalfWidth * 0.6f;
+        // A pop gun fights from down the lane; everything else up close.
+        float reach = _self.Weapon == ClownSquad.Progression.WeaponKind.PopGun ? 5.5f : AttackRange + target.BodyHalfWidth * 0.6f;
         Vector3 spot = new(t.X + side * reach * 0.8f, 0f, t.Z);
+        // Pinned at the screen edge with the target against it: come in from the other side.
+        if (Arena.Current is Arena edge && Flat(edge.Clamp(spot, _self.BodyHeight, _self.BodyHalfWidth, out _) - spot).Length() > 0.05f)
+        {
+            side = -side;
+            spot = new Vector3(t.X + side * reach * 0.8f, 0f, t.Z);
+        }
         if (Danger(spot, out _) > 0f) spot = new Vector3(t.X + side * (reach + 1.5f), 0f, t.Z);   // wait out of the danger
 
         Vector3 to = spot - me;

@@ -30,6 +30,7 @@ BASELINE = TOP_PAD + BODY_H
 SUIT, DIAMOND, RED, YELLOW, WHITE, SKIN, HAIR, NOSE = 1, 2, 3, 4, 5, 6, 7, 8
 INK, EYE, LIP, BLUSH, MAKEUP, SOLE, WOOD, METAL, BELT, GOLD = 9, 10, 11, 12, 13, 14, 15, 16, 17, 18
 IRON, CHICK, BEAK, COMB, DARKWOOD = 19, 20, 21, 22, 23
+CRUST, BALLOON, CORK, CREAM = 24, 25, 26, 27
 
 MATS = {
     SUIT: Material((70, 108, 210)),
@@ -55,6 +56,10 @@ MATS = {
     BEAK: Material((240, 140, 40)),
     COMB: Material((220, 40, 50)),
     DARKWOOD: Material((110, 64, 40)),
+    CRUST: Material((222, 164, 92)),
+    BALLOON: Material((236, 70, 170), gloss=True),
+    CORK: Material((196, 150, 100)),
+    CREAM: Material((252, 246, 232), soft=True),
 }
 
 # ------------------------------------------------------------------- parts
@@ -224,22 +229,136 @@ def chicken_legs(c, hx, hy, angle, length):
         c.capsule(hx - uy * side, hy + ux * side, hx + ux * length * 0.3 - uy * side, hy + uy * length * 0.3 + ux * side, 1.4, 1.4, BEAK)
 
 
+def axis(angle):
+    r = math.radians(angle)
+    ux, uy = math.cos(r), -math.sin(r)
+    px, py = -uy, ux                       # across, toward the top of the screen
+    if py > 0:
+        px, py = -px, -py
+    return ux, uy, px, py
+
+
+def pie_head(c, hx, hy, angle, length):
+    """A CREAM PIE balanced on the palm: a tin, a crust, a dome of cream, a cherry.
+    It stays level whatever the arm does, the way a waiter carries a plate."""
+    ux, uy, _, _ = axis(angle)
+    x, y = hx + ux * 10, hy + uy * 10 - 6
+    c.part()
+    c.ellipse(x, y + 3, 17, 4.5, METAL)                 # the tin
+    c.part()
+    c.ellipse(x, y, 16, 5.5, CRUST)                     # the crust rim
+    c.recolor(lambda xx, yy, m: CRUST if abs(math.sin(xx * 0.9)) > 0.6 else m)
+    c.part()
+    c.ellipse(x, y - 5, 13, 8, CREAM)                   # the cream
+    for k in (-8, 0, 8):
+        c.ellipse(x + k, y - 4, 4.5, 4.5, CREAM)        # piped swirls round the edge
+    c.part()
+    c.ellipse(x + 1, y - 13, 3.6, 3.6, NOSE)            # the cherry
+
+
+def pie_handle(c, hx, hy, angle, length):
+    pass
+
+
+def pin_head(c, hx, hy, angle, length):
+    """A juggling PIN held by its neck: a white bottle-shaped club, red bands."""
+    ux, uy, px, py = axis(angle)
+    L = length * 1.05
+    bx, by = hx + ux * L * 0.72, hy + uy * L * 0.72
+    c.part()
+    c.ellipse_rot(bx, by, L * 0.34, 9.5, math.atan2(uy, ux), WHITE)
+    c.part()
+    c.capsule(hx + ux * L * 0.2, hy + uy * L * 0.2, bx - ux * L * 0.15, by - uy * L * 0.15, 3.6, 6, WHITE)
+
+    def bands(x, y, m):
+        u = (x - hx) * ux + (y - hy) * uy
+        return RED if abs(u - L * 0.42) < 2.2 or abs(u - L * 0.5) < 1.6 else m
+    c.recolor(bands)
+
+
+def pin_handle(c, hx, hy, angle, length):
+    ux, uy, _, _ = axis(angle)
+    c.part()
+    c.capsule(hx - ux * 5, hy - uy * 5, hx + ux * length * 0.25, hy + uy * length * 0.25, 3.2, 3.2, WHITE)
+    c.part()
+    c.ellipse(hx - ux * 6, hy - uy * 6, 4.4, 4.4, WHITE)    # the knob
+
+
+def slapstick_head(c, hx, hy, angle, length):
+    """The SLAPSTICK: two long flat slats on one handle, a gap between them that
+    claps shut on impact. One slat yellow, one red."""
+    ux, uy, px, py = axis(angle)
+    a0, a1 = length * 0.3, length * 1.05
+    for side, mat in ((-3.2, YELLOW), (3.2, RED)):
+        c.part()
+        c.capsule(hx + ux * a0 + px * side, hy + uy * a0 + py * side,
+                  hx + ux * a1 + px * side, hy + uy * a1 + py * side, 2.8, 3.0, mat)
+
+
+def slapstick_handle(c, hx, hy, angle, length):
+    ux, uy, _, _ = axis(angle)
+    c.part()
+    c.capsule(hx - ux * 4, hy - uy * 4, hx + ux * length * 0.32, hy + uy * length * 0.32, 3.4, 3.4, WOOD)
+    c.recolor(lambda x, y, m: GOLD if abs((x - hx) * ux + (y - hy) * uy - length * 0.3) < 1.8 else m)
+
+
+def popgun_head(c, hx, hy, angle, length):
+    """A toy POP GUN: a red barrel with yellow bands and a cork in the muzzle,
+    tied on with a string that loops back to the stock."""
+    ux, uy, px, py = axis(angle)
+    L = length * 0.95
+    c.part()
+    c.capsule(hx + ux * 2, hy + uy * 2, hx + ux * L, hy + uy * L, 4.6, 4.2, RED)
+    c.recolor(lambda x, y, m: YELLOW if abs((x - hx) * ux + (y - hy) * uy - L * 0.45) < 2 or
+              abs((x - hx) * ux + (y - hy) * uy - L * 0.8) < 2 else m)
+    c.part()
+    c.ellipse_rot(hx + ux * (L + 4), hy + uy * (L + 4), 4, 4.4, math.atan2(uy, ux), CORK)
+    c.part(line=False)
+    c.stroke(bezier((hx + ux * (L + 4), hy + uy * (L + 4)), (hx + ux * L * 0.6 - px * 9, hy + uy * L * 0.6 - py * 9),
+                    (hx + ux * 4, hy + uy * 4)), 0.8, INK)
+
+
+def popgun_handle(c, hx, hy, angle, length):
+    ux, uy, px, py = axis(angle)
+    c.part()
+    # the stock, behind the hand, angled down like a rifle's
+    c.capsule(hx - ux * 2, hy - uy * 2, hx - ux * 16 - px * 4, hy - uy * 16 - py * 4, 4.8, 6.2, DARKWOOD)
+
+
+def balloon_head(c, hx, hy, angle, length):
+    """A BALLOON SWORD: a long twisted balloon blade of glossy bulbs, a balloon crossguard."""
+    ux, uy, px, py = axis(angle)
+    L = length * 1.1
+    n = 5
+    seg = (L - 8) / n
+    for i in range(n):
+        u = 8 + seg * (i + 0.5)
+        c.part()
+        c.ellipse_rot(hx + ux * u, hy + uy * u, seg * 0.62, 5.2, math.atan2(uy, ux), BALLOON)
+    c.part()
+    c.ellipse(hx + ux * (L + 2), hy + uy * (L + 2), 2.2, 2.2, BALLOON)      # the knot at the tip
+
+
+def balloon_handle(c, hx, hy, angle, length):
+    ux, uy, px, py = axis(angle)
+    c.part()
+    c.ellipse_rot(hx + ux * 6, hy + uy * 6, 3.2, 10, math.atan2(uy, ux), YELLOW)     # crossguard, across the blade
+    c.part()
+    c.ellipse_rot(hx - ux * 5, hy - uy * 5, 5, 4, math.atan2(uy, ux), YELLOW)       # pommel
+
+
+HEADS = {"hammer": hammer_head, "chicken": chicken_body, "pie": pie_head, "pins": pin_head,
+         "slapstick": slapstick_head, "popgun": popgun_head, "balloon": balloon_head}
+HANDLES = {"hammer": hammer_handle, "chicken": chicken_legs, "pie": pie_handle, "pins": pin_handle,
+           "slapstick": slapstick_handle, "popgun": popgun_handle, "balloon": balloon_handle}
+
+
 def weapon_head(c, hx, hy, angle, length):
-    if WEAPON == "hammer":
-        hammer_head(c, hx, hy, angle, length)
-    elif WEAPON == "chicken":
-        chicken_body(c, hx, hy, angle, length)
-    else:
-        mallet_head(c, hx, hy, angle, length)
+    HEADS.get(WEAPON, mallet_head)(c, hx, hy, angle, length)
 
 
 def weapon_handle(c, hx, hy, angle, length):
-    if WEAPON == "hammer":
-        hammer_handle(c, hx, hy, angle, length)
-    elif WEAPON == "chicken":
-        chicken_legs(c, hx, hy, angle, length)
-    else:
-        mallet_handle(c, hx, hy, angle, length)
+    HANDLES.get(WEAPON, mallet_handle)(c, hx, hy, angle, length)
 
 
 # -------------------------------------------------------------------- pose
@@ -433,11 +552,24 @@ def player_frames():
     for name, kw in BASE:
         add(name, draw(old(mallet=DODGE_CARRY if name == "dodge" else CARRY, **kw)))
 
-    # attack: mallet arcs from behind the head, out to 45 degrees, down to ground
-    add("attack", draw(old(lean=-3, body_dy=1, near_arm=-6, far_arm=-4, arm_lift=5, mallet=(165, 26))))
-    add("attack", draw(old(lean=0, body_dy=-1, near_arm=-2, far_arm=-1, arm_lift=9, mallet=(120, 30))))
-    add("attack", draw(old(lean=3, body_dy=-1, near_arm=6, far_arm=3, arm_lift=5, mallet=(45, 30))))
-    add("attack", draw(old(lean=4, body_dy=1, near_arm=9, far_arm=5, arm_lift=-2, mallet=(0, 26))))
+    if WEAPON == "popgun":
+        # attack: shouldered and aimed down the lane, a kick of recoil on the shot
+        add("attack", draw(old(lean=-1, near_arm=6, far_arm=7, arm_lift=8, mallet=(6, 26))))
+        add("attack", draw(old(lean=0, near_arm=8, far_arm=8, arm_lift=8, mallet=(2, 26))))
+        add("attack", draw(old(lean=-3, near_arm=5, far_arm=6, arm_lift=10, mallet=(16, 24))))
+        add("attack", draw(old(lean=-1, near_arm=7, far_arm=7, arm_lift=8, mallet=(4, 26))))
+    elif WEAPON == "pie":
+        # attack: the pie held back, then shoved forward into a face
+        add("attack", draw(old(lean=-3, body_dy=1, near_arm=-8, far_arm=-4, arm_lift=6, mallet=(140, 14))))
+        add("attack", draw(old(lean=0, near_arm=-2, far_arm=-1, arm_lift=8, mallet=(90, 14))))
+        add("attack", draw(old(lean=4, near_arm=10, far_arm=4, arm_lift=8, mallet=(10, 14))))
+        add("attack", draw(old(lean=5, body_dy=1, near_arm=13, far_arm=5, arm_lift=6, mallet=(0, 14))))
+    else:
+        # attack: mallet arcs from behind the head, out to 45 degrees, down to ground
+        add("attack", draw(old(lean=-3, body_dy=1, near_arm=-6, far_arm=-4, arm_lift=5, mallet=(165, 26))))
+        add("attack", draw(old(lean=0, body_dy=-1, near_arm=-2, far_arm=-1, arm_lift=9, mallet=(120, 30))))
+        add("attack", draw(old(lean=3, body_dy=-1, near_arm=6, far_arm=3, arm_lift=5, mallet=(45, 30))))
+        add("attack", draw(old(lean=4, body_dy=1, near_arm=9, far_arm=5, arm_lift=-2, mallet=(0, 26))))
 
     # charge: coiled low with the mallet drawn right back, two frames to shudder
     add("charge", draw(old(body_dy=5, lean=-4, head_dy=1, near_leg=5, far_leg=-5,
@@ -548,7 +680,7 @@ SQUAD = {
 
 # Each clown with each weapon. The mallet sheets keep their original names;
 # the others carry the weapon: pip_hammer_hd.png, pip_chicken_hd.png.
-WEAPONS = ("mallet", "hammer", "chicken")
+WEAPONS = ("mallet", "hammer", "chicken", "pie", "pins", "slapstick", "popgun", "balloon")
 
 
 def sheet_name(clown, weapon):
@@ -580,7 +712,7 @@ def render_weapon(weapon):
 def main():
     from multiprocessing import Pool
     weapons = [w for w in sys.argv[1:] if w in WEAPONS] or list(WEAPONS)
-    with Pool(len(weapons)) as pool:
+    with Pool(min(len(weapons), os.cpu_count() or 4)) as pool:
         pool.map(render_weapon, weapons)
     if "mallet" in weapons:
         write_sheet("grunt_hd", grunt_frames(), GRUNT_MATS)

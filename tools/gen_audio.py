@@ -588,6 +588,17 @@ def squawk(sec=0.42):
 
 write("squawk", squawk())
 
+
+# A cream pie in the face: a wet, low slap with a squelchy tail.
+def splat(sec=0.45):
+    hit = shape(filt(noise(sec), "lp", 900), lambda t: math.exp(-t / 0.05))
+    squelch = shape(filt(noise(sec), "bp", 420 + 0, 3.0), lambda t: min(1.0, t / 0.02) * math.exp(-t / 0.14))
+    gloop = shape(osc(lambda t: 220 - 160 * min(1.0, t / 0.2), sec), lambda t: math.exp(-t / 0.09))
+    return add((hit, 1.0), (squelch, 0.8), (gloop, 0.35))
+
+
+write("splat", splat())
+
 # The Ringmaster: a full calliope fanfare over a drum roll.
 rm = silence(3.2)
 place(rm, drumroll(1.2), 0, 0.7)
