@@ -331,6 +331,8 @@ public partial class CastFighter : PlayerFighter
 
     /// <summary>While true, hits from the front do a fraction of their damage and do not stun.</summary>
     protected bool Guarding { get; set; }
+    /// <summary>For anything deciding where to hit this fighter from.</summary>
+    public bool IsGuarding => Guarding;
     protected virtual float GuardFactor => 0.3f;
 
     public override void TakeDamage(in DamageInfo info)

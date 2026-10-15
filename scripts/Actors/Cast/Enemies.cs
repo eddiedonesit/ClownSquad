@@ -26,7 +26,7 @@ public partial class JugglerEnemy : CastFighter
         MoveSpeed = 3.0f;
         DamageMultiplier = 0.6f;
         base._Ready();
-        AddMove("toss", 2.5f, 10f, 1.6f,
+        AddMove("toss", 2.5f, 10f, 2.6f,
             () => Sfx.Play("whoosh", 1.4f, -6f),
             dt =>
             {
@@ -36,7 +36,7 @@ public partial class JugglerEnemy : CastFighter
                 {
                     Vector3 lead = t.GlobalPosition + Flat(t.Velocity) * 0.35f;
                     var shot = EnemyShot.Lob(this, EnemyShot.Pin(1.3f), GlobalPosition + new Vector3(Facing.X * 0.3f, 1.5f, 0f), InView(lead, 0f), 0.75f);
-                    shot.Damage = 9f;
+                    shot.Damage = 7f;
                     Sfx.Play("fwee", 1.3f, -4f);
                 }
                 return MoveTime > 0.65f;
@@ -108,20 +108,26 @@ public partial class WeightlifterEnemy : CastFighter
     {
         MaxHealth = 120f;
         MoveSpeed = 2.5f;
-        DamageMultiplier = 0.85f;
+        DamageMultiplier = 0.7f;
         base._Ready();
         AddMove("guard", 0f, 4f, 3.5f,
             () => Guarding = true,
             dt => { Stop(dt); PinClipFrame("guard", 0); return MoveTime > 1.6f; }, weight: 1.2f);
         AddMove("grab", 0f, 1.8f, 4.5f,
-            () => Sfx.Play("honk_low", 1.1f, -4f),
+            () =>
+            {
+                // Telegraphed like every special: the reach of the lunge, a beat before it.
+                Track(Telegraph.Lane(Stage, GlobalPosition, Facing, 2.4f, 1.2f, 0.45f));
+                Sfx.Play("honk_low", 1.1f, -4f);
+            },
             dt =>
             {
                 if (_held is null)
                 {
                     PinClipFrame("special", 0);
-                    if (MoveTime < 0.35f) { ApplyGroundMovement(Facing * 4f, dt); }
-                    else if (MoveTime < 0.45f)
+                    if (MoveTime < 0.45f) { Stop(dt); }
+                    else if (MoveTime < 0.7f) { ApplyGroundMovement(Facing * 4.5f, dt); }
+                    else if (MoveTime < 0.8f)
                     {
                         foreach (Fighter f in Players())
                         {
@@ -130,18 +136,18 @@ public partial class WeightlifterEnemy : CastFighter
                             {
                                 _held = f;
                                 f.Stagger(2f);
-                                f.Hold = () => GlobalPosition + new Vector3(Facing.X * 0.15f, Mathf.Min(1f, (MoveTime - 0.4f) * 3f) * BodyHeight * 1.05f, 0.05f);
+                                f.Hold = () => GlobalPosition + new Vector3(Facing.X * 0.15f, Mathf.Min(1f, (MoveTime - 0.75f) * 3f) * BodyHeight * 1.05f, 0.05f);
                                 Sfx.Play("boing", 0.8f);
                                 break;
                             }
                         }
                     }
-                    else { Stop(dt); return MoveTime > 1.0f; }
+                    else { Stop(dt); return MoveTime > 1.3f; }
                     return false;
                 }
-                PinClipFrame("special", MoveTime < 1.1f ? 1 : 2);
-                if (MoveTime > 1.1f) Slam();
-                return MoveTime > 1.5f;
+                PinClipFrame("special", MoveTime < 1.45f ? 1 : 2);
+                if (MoveTime > 1.45f) Slam();
+                return MoveTime > 1.85f;
             });
     }
 
@@ -303,6 +309,9 @@ public partial class MimeEnemy : CastFighter
     public override string HurtSound => "squeak";
     private Fighter? _pulled;
     private Vector3 _from;
+    private Vector3 _ropeDir;
+    private float _ropeLen;
+    private bool _missed;
 
     public override void _Ready()
     {
@@ -311,20 +320,37 @@ public partial class MimeEnemy : CastFighter
         DamageMultiplier = 0.6f;
         base._Ready();
         AddMove("rope", 2.5f, 7.5f, 5f,
-            () => { _pulled = null; Sfx.Play("whoosh", 0.7f, -6f); },
+            () =>
+            {
+                _pulled = null;
+                _missed = false;
+                // The invisible rope is thrown along a lane you can see, and only catches you if you stay in it.
+                Fighter? aim = Target();
+                Vector3 to = aim is null ? Facing * 5f : Flat(aim.GlobalPosition - GlobalPosition);
+                _ropeDir = to.Normalized();
+                _ropeLen = to.Length() + 0.8f;
+                Track(Telegraph.Lane(Stage, GlobalPosition, _ropeDir, _ropeLen, 1.0f, 0.55f, new Color(0.85f, 0.9f, 1f)));
+                Sfx.Play("whoosh", 0.7f, -6f);
+            },
             dt =>
             {
                 Stop(dt);
-                if (MoveTime < 0.4f) { PinClipFrame("special", 0); return false; }
+                if (MoveTime < 0.55f) { PinClipFrame("special", 0); return false; }
                 if (_pulled is null)
                 {
                     if (Target() is not Fighter t || !t.CanBeHit()) return true;
+                    if (_missed || !Telegraph.InLane(t.GlobalPosition, GlobalPosition, _ropeDir, _ropeLen, 1.0f))
+                    {
+                        _missed = true;                   // missed: the rope comes back empty
+                        PinClipFrame("special", 1);
+                        return MoveTime > 0.9f;
+                    }
                     _pulled = t;
                     _from = t.GlobalPosition;
                     t.Stagger(1.4f);
                     PopText.Spawn(Stage, t.GlobalPosition + new Vector3(0f, t.BodyHeight + 0.3f, 0f), "?!", Colors.White, 0.8f, 0.5f);
                 }
-                float k = Mathf.Clamp((MoveTime - 0.4f) / 0.7f, 0f, 1f);
+                float k = Mathf.Clamp((MoveTime - 0.55f) / 0.7f, 0f, 1f);
                 Vector3 to = GlobalPosition + new Vector3(Facing.X * 1.1f, 0f, 0f);
                 _pulled.Hold = () => _from.Lerp(to, Mathf.SmoothStep(0f, 1f, k));
                 PinClipFrame("special", 1 + (int)(MoveTime * 8f) % 2);

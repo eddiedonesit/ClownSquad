@@ -1203,8 +1203,19 @@ public partial class GameRoot : Node3D
     /// Plays the whole fight unattended, fast. For "win" an AI drives the
     /// player; for "lose" nobody does. Either way the outcome is asserted.
     /// </summary>
+    /// <summary>Damage the probe's players took, by what dealt it: where a run went wrong.</summary>
+    private readonly Dictionary<string, float> _hurtBy = new();
+
+    private void TallyHurt(Fighter? attacker, Fighter victim, float amount)
+    {
+        if (victim.Hostile) return;
+        string by = attacker is null ? "wall/hazard" : attacker.GetType().Name;
+        _hurtBy[by] = _hurtBy.TryGetValue(by, out float sum) ? sum + amount : amount;
+    }
+
     private void StartOutcomeProbe()
     {
+        Fighter.HitLanded += TallyHurt;
         Engine.TimeScale = 4.0;
         GD.Print($"=== WAVE PROBE: expecting {_outcomeProbe} ===");
         if (_outcomeProbe != "win")
@@ -1218,8 +1229,11 @@ public partial class GameRoot : Node3D
         }
 
         PlayerFighter p = _players[0];
-        p.Source = new BrawlerAi(p, attackRange: 1.7f, backoffRange: 0.8f, attackCooldownMs: 350) { AdvanceWhenIdle = true };
-        p.ExtraDamageMultiplier = 2.5f;
+        // The careful bot: reads telegraphs, hazards and shots and dodges them.
+        // "-- fair" plays it at its real damage; by default it hits harder so
+        // the regression runs stay short.
+        p.Source = new SmartBot(p);
+        p.ExtraDamageMultiplier = Array.IndexOf(OS.GetCmdlineUserArgs(), "fair") >= 0 ? 1f : 2.0f;
 
         // "-- level 20": play the probe as a squad of a fitting level, points
         // spent evenly on POW and GUTS, so late worlds and bosses can be tested.
@@ -1329,6 +1343,10 @@ public partial class GameRoot : Node3D
         string got = d.Current == WaveDirector.Phase.Victory ? "win"
                    : d.Current == WaveDirector.Phase.Defeat ? "lose" : "timeout";
         bool ok = got == _outcomeProbe;
+        Fighter.HitLanded -= TallyHurt;
+        var hurt = new List<KeyValuePair<string, float>>(_hurtBy);
+        hurt.Sort((a, b) => b.Value.CompareTo(a.Value));
+        GD.Print($"  damage taken by source: {string.Join(", ", hurt.ConvertAll(kv => $"{kv.Key} {kv.Value:F0}"))}");
         if (got == "timeout")
             foreach (Node n in GetTree().GetNodesInGroup(Fighter.Group))
                 if (n is Fighter f && f.Hostile)

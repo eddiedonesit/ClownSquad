@@ -60,8 +60,14 @@ public partial class EnemyShot : Node3D
         return s;
     }
 
+    public const string Group = "enemy_shots";
+
+    /// <summary>Where this shot will be in `t` seconds (ignoring homing), for anything trying to get out of its way.</summary>
+    public Vector3 Predict(float t) => GlobalPosition + Velocity * t + Vector3.Down * (0.5f * Gravity * t * t);
+
     private void Launch0(PlayerFighter owner, Node3D model, Vector3 from)
     {
+        AddToGroup(Group);
         _model = model;
         AddChild(model);
         owner.GetParent().AddChild(this);

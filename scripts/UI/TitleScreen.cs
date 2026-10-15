@@ -80,6 +80,23 @@ public partial class TitleScreen : Node3D
         AddChild(_intro);
 
         if (Array.IndexOf(args, "titleshot") >= 0) TitleShots();
+        if (Array.IndexOf(args, "titlemovie") >= 0) TitleMovie();
+    }
+
+    /// <summary>
+    /// "-- titlemovie" (with Godot's --write-movie): the intro, then the menu
+    /// with the cursor walked down and back up, then quit. For recording.
+    /// </summary>
+    private void TitleMovie()
+    {
+        double[] at = { 7.0, 7.7, 8.4, 9.4, 10.1 };
+        MapPad.Press[] press = { MapPad.Press.Down, MapPad.Press.Down, MapPad.Press.Down, MapPad.Press.Up, MapPad.Press.Up };
+        for (int i = 0; i < at.Length; i++)
+        {
+            MapPad.Press p = press[i];
+            GetTree().CreateTimer(at[i]).Timeout += () => { if (_intro is null) TickMain(p); };
+        }
+        GetTree().CreateTimer(12.0).Timeout += () => GetTree().Quit();
     }
 
     private ComicIntro? _intro;

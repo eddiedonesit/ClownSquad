@@ -42,8 +42,16 @@ public partial class GlassField : Node3D
         return g;
     }
 
-    public override void _EnterTree() => All.Add(this);
+    public override void _EnterTree() { All.Add(this); AddToGroup(Hazard.Group); }
     public override void _ExitTree() => All.Remove(this);
+
+    /// <summary>Whether a ground point would cut someone standing there.</summary>
+    public bool Covers(Vector3 p, float margin = 0.2f)
+    {
+        foreach (Node3D s in _shards)
+            if (new Vector2(p.X - s.GlobalPosition.X, p.Z - s.GlobalPosition.Z).Length() < 0.4f + margin) return true;
+        return false;
+    }
 
     /// <summary>Take up to `n` shards nearest a point, removing them from the floor. Returns where they lay.</summary>
     public List<Vector3> Take(Vector3 near, int n)
@@ -123,6 +131,25 @@ public partial class Hazard : Node3D
         h.GlobalPosition = new Vector3(at.X, 0f, at.Z);
         return h;
     }
+
+    /// <summary>Floor that hurts: fire and glass. The test bot steers round anything in it.</summary>
+    public const string Group = "hazards";
+
+    /// <summary>Whether a ground point is (or is about to be) burning.</summary>
+    public bool Covers(Vector3 p, float margin = 0.2f)
+    {
+        float d = new Vector2(p.X - GlobalPosition.X, p.Z - GlobalPosition.Z).Length();
+        if (_age > WarmUp + Seconds) return false;
+        if (Thickness > 0f) return d <= Radius + margin + Grow * 0.4f && d >= Radius - Thickness - margin;
+        return d <= Radius + margin;
+    }
+
+    /// <summary>A growing ring that is about to sweep through a point: jump it.</summary>
+    public bool RingNear(Vector3 p) =>
+        Thickness > 0f && Grow > 0f && _age > WarmUp &&
+        Mathf.Abs(new Vector2(p.X - GlobalPosition.X, p.Z - GlobalPosition.Z).Length() - Radius) < 0.9f;
+
+    public override void _EnterTree() => AddToGroup(Group);
 
     public override void _Ready()
     {

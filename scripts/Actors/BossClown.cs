@@ -78,6 +78,10 @@ public partial class BossClown : PlayerFighter, IBoss
     /// <summary>True during the mid-air hang. Exposed for probes.</summary>
     public bool Hanging => InSpecial && _flop == Flop.Hang;
 
+    /// <summary>A belly flop is coming down: anywhere within SlamReach of him is about to be hit.</summary>
+    public bool SlamComing => InSpecial && _flop is Flop.Crouch or Flop.Rise or Flop.Hang or Flop.Drop;
+    public static float SlamReach => SlamRadius;
+
     public override void _Ready()
     {
         if (DisplayName.Length == 0) DisplayName = "BELLYFLOP BERTIE";

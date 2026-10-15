@@ -15,7 +15,6 @@ public partial class Telegraph : Node3D
 
     private StandardMaterial3D _mat = null!;
     private float _age;
-    private float _lead = 1f;
     private Color _color = Warn;
 
     /// <summary>0 when it appears, 1 at the moment of impact. Drives the pulse.</summary>
@@ -32,6 +31,24 @@ public partial class Telegraph : Node3D
         NoDepthTest = false,
     };
 
+    // ---- what it covers, for anything that wants to stay out of it (the test bot) ----
+
+    public const string Group = "telegraphs";
+    public enum Shape { Circle, Lane, Cone }
+    public Shape Kind { get; private set; }
+    private Vector3 _from, _dir;
+    private float _radius, _length, _width, _spread;
+
+    /// <summary>Whether a ground point is inside what this telegraph warns of (with a safety margin).</summary>
+    public bool Covers(Vector3 p, float margin = 0.3f) => Kind switch
+    {
+        Shape.Circle => new Vector2(p.X - _from.X, p.Z - _from.Z).Length() <= _radius + margin,
+        Shape.Lane => InLane(p, _from - _dir * margin, _dir, _length + margin * 2f, _width + margin * 2f),
+        _ => InCone(p, _from - _dir * margin, _dir, _length + margin, _spread + 10f),
+    };
+
+    public override void _EnterTree() => AddToGroup(Group);
+
     private static Telegraph Make(Node parent, Mesh mesh, Vector3 at, float yaw, float autoSeconds, Color? color)
     {
         var t = new Telegraph { AutoSeconds = autoSeconds, _color = color ?? Warn };
@@ -44,8 +61,14 @@ public partial class Telegraph : Node3D
     }
 
     /// <summary>A disc of the given radius on the floor.</summary>
-    public static Telegraph Circle(Node parent, Vector3 at, float radius, float autoSeconds = 0f, Color? color = null) =>
-        Make(parent, new CylinderMesh { TopRadius = radius, BottomRadius = radius, Height = 0.02f, RadialSegments = 48 }, at, 0f, autoSeconds, color);
+    public static Telegraph Circle(Node parent, Vector3 at, float radius, float autoSeconds = 0f, Color? color = null)
+    {
+        Telegraph t = Make(parent, new CylinderMesh { TopRadius = radius, BottomRadius = radius, Height = 0.02f, RadialSegments = 48 }, at, 0f, autoSeconds, color);
+        t.Kind = Shape.Circle;
+        t._from = at;
+        t._radius = radius;
+        return t;
+    }
 
     /// <summary>A lane from a point along a direction: length long, width wide.</summary>
     public static Telegraph Lane(Node parent, Vector3 from, Vector3 dir, float length, float width, float autoSeconds = 0f, Color? color = null)
@@ -54,6 +77,11 @@ public partial class Telegraph : Node3D
         dir = dir.LengthSquared() > 0.001f ? dir.Normalized() : Vector3.Right;
         var mesh = new BoxMesh { Size = new Vector3(length, 0.02f, width) };
         Telegraph t = Make(parent, mesh, from + dir * (length * 0.5f), -Mathf.Atan2(dir.Z, dir.X), autoSeconds, color);
+        t.Kind = Shape.Lane;
+        t._from = from;
+        t._dir = dir;
+        t._length = length;
+        t._width = width;
         return t;
     }
 
@@ -73,7 +101,13 @@ public partial class Telegraph : Node3D
             st.AddVertex(new Vector3(Mathf.Cos(a1), 0f, Mathf.Sin(a1)) * length);
             st.AddVertex(new Vector3(Mathf.Cos(a0), 0f, Mathf.Sin(a0)) * length);
         }
-        return Make(parent, st.Commit(), from, -Mathf.Atan2(dir.Z, dir.X), autoSeconds, color);
+        Telegraph t = Make(parent, st.Commit(), from, -Mathf.Atan2(dir.Z, dir.X), autoSeconds, color);
+        t.Kind = Shape.Cone;
+        t._from = from;
+        t._dir = dir;
+        t._length = length;
+        t._spread = spread;
+        return t;
     }
 
     public override void _Process(double delta)

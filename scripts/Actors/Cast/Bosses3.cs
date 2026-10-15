@@ -279,18 +279,23 @@ public partial class StrongmanBoss : BossFighter
             return MoveTime > 1.8f;
         }, weight: 1.5f);
 
-        AddMove("grab", 0f, 2.2f, 5f, () => Sfx.Play("honk_low", 0.9f), dt =>
+        AddMove("grab", 0f, 2.6f, 5f, () =>
+        {
+            Track(Telegraph.Lane(Stage, GlobalPosition, Facing, 3.4f * Big * 0.8f, 1.4f, 0.45f));
+            Sfx.Play("honk_low", 0.9f);
+        }, dt =>
         {
             if (_held is null)
             {
                 PinClipFrame("grab", 0);
-                if (MoveTime < 0.4f) { ApplyGroundMovement(Facing * 4.5f, dt); return false; }
-                if (MoveTime < 0.5f)
+                if (MoveTime < 0.45f) { Stop(dt); return false; }
+                if (MoveTime < 0.85f) { ApplyGroundMovement(Facing * 4.5f, dt); return false; }
+                if (MoveTime < 0.95f)
                 {
                     foreach (Fighter f in Players())
                     {
                         Vector3 d = f.GlobalPosition - GlobalPosition;
-                        if (!f.CanBeHit() || d.X * Facing.X < -0.2f || d.X * Facing.X > 1.6f || Mathf.Abs(d.Z) > 0.7f) continue;
+                        if (!f.CanBeHit() || d.X * Facing.X < -0.2f || d.X * Facing.X > 1.6f * Big || Mathf.Abs(d.Z) > 0.7f) continue;
                         _held = f;
                         f.Stagger(2.5f);
                         f.Hold = () => GlobalPosition + new Vector3(0f, BodyHeight + 0.1f, 0.05f);
@@ -299,11 +304,11 @@ public partial class StrongmanBoss : BossFighter
                     }
                 }
                 Stop(dt);
-                return MoveTime > 1.1f;
+                return MoveTime > 1.5f;
             }
             Stop(dt);
             PinClipFrame("grab", 1);
-            if (MoveTime > 1.3f)
+            if (MoveTime > 1.75f)
             {
                 Fighter f = _held;
                 _held = null;

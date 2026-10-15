@@ -404,7 +404,7 @@ public partial class FireEaterBoss : BossFighter
         _glow = new OmniLight3D { LightColor = new Color(1f, 0.55f, 0.2f), LightEnergy = 0f, OmniRange = 6f, Position = new Vector3(1.5f, 1.4f, 0.4f) };
         AddChild(_glow);
 
-        AddMove("breath", 0f, 6f, 4f, () =>
+        AddMove("breath", 0f, 6f, 5f, () =>
         {
             _burned.Clear();
             Track(Telegraph.Cone(Stage, GlobalPosition, Facing, 4.8f, 50f, 0.7f, new Color(1f, 0.5f, 0.1f)));
@@ -417,6 +417,8 @@ public partial class FireEaterBoss : BossFighter
             if (MoveTime - dt < 0.7f)
             {
                 ClearTelegraphs();
+                // The cone stays on the floor while the fire burns: what you see is where it reaches.
+                Track(Telegraph.Cone(Stage, GlobalPosition, Facing, 4.8f, 50f, 0f, new Color(1f, 0.5f, 0.1f))).Urgency = 1f;
                 _flame.Position = new Vector3(Facing.X * 0.55f * Big, 1.7f * Big, 0.08f);
                 if (_flame.ProcessMaterial is ParticleProcessMaterial pm) pm.Direction = new Vector3(Facing.X, 0.05f, 0f);
                 _flame.Emitting = true;
@@ -430,7 +432,7 @@ public partial class FireEaterBoss : BossFighter
                 if (!f.CanBeHit() || !Telegraph.InCone(f.GlobalPosition, GlobalPosition, Facing, 4.8f, 50f)) continue;
                 if (_burned.TryGetValue(f, out float next) && MoveTime < next) continue;
                 _burned[f] = MoveTime + 0.3f;
-                f.TakeDamage(new DamageInfo(6f * DamageMultiplier, Facing, 3f, 0.03f, this, 2f, 0.25f));
+                f.TakeDamage(new DamageInfo(5f * DamageMultiplier, Facing, 3f, 0.03f, this, 2f, 0.25f));
             }
             if (MoveTime > 1.9f) { _flame.Emitting = false; _glow.LightEnergy = 0f; return true; }
             return false;
@@ -555,7 +557,7 @@ public partial class FireEaterBoss : BossFighter
                 {
                     var s = EnemyShot.Fling(this, EnemyShot.FireRing(1.3f), new Vector3(GlobalPosition.X + Facing.X * 0.8f, 0.85f, f.GlobalPosition.Z), Facing, 8f);
                     s.Pierce = true;
-                    s.Damage = 10f;
+                    s.Damage = 8f;
                     s.Launch = 4f;
                     s.SpinSpeed = 9f;
                     s.HitRadius = 0.7f;
