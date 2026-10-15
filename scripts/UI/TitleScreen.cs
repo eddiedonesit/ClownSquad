@@ -58,7 +58,7 @@ public partial class TitleScreen : Node3D
     {
         // Tests and debug runs go straight where they are going.
         string[] args = OS.GetCmdlineUserArgs();
-        foreach (string f in new[] { "wavetest", "losetest", "movetest", "animtest", "aitest", "sandbox", "fight", "stage", "tentshot" })
+        foreach (string f in new[] { "wavetest", "losetest", "movetest", "animtest", "aitest", "sandbox", "fight", "stage", "tentshot", "stageshot" })
             if (Array.IndexOf(args, f) >= 0) { CallDeferred(MethodName.Go, Campaign.FightScene); return; }
         if (Array.IndexOf(args, "mapshot") >= 0) { CallDeferred(MethodName.Go, Campaign.MapScene); return; }
 

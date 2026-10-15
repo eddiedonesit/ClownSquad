@@ -201,6 +201,25 @@ public partial class GameRoot : Node3D
 
         if (_outcomeProbe.Length > 0) StartOutcomeProbe();
         if (Has("tentshot")) StartTentShot();
+        if (Has("stageshot")) StartStageShot();
+    }
+
+    /// <summary>"-- stageshot stage 3-1": two stills of a stage's scenery, then quit. Needs a window.</summary>
+    private void StartStageShot()
+    {
+        string id = _stage?.Id.Replace("*", "bonus") ?? "fight";
+        GetTree().CreateTimer(1.6).Timeout += () =>
+        {
+            GetViewport().GetTexture().GetImage().SavePng($"C:/Claude/ClownSquad/debug/stage_{id}.png");
+            _camX += 14f;                                  // further along the road
+            if (_rig is not null) _rig.Position = new Vector3(_camX, 0f, 0f);
+            _scenery?.Follow(_camX);
+            GetTree().CreateTimer(0.5).Timeout += () =>
+            {
+                GetViewport().GetTexture().GetImage().SavePng($"C:/Claude/ClownSquad/debug/stage_{id}_b.png");
+                GetTree().Quit();
+            };
+        };
     }
 
     /// <summary>"-- tentshot": a levelled character, a HUD still, then the Stat Tent open. Needs a window.</summary>
@@ -287,6 +306,7 @@ public partial class GameRoot : Node3D
                 senv.AmbientLightEnergy = theme.ambient;
                 senv.AmbientLightColor = theme.sky.Lerp(Colors.White, 0.5f);
                 senv.VolumetricFogDensity = 0.006f;
+                _scenery.Dress(senv, GetNodeOrNull<WorldEnvironment>("WorldEnvironment")?.CameraAttributes as CameraAttributesPractical);
             }
             if (GetNodeOrNull<DirectionalLight3D>("DirectionalLight3D") is DirectionalLight3D ssun)
             {
@@ -522,6 +542,15 @@ public partial class GameRoot : Node3D
         cam.Position = new Vector3(0f, 3.8f, 9.6f);
         cam.RotationDegrees = new Vector3(-17f, 0f, 0f);
         cam.Fov = 35f;
+        if (!ClownSquad.Visuals.ArtStyle.Classic)
+        {
+            // The 3D scenery wants a view past the fence to the horizon: a
+            // little lower, further back and tilted up, the clowns the same
+            // size on screen and the whole walkway still in frame.
+            cam.Position = new Vector3(0f, 3.3f, 10.4f);
+            cam.RotationDegrees = new Vector3(-9.5f, 0f, 0f);
+            cam.Fov = 33f;
+        }
     }
 
     /// <summary>Spread the stage's groups along the road, put the exit past the last, and fill in crates.</summary>
