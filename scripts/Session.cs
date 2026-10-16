@@ -1,5 +1,6 @@
 namespace ClownSquad;
 
+using Godot;
 using ClownSquad.Map;
 using ClownSquad.Progression;
 
@@ -31,7 +32,11 @@ public enum PlayMode
 /// </summary>
 public static class Session
 {
-    public const string TestSave = "user://probe_save.json";
+    /// <summary>
+    /// A throwaway save for this test run alone: probes run side by side, and a
+    /// shared file had them tripping over each other's writes.
+    /// </summary>
+    public static readonly string TestSave = $"user://probe_save_{OS.GetProcessId()}.json";
     public const string RushSave = "user://bossrush_save.json";
     public const string PracticeSave = "user://practice_save.json";
 
@@ -81,6 +86,7 @@ public static class Session
         GameSettings.GodMode = false;
         SaveSystem.Path = TestSave;
         SaveSystem.DeleteForTests();
+        ClearOldTestSaves();
     }
 
     public const string GuestSave = "user://online_guest_save.json";
@@ -107,6 +113,20 @@ public static class Session
     {
         Reset(PlayMode.OnlineGuest);
         SaveSystem.Path = GuestSave;
+    }
+
+    /// <summary>Tidy away scratch saves left by earlier test runs (an hour old or more).</summary>
+    private static void ClearOldTestSaves()
+    {
+        string dir = ProjectSettings.GlobalizePath("user://");
+        try
+        {
+            foreach (string f in System.IO.Directory.GetFiles(dir, "probe_save_*.json*"))
+                if (System.DateTime.Now - System.IO.File.GetLastWriteTime(f) > System.TimeSpan.FromHours(1)) System.IO.File.Delete(f);
+            string old = System.IO.Path.Combine(dir, "probe_save.json");
+            if (System.IO.File.Exists(old)) System.IO.File.Delete(old);
+        }
+        catch (System.Exception e) when (e is System.IO.IOException or System.UnauthorizedAccessException) { }
     }
 
     private static void Reset(PlayMode mode)
