@@ -113,7 +113,7 @@ public partial class AchievementsMenu : CanvasLayer
         bool have = Platform.Current.IsUnlocked(sel.Id);
         _name.Text = have || !sel.Hidden ? sel.Name : "? ? ?";
         _desc.Text = have || !sel.Hidden ? sel.Description : "A secret. Keep playing.";
-        _when.Text = have ? (Platform.Current is OfflinePlatform off && off.UnlockedAt(sel.Id) is string at2 ? $"EARNED {at2.Replace('T', ' ')}" : "EARNED") : "NOT YET";
+        _when.Text = have ? (Platform.Local is OfflinePlatform off && off.UnlockedAt(sel.Id) is string at2 ? $"EARNED {at2.Replace('T', ' ')}" : "EARNED") : "NOT YET";
         _when.LabelSettings.FontColor = have ? new Color(0.6f, 1f, 0.6f) : new Color(0.75f, 0.7f, 0.85f);
     }
 

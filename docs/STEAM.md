@@ -64,19 +64,17 @@ adds a `SteamPlatform` class and nothing else changes.
 Steam Auto-Cloud syncs the files in §2.6 itself. Saves are already written
 atomically (temp file, then replace), which is what Auto-Cloud expects.
 
-## 4. The code step: `SteamPlatform` and the Steam transport
+## 4. The code: `SteamPlatform` (built) and the Steam transport (next)
 
-Needs your OK to download one package, plus your App ID (or Valve's test App ID
-480, "Spacewar", which works for development before you have your own).
+**Built (2026-10-16):** Facepunch.Steamworks 2.3.3 (NuGet) and `steam_api64.dll`
+beside the project; `scripts/Platform/SteamPlatform.cs`.
+- At start-up `Platform.Start()` connects to Steam if it is running; otherwise the game plays offline as before.
+  Tests, headless runs and `-- nosteam` always stay offline.
+- Achievements, stats (sent in batches), the `boss_rush` leaderboard (milliseconds), rich presence (`#Status`) and the overlay pause all go to Steam.
+- Everything is also kept in the offline record, which the in-game ACHIEVEMENTS list reads; anything earned offline unlocks on Steam at the next start.
+- **App ID:** `SteamPlatform.AppId`, set to 480 (Valve's "Spacewar" test app) until Clown Squad has its own. Change that one number and `steam_appid.txt`.
+- **To try it:** open Steam, then start the game. The log says `Steam: signed in as ...`, Shift+Tab opens the overlay and pauses the game, and friends see what you are doing (as Spacewar until the real App ID).
 
-- **SDK:** Facepunch.Steamworks (MIT licence, NuGet, plain C#; bundles
-  `steam_api64.dll`). It covers achievements, stats, leaderboards, rich
-  presence, the overlay callback, friends, lobbies and Steam Networking Sockets.
-- **`SteamPlatform : IPlatform`** (~150 lines):
-  1. Init with the App ID; if Steam is not running, fall back to `OfflinePlatform`.
-  2. Push anything earned offline.
-  3. Map each call across.
-  4. `Tick` runs the callbacks.
 - **Online over Steam:** a `SteamPeer : MultiplayerPeerExtension` (~300 lines)
   carrying Godot's RPCs over Steam Networking Sockets, plus a Steam lobby.
   - Host: create the lobby.

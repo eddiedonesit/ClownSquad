@@ -99,11 +99,40 @@ public static class Platform
 {
     private static IPlatform? _current;
 
-    /// <summary>The store layer. Offline until a store build installs its own at start-up.</summary>
+    /// <summary>The store layer: Steam when it is running (<see cref="Start"/>), otherwise offline.</summary>
     public static IPlatform Current
     {
         get => _current ??= new OfflinePlatform();
         set => _current = value;
+    }
+
+    private static bool _started;
+
+    /// <summary>
+    /// Connect to Steam once, at start-up, if it is there. Tests, headless runs
+    /// and "-- nosteam" stay offline, so they never touch a Steam account.
+    /// </summary>
+    public static void Start()
+    {
+        if (_started) return;
+        _started = true;
+        string[] args = OS.GetCmdlineUserArgs();
+        if (Session.IsTest || DisplayServer.GetName() == "headless" || System.Array.IndexOf(args, "nosteam") >= 0) return;
+        var local = Current as OfflinePlatform ?? new OfflinePlatform();
+        if (SteamPlatform.TryStart(local) is SteamPlatform steam) _current = steam;
+    }
+
+    /// <summary>The offline record (the game's own lists), whichever platform is running.</summary>
+    public static OfflinePlatform? Local => Current switch
+    {
+        OfflinePlatform off => off,
+        SteamPlatform steam => steam.Local,
+        _ => null,
+    };
+
+    public static void Stop()
+    {
+        if (_current is SteamPlatform steam) steam.Shutdown();
     }
 
     /// <summary>Practice and automated tests never earn anything: they would be free achievements.</summary>

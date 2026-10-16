@@ -5,4 +5,11 @@
     <Nullable>enable</Nullable>
     <LangVersion>latest</LangVersion>
   </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Facepunch.Steamworks" Version="2.3.3" />
+  </ItemGroup>
+  <ItemGroup>
+    <!-- Valve's native Steam API (from the Facepunch.Steamworks package), beside the build. -->
+    <None Include="steam_api64.dll" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
 </Project>

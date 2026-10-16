@@ -16,6 +16,7 @@ public partial class PlatformPump : Node
     public static void Ensure(SceneTree tree)
     {
         if (_instance is not null && IsInstanceValid(_instance)) return;
+        Platform.Start();
         _instance = new PlatformPump { Name = "PlatformPump", ProcessMode = ProcessModeEnum.Always };
         tree.Root.CallDeferred(Node.MethodName.AddChild, _instance);
     }
@@ -29,6 +30,11 @@ public partial class PlatformPump : Node
     }
 
     public override void _Process(double delta) => Platform.Current.Tick();
+
+    public override void _Notification(int what)
+    {
+        if (what == NotificationWMCloseRequest || what == NotificationPredelete) Platform.Stop();
+    }
 
     private void OnOverlay(bool open)
     {
