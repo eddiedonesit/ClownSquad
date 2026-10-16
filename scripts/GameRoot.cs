@@ -94,6 +94,11 @@ public partial class GameRoot : Node3D
 
     private bool _aiProbe;
     private bool _practice;
+    private bool _daily;
+    private DailyCircus.ActInfo? _act;
+    private bool _anyoneFell;
+    private int _dailyScore;
+    private bool _dailyBest;
     private string _outcomeProbe = "";   // "win" or "lose" when a wave probe is running
 
     // ------------------------------------------------------------- startup
@@ -127,6 +132,13 @@ public partial class GameRoot : Node3D
         // A probe of the boss rush ("-- wavetest bossrush") runs the rush on the test save.
         _rush = Session.Mode == PlayMode.BossRush || (probe && Has("bossrush"));
         _practice = Session.Mode == PlayMode.Practice || Has("practicetest");
+        // The Daily Circus ("-- wavetest daily" tests it): today's stage and act.
+        _daily = Session.Mode == PlayMode.Daily || (probe && Has("daily"));
+        if (_daily) _act = DailyCircus.TodaysAct;
+        // "-- wavetest daily act 2": try one act whatever the date.
+        if (_daily && probe && Array.IndexOf(args, "act") is int actAt && actAt >= 0 && actAt + 1 < args.Length
+            && int.TryParse(args[actAt + 1], out int actN) && actN >= 0 && actN < DailyCircus.Acts.Length)
+            _act = DailyCircus.Acts[actN];
 
         // A stage chosen on the world map, or named on the command line
         // ("-- stage 2-3"). With neither, and no test or sandbox asked for, the
@@ -135,6 +147,7 @@ public partial class GameRoot : Node3D
         int stageArg = Array.IndexOf(args, "stage");
         if (stageArg >= 0 && stageArg + 1 < args.Length) _stage = Campaign.Get(args[stageArg + 1]);
         Campaign.Pending = null;
+        if (_daily) _stage = DailyCircus.TodaysStage;
         // Fights on the map are walked through left to right; bonus stages stay in the ring.
         _scrolling = _stage is StageDef sc && Campaign.IsFight(sc) && sc.Kind != StageKind.Bonus;
         if (!probe && !_rush && !_practice && !Has("sandbox") && !Has("fight") && _stage is null)
@@ -164,6 +177,8 @@ public partial class GameRoot : Node3D
         int fieldAt = Array.IndexOf(args, "field");
         if (fieldAt >= 0 && fieldAt + 1 < args.Length && Enum.TryParse(args[fieldAt + 1], true, out FieldSize fs)) GameSettings.Field = fs;
         if (Has("god")) GameSettings.GodMode = true;           // "-- god": try god mode in a test run
+        Fighter.GravityScale = _act?.Act == DailyCircus.Act.MoonBounce ? 0.45f : 1f;
+        if (_act?.Act == DailyCircus.Act.BigTop) GameSettings.Field = FieldSize.Huge;
         if (GetNodeOrNull<Camera3D>("Camera3D") is Camera3D cam)
         {
             if (_scrolling) MountStageCamera(cam);
@@ -191,6 +206,7 @@ public partial class GameRoot : Node3D
 
         SpawnPlayers();
         if (_rush) foreach (PlayerFighter rp in _players) ApplyLevel(rp, BossRush.Level);
+        if (_daily) SetUpDaily();
         // Hosting online: the guests' clowns join the stage (campaign stages only, not the rush or practice).
         if (ClownSquad.Net.NetSession.Instance is { Mode: ClownSquad.Net.NetSession.Role.Host } hostNet && hostNet.Members.Count > 1
             && _stage is not null && !_rush && !_practice)
@@ -232,9 +248,19 @@ public partial class GameRoot : Node3D
             _director.BonusSeconds = st.BonusSeconds;
             int clears = SaveSystem.Data.Campaign.Cleared.Count;
             _director.Seed = (ulong)GD.Hash(st.Id) * 7919UL + (ulong)clears;
+            if (_daily)
+            {
+                // Everyone gets the same waves today.
+                _director.Seed = DailyCircus.Seed;
+                // Wherever today's stage is in the campaign, its acts meet the squad at the daily's level.
+                _director.LevelFloor = DailyCircus.EnemyLevel;
+                _director.RankBoost = 1f;
+                if (_act?.Act == DailyCircus.Act.AllStars) _director.RankBoost = 4f;
+                if (_act?.Act == DailyCircus.Act.Stampede) _director.GruntCooldownMs = Mathf.Max(250, st.GruntCooldownMs * 2 / 3);
+            }
             // A rare chance of the secret shop appearing before one of the later waves.
             var roll = new RandomNumberGenerator { Seed = _director.Seed ^ 0x5ec2e7UL };
-            if (st.Kind != StageKind.Bonus && st.Waves.Length > 1 && (roll.Randf() < SecretShopChance || Has("secret")))
+            if (!_daily && st.Kind != StageKind.Bonus && st.Waves.Length > 1 && (roll.Randf() < SecretShopChance || Has("secret")))
                 _secretWave = roll.RandiRange(2, st.Waves.Length);
             if (_scrolling) ConfigureEncounters(st);
             GD.Print($"Stage {st.Id}: {st.Waves.Length} wave(s), enemy level floor {st.EnemyLevel}, rank boost {st.RankBoost:F2}" +
@@ -353,7 +379,8 @@ public partial class GameRoot : Node3D
         // Leaving the scene (quit, or replaying the stage) always saves.
         SaveSystem.Save();
         if (_netHost is not null) ClownSquad.Net.NetSession.Instance?.EndStage();
-        if (Session.Mode == PlayMode.OnlineGuest) GameSettings.Load();   // the host's field size was only for that stage
+        if (Session.Mode == PlayMode.OnlineGuest || _act?.Act == DailyCircus.Act.BigTop) GameSettings.Load();   // a field size only for that stage
+        Fighter.GravityScale = 1f;
         Fighter.HitLanded -= OnHitLanded;
         Fighter.HitLanded -= OnPracticeHit;
         Arena.Current = null;

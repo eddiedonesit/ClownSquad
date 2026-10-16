@@ -203,7 +203,10 @@ public static class SaveSystem
     public static void DeleteForTests()
     {
         if (Path == LegacyPath || Path.StartsWith("user://clownsquad_slot")) throw new InvalidOperationException("refusing to delete a real save");
-        if (File.Exists(Disk)) File.Delete(Disk);
+        // Probes run side by side on one scratch file: another may be writing it
+        // this instant. Starting fresh in memory is what matters.
+        try { if (File.Exists(Disk)) File.Delete(Disk); }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException) { GD.Print($"Save: {Disk} is busy; starting fresh anyway."); }
         Data = new SaveData();
     }
 }

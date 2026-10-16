@@ -106,6 +106,22 @@ public sealed class SteamPlatform : IPlatform
         catch (Exception e) { GD.Print($"Steam: leaderboard {board} failed ({e.Message})."); }
     }
 
+    public void SubmitScore(string board, int score)
+    {
+        _local.SubmitScore(board, score);
+        _ = SubmitBest(board, score);
+    }
+
+    private static async System.Threading.Tasks.Task SubmitBest(string board, int score)
+    {
+        try
+        {
+            Leaderboard? lb = await SteamUserStats.FindOrCreateLeaderboardAsync(board, LeaderboardSort.Descending, LeaderboardDisplay.Numeric);
+            if (lb is Leaderboard found) await found.SubmitScoreAsync(score);
+        }
+        catch (Exception e) { GD.Print($"Steam: leaderboard {board} failed ({e.Message})."); }
+    }
+
     public void SetPresence(string text)
     {
         // Shown to friends through the "#Status" token (docs/STEAM.md §2.5).

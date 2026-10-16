@@ -65,7 +65,7 @@ public partial class TitleScreen : Node3D
             if (!ClownSquad.Debug.NetProbe.Running) GetTree().Root.CallDeferred(Node.MethodName.AddChild, new ClownSquad.Debug.NetProbe());
             return;
         }
-        foreach (string f in new[] { "wavetest", "losetest", "movetest", "animtest", "aitest", "sandbox", "fight", "stage", "tentshot", "stageshot", "castshot", "weapontest", "weaponmoves", "bindtest", "skillshot", "practice", "practicetest", "demo", "bossrush" })
+        foreach (string f in new[] { "daily", "wavetest", "losetest", "movetest", "animtest", "aitest", "sandbox", "fight", "stage", "tentshot", "stageshot", "castshot", "weapontest", "weaponmoves", "bindtest", "skillshot", "practice", "practicetest", "demo", "bossrush" })
             if (Array.IndexOf(args, f) >= 0) { CallDeferred(MethodName.Go, Campaign.FightScene); return; }
         if (Array.IndexOf(args, "mapshot") >= 0) { CallDeferred(MethodName.Go, Campaign.MapScene); return; }
 
@@ -181,6 +181,7 @@ public partial class TitleScreen : Node3D
         void Shot(string name) => GetViewport().GetTexture().GetImage().SavePng($"{ClownSquad.Debug.DebugShots.Dir}{name}.png");
         GetTree().CreateTimer(1.75).Timeout += () => Shot("intro_panels");
         GetTree().CreateTimer(2.75).Timeout += () => Shot("intro_logo");
+        GetTree().CreateTimer(5.4).Timeout += () => Shot("menu");
         GetTree().CreateTimer(5.6).Timeout += () => OpenSettings();
         GetTree().CreateTimer(6.0).Timeout += () =>
         {
@@ -305,6 +306,7 @@ public partial class TitleScreen : Node3D
     {
         foreach (Node n in _menu.GetChildren()) n.QueueFree();
         if (_squadRow is not null) { _squadRow.QueueFree(); _squadRow = null; }
+        _menu.AddThemeConstantOverride("separation", 8);
     }
 
     private Label MenuLine(string text, bool selected, int size = 30)
@@ -338,6 +340,14 @@ public partial class TitleScreen : Node3D
         _main.Add(("NEW GAME", () => { _newGame = true; ShowSlots(); }));
         if (recent > 0) _main.Add(("LOAD GAME", () => { _newGame = false; ShowSlots(); }));
         _main.Add(("ONLINE", OpenOnline));
+        // Today's stage and act, the same for everyone.
+        _main.Add(($"DAILY CIRCUS: {DailyCircus.TodaysAct.Name}", () =>
+        {
+            _starting = true;
+            if (recent > 0) SaveSystem.ActiveSlot = recent;
+            Sfx.Play("drumroll");
+            DailyCircus.Start(GetTree());
+        }));
         _main.Add(("BOSS RUSH", () => { _starting = true; Sfx.Play("drumroll"); BossRush.Start(GetTree()); }));
         // Practice with the clowns of the last save played (a copy: nothing is kept).
         _main.Add(("PRACTICE RING", () =>
@@ -359,7 +369,10 @@ public partial class TitleScreen : Node3D
     private void RefreshMain()
     {
         ClearMenu();
-        for (int i = 0; i < _main.Count; i++) MenuLine(_main[i].label, i == _mainCursor);
+        // A long menu (a save to continue, plus the daily) sets a little smaller, so it all fits the ring.
+        int size = _main.Count > 9 ? 26 : 30;
+        _menu.AddThemeConstantOverride("separation", _main.Count > 9 ? 3 : 8);
+        for (int i = 0; i < _main.Count; i++) MenuLine(_main[i].label, i == _mainCursor, size);
     }
 
     // ---------------------------------------------------------------- slots

@@ -84,6 +84,7 @@ public partial class GameRoot
         p.DisplayName = record.Name;
         p.Look = record.Look;
         if (Session.IsTest) ApplyProbeWeapon(record);
+        if (_act?.Act == DailyCircus.Act.PieNight) record.Weapon = WeaponKind.Pie;
         p.ApplyProgression(record);
         AddChild(p);
         Vector3 home = new(-1.5f + index * 1.5f, 0f, 1.5f);
@@ -102,6 +103,7 @@ public partial class GameRoot
     {
         // A clown taking a tumble: the crowd cannot help itself.
         Fx.Sound("crowd_laugh");
+        if (f is PlayerFighter && !f.Hostile) _anyoneFell = true;
         Vector3 home = f is PlayerFighter p && _homes.TryGetValue(p, out Vector3 h) ? h : Vector3.Zero;
         if (_scrolling) home = new Vector3(_camX - 2f, 0f, home.Z);
 

@@ -52,6 +52,7 @@ public partial class GameRoot
         // A campaign stage returns to the map, won or lost; a boss rush to the
         // title; the free fight replays.
         if (_rush) BossRush.Leave(GetTree());
+        else if (_daily && !Session.IsTest) DailyCircus.Leave(GetTree());
         else if (_stage is not null) GoToMap();
         else GetTree().ReloadCurrentScene();
     }
@@ -98,7 +99,7 @@ public partial class GameRoot
         var items = new List<(PauseMenu.Choice, string)> { (PauseMenu.Choice.Resume, "RESUME"), (PauseMenu.Choice.Stats, "STAT TENT"), (PauseMenu.Choice.Inventory, "INVENTORY"), (PauseMenu.Choice.Skills, "SKILLS"), (PauseMenu.Choice.Settings, "SETTINGS") };
         if (_stage is not null) items.Add((PauseMenu.Choice.Retry, "RETRY STAGE"));
         // A boss rush is left for the title, never the map: the map would carry the rush on into the next stage.
-        items.Add((PauseMenu.Choice.Map, _rush ? "QUIT BOSS RUSH" : _practice ? "LEAVE PRACTICE" : "BACK TO THE MAP"));
+        items.Add((PauseMenu.Choice.Map, _rush ? "QUIT BOSS RUSH" : _daily ? "LEAVE THE DAILY CIRCUS" : _practice ? "LEAVE PRACTICE" : "BACK TO THE MAP"));
         _pause = new PauseMenu(items, devices, choice =>
         {
             _pause = null;
@@ -120,6 +121,7 @@ public partial class GameRoot
                 case PauseMenu.Choice.Map:
                     SaveSystem.Save();
                     if (_rush) BossRush.Leave(GetTree());
+                    else if (_daily) DailyCircus.Leave(GetTree());
                     else if (_practice) { Session.BeginCampaign(); GetTree().ChangeSceneToFile(Campaign.TitleScene); }
                     else GoToMap();
                     break;
@@ -172,6 +174,27 @@ public partial class GameRoot
             {
                 Text = "ATTACK  back to the title      DODGE  run it again",
                 HorizontalAlignment = HorizontalAlignment.Center, LabelSettings = S(14, new Color(1f, 0.85f, 0.3f)),
+            });
+            _results = panel;
+            panel.Scale = new Vector2(0.6f, 0.6f);
+            panel.PivotOffset = new Vector2(210, 80);
+            CreateTween().TweenProperty(panel, "scale", Vector2.One, 0.3f).SetTrans(Tween.TransitionType.Back).SetEase(Tween.EaseType.Out);
+            return;
+        }
+        if (_daily && _act is not null)
+        {
+            Row("DAILY CIRCUS", _act.Name);
+            Row("TIME", $"{(int)secs / 60}:{(int)secs % 60:00}");
+            Row("KNOCKOUTS", _kos.ToString());
+            Row("BEST COMBO", $"{_bestCombo} HITS");
+            Row("SCORE", _dailyScore.ToString("N0"));
+            Row("TODAY'S BEST", DailyCircus.BestToday.ToString("N0"));
+            if (_dailyBest)
+                box.AddChild(new Label { Text = "NEW BEST TODAY!", HorizontalAlignment = HorizontalAlignment.Center, LabelSettings = S(22, new Color(1f, 0.85f, 0.3f)) });
+            box.AddChild(new Label
+            {
+                Text = "ATTACK  back to the title      DODGE  try again", HorizontalAlignment = HorizontalAlignment.Center,
+                LabelSettings = S(14, new Color(1f, 0.85f, 0.3f)),
             });
             _results = panel;
             panel.Scale = new Vector2(0.6f, 0.6f);

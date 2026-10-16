@@ -40,6 +40,7 @@ public static class Achievements
             new("rush_fast", "QUICK CHANGE", "Beat the boss rush in under 20 minutes."),
             new("together", "SEND IN THE CLOWNS", "Play an online game with a friend."),
             new("ring_bell", "RING THE BELL", "Ring the High Striker with Big Bertha."),
+            new("daily_clear", "SAME TIME TOMORROW", "Clear a Daily Circus."),
         };
         string[] bosses = { "BELLYFLOP BERTIE", "BOBO THE BALANCER", "MADAME STRIPES", "THE JALOPY", "STRETCH",
                             "THE FLYING FRATELLI", "PYRO PETE", "THE TOTEM TOTS", "IRON IVAN", "THE RINGMASTER" };

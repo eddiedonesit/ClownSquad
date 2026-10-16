@@ -104,6 +104,8 @@ public partial class Fighter : CharacterBody3D
     [Export] public float Acceleration { get; set; } = 60f;
     [Export] public float Friction { get; set; } = 45f;
     [Export] public float Gravity { get; set; } = 26f;
+    /// <summary>Everyone's gravity at once: the Daily Circus's MOON BOUNCE turns it down. Reset by each fight.</summary>
+    public static float GravityScale { get; set; } = 1f;
 
     private const float DownTime = 0.6f;
     private const float GetupInvulnerability = 0.55f;
@@ -255,7 +257,7 @@ public partial class Fighter : CharacterBody3D
             Grounded = false;
         }
 
-        if (!Grounded) Velocity = new Vector3(Velocity.X, Velocity.Y - Gravity * dt, Velocity.Z);
+        if (!Grounded) Velocity = new Vector3(Velocity.X, Velocity.Y - Gravity * GravityScale * dt, Velocity.Z);
 
         Visual?.SetFacing(Facing);
         Visual?.Tick(dt);

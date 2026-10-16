@@ -159,7 +159,13 @@ run-based or level-based structure, and max player count.
   user's Claude Code settings.
 - Balance needs human playtesting: the smart bot wins 7-B about half the time and
   reaches boss 7 of 10 in the boss rush; the eight weapons are tuned by probe only.
-- Saved for later: the daily circus (seeded daily stage with modifiers, local best).
+- Daily Circus (built 2026-10-16): Title > DAILY CIRCUS.
+  - One stage a day, picked from the UTC date: a normal fight of up to four waves from anywhere in the campaign, the same waves for everyone.
+  - One of six acts: ALL-STAR NIGHT, PIE NIGHT, MOON BOUNCE, GLASS CANNONS, THE BIG TOP, STAMPEDE.
+  - Fresh copies of your clowns at level 20 against level-15 acts, on a save of its own.
+  - Score: knockouts, best combo, time against par, and a bonus if nobody falls.
+  - The day's best is kept locally and on a per-day Steam leaderboard.
+  - Achievement: SAME TIME TOMORROW.
 - The code review of 2026-10-15 ([REVIEW-2026-10-15](REVIEW-2026-10-15.md)) lists
   the open risks; R2 (GameRoot split), R3 (Session), R4 (Fx), R6 (rebinding)
   and R7 (debug flags) are done. Still open: R1, push to GitHub and stop

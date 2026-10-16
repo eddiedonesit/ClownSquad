@@ -16,6 +16,8 @@ public enum PlayMode
     Test,
     /// <summary>A guest in someone else's online game: nothing here is saved (the host plays the stage).</summary>
     OnlineGuest,
+    /// <summary>The Daily Circus: today's stage, everyone at the same level, on a save of its own.</summary>
+    Daily,
 }
 
 /// <summary>
@@ -82,6 +84,23 @@ public static class Session
     }
 
     public const string GuestSave = "user://online_guest_save.json";
+    public const string DailySave = "user://daily_save.json";
+
+    /// <summary>
+    /// The Daily Circus with your clowns as they look and fight (name, clown
+    /// and weapon), but fresh: every one at the daily's level with no gear,
+    /// so everyone's score is earned on the same footing. Nothing reaches the slot.
+    /// </summary>
+    public static void BeginDaily()
+    {
+        Reset(PlayMode.Daily);
+        SaveSystem.UseActiveSlot();
+        SaveSystem.Load();
+        SaveSystem.Path = DailySave;
+        var chars = SaveSystem.Data.Characters;
+        for (int i = 0; i < chars.Count; i++)
+            chars[i] = new CharacterRecord { Name = chars[i].Name, Look = chars[i].Look, Weapon = chars[i].Weapon };
+    }
 
     /// <summary>Watching and playing in a host's stage: saves go to a scratch file, so the guest's own slot is never touched.</summary>
     public static void BeginOnlineGuest()

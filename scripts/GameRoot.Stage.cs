@@ -55,6 +55,7 @@ public partial class GameRoot
             }
         }
         if (phase == WaveDirector.Phase.Defeat) LoseLoot();
+        if (_daily && phase is WaveDirector.Phase.Victory or WaveDirector.Phase.Defeat) ScoreDaily(phase == WaveDirector.Phase.Victory);
         if (phase is WaveDirector.Phase.Victory or WaveDirector.Phase.Defeat)
         {
             _endedAt = GameClock.Seconds;

@@ -33,6 +33,7 @@ BALANCE=(
   "wavetest stage 7-B level 22"
   "wavetest stage 10-B level 30"
   "wavetest bossrush"
+  "wavetest daily act 4"   # today's Daily Circus stage, THE BIG TOP (the stage changes daily)
 )
 RUNS=("${MUST[@]}")
 [ "${1:-}" = "--balance" ] && RUNS+=("${BALANCE[@]}")

@@ -23,6 +23,7 @@ public partial class GameRoot
             if (Platform.Counts) Platform.Current.SubmitTime("boss_rush", secs);
             return;
         }
+        if (_daily) { Achievements.Award("daily_clear"); return; }
         if (_stage is not StageDef st) return;
         Achievements.Award("first_clear");
         Platform.AddStat("stages");

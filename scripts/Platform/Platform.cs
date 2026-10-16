@@ -26,6 +26,9 @@ public interface IPlatform
     /// <summary>A time on a leaderboard where lower is better (the boss rush). Steam boards take it in milliseconds.</summary>
     void SubmitTime(string board, double seconds);
 
+    /// <summary>A score on a leaderboard where higher is better (the Daily Circus).</summary>
+    void SubmitScore(string board, int score);
+
     /// <summary>What friends see this player doing ("Fighting stage 3-B").</summary>
     void SetPresence(string text);
 
@@ -89,6 +92,14 @@ public sealed class OfflinePlatform : IPlatform
         _cfg.Save(FilePath);
     }
 
+    public void SubmitScore(string board, int score)
+    {
+        int best = _cfg.HasSectionKey("scores", board) ? (int)_cfg.GetValue("scores", board) : int.MinValue;
+        if (score <= best) return;
+        _cfg.SetValue("scores", board, score);
+        _cfg.Save(FilePath);
+    }
+
     public void SetPresence(string text) { }
 
     public void Tick() { }
@@ -136,7 +147,7 @@ public static class Platform
     }
 
     /// <summary>Practice and automated tests never earn anything: they would be free achievements.</summary>
-    public static bool Counts => (Session.Mode is PlayMode.Campaign or PlayMode.BossRush && !ClownSquad.Progression.GameSettings.God) || CountInTests;
+    public static bool Counts => (Session.Mode is PlayMode.Campaign or PlayMode.BossRush or PlayMode.Daily && !ClownSquad.Progression.GameSettings.God) || CountInTests;
 
     /// <summary>A test checking achievements turns them on, against a scratch platform file.</summary>
     public static bool CountInTests { get; set; }

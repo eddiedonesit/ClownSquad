@@ -43,7 +43,7 @@ public partial class GameRoot
             () => _endedAt >= 0 && GameClock.Seconds - _endedAt > 1.5)
         {
             BagText = BagText,
-            StageLabel = _rush ? "BOSS RUSH  " : _stage is StageDef s ? (s.Kind == StageKind.Boss ? $"{s.World}-BOSS  " : $"{s.Id}  ") : "",
+            StageLabel = _rush ? "BOSS RUSH  " : _daily ? "DAILY CIRCUS  " : _stage is StageDef s ? (s.Kind == StageKind.Boss ? $"{s.World}-BOSS  " : $"{s.Id}  ") : "",
             ReplayText = _stage is not null ? "" : "press ATTACK to play again",
         };
         AddChild(_clownHud);

@@ -226,9 +226,9 @@ public static class Weapons
         WeaponKind.Slapstick, "SLAPSTICK", "Light damage, loud slaps that stun. A held charge claps everything in front senseless.",
         new AttackStep[]
         {
-            new(0.06f, 0.05f, 0.14f, 7f, 3.5f, 0.060f, 2.1f, 0f),
-            new(0.06f, 0.05f, 0.14f, 7f, 3.5f, 0.060f, 2.1f, 0f),
-            new(0.10f, 0.07f, 0.28f, 15f, 11f, 0.120f, 2.4f, 5.5f),
+            new(0.06f, 0.05f, 0.14f, 8f, 3.5f, 0.060f, 2.1f, 0f),     // balance pass 2026-10-16: 7, 7, 15 had the weakest combo
+            new(0.06f, 0.05f, 0.14f, 8f, 3.5f, 0.060f, 2.1f, 0f),
+            new(0.10f, 0.07f, 0.28f, 17f, 11f, 0.120f, 2.4f, 5.5f),
         },
         new(0.06f, 0.05f, 0.14f, 7f, 3.5f, 0.060f, 2.1f, 0f),
         ChargeMove.Clap, "mallet_spin_hd", "slap",
@@ -278,9 +278,9 @@ public static class Weapons
         WeaponKind.BalloonSword, "BALLOON SWORD", "The longest reach in the circus. Quick squeaky slashes; hold attack and a direction to thrust them into the wall; a held charge lunges like a fencer.",
         new AttackStep[]
         {
-            new(0.07f, 0.05f, 0.14f, 8f, 2.0f, 0.040f, 2.7f, 0f),
-            new(0.07f, 0.05f, 0.15f, 8f, 2.0f, 0.040f, 2.7f, 0f),
-            new(0.11f, 0.07f, 0.28f, 17f, 7f, 0.100f, 2.9f, 6f),
+            new(0.07f, 0.05f, 0.14f, 9f, 2.0f, 0.040f, 2.7f, 0f),     // balance pass 2026-10-16: 8, 8, 17 trailed the field
+            new(0.07f, 0.05f, 0.15f, 9f, 2.0f, 0.040f, 2.7f, 0f),
+            new(0.11f, 0.07f, 0.28f, 18f, 7f, 0.100f, 2.9f, 6f),
         },
         new(0.07f, 0.05f, 0.14f, 8f, 2.0f, 0.040f, 2.7f, 0f),
         ChargeMove.Lunge, "mallet_spin_hd", "whoosh",
