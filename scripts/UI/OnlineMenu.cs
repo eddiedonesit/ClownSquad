@@ -111,8 +111,9 @@ public partial class OnlineMenu : CanvasLayer
             case Page.Choose:
                 _title.Text = "PLAY ONLINE";
                 _info.Text = $"Playing as {Me}, from your last save.\nHost a game for up to 3 friends, or join one by its address.";
-                _items.Add(("HOST A GAME", HostGame));
-                _items.Add(("JOIN A GAME", () => Show(Page.Join)));
+                if (NetSession.SteamAvailable) _items.Add(("HOST ON STEAM (INVITE FRIENDS)", HostSteam));
+                _items.Add((NetSession.SteamAvailable ? "HOST BY ADDRESS" : "HOST A GAME", HostGame));
+                _items.Add(("JOIN BY ADDRESS", () => Show(Page.Join)));
                 _items.Add(("BACK", Close));
                 break;
             case Page.Join:
@@ -136,6 +137,7 @@ public partial class OnlineMenu : CanvasLayer
             case Page.Lobby:
                 _title.Text = _net.Mode == NetSession.Role.Host ? "YOUR GAME" : "LOBBY";
                 _items.Add(("START", Start));
+                if (_net.Mode == NetSession.Role.Host && _net.OverSteam) _items.Add(("INVITE FRIENDS", () => _net.InviteFriends()));
                 _items.Add(("LEAVE", () => { _net.Leave(); Show(Page.Choose); }));
                 break;
         }
@@ -148,6 +150,19 @@ public partial class OnlineMenu : CanvasLayer
     private void HostGame()
     {
         if (_net.Host(_me) == Error.Ok) { Sfx.Play("tada", 1.1f, -6f); Show(Page.Lobby); }
+        else { Sfx.Play("honk_low", 1.2f, -6f); Refresh(); }
+    }
+
+    private void HostSteam()
+    {
+        if (_net.HostSteam(_me) == Error.Ok) { Sfx.Play("tada", 1.1f, -6f); Show(Page.Lobby); _net.InviteFriends(); }
+        else { Sfx.Play("honk_low", 1.2f, -6f); Refresh(); }
+    }
+
+    /// <summary>A Steam invite was accepted: join that host's game.</summary>
+    public void JoinViaSteam(Steamworks.SteamId host)
+    {
+        if (_net.JoinSteam(host, _me, _savePath) == Error.Ok) { Sfx.Play("whoosh", 1.2f); Show(Page.Lobby); }
         else { Sfx.Play("honk_low", 1.2f, -6f); Refresh(); }
     }
 
@@ -197,7 +212,9 @@ public partial class OnlineMenu : CanvasLayer
         foreach (Node n in _list.GetChildren()) n.QueueFree();
         if (_page == Page.Lobby)
         {
-            if (_net.Mode == NetSession.Role.Host)
+            if (_net.Mode == NetSession.Role.Host && _net.OverSteam)
+                _info.Text = "Hosting through Steam: invite friends from the overlay, or they can join from your Steam profile.";
+            else if (_net.Mode == NetSession.Role.Host)
             {
                 List<string> mine = NetSession.LocalAddresses();
                 _info.Text = mine.Count > 0

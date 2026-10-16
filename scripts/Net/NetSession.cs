@@ -79,7 +79,13 @@ public partial class NetSession : Node
     private readonly List<NetMember> _members = new();
     private readonly Dictionary<long, CharacterRecord> _records = new();
     private CharacterRecord _local = new();
-    private ENetMultiplayerPeer? _peer;
+    private MultiplayerPeer? _peer;
+    private Steamworks.Data.Lobby? _lobby;
+
+    /// <summary>Steam is running, so games can be hosted and joined through it (invites, no addresses).</summary>
+    public static bool SteamAvailable => ClownSquad.Services.Platform.Current is ClownSquad.Services.SteamPlatform;
+    /// <summary>This game is carried over Steam rather than by IP address.</summary>
+    public bool OverSteam => _peer is SteamPeer;
     private MultiplayerApi _api = null!;
 
     /// <summary>
@@ -120,8 +126,9 @@ public partial class NetSession : Node
     {
         Leave(quiet: true);
         _local = me;
-        _peer = new ENetMultiplayerPeer();
-        Error err = _peer.CreateServer(Port, MaxGuests);
+        var enet = new ENetMultiplayerPeer();
+        _peer = enet;
+        Error err = enet.CreateServer(Port, MaxGuests);
         if (err != Error.Ok)
         {
             _peer = null;
@@ -153,8 +160,9 @@ public partial class NetSession : Node
         Leave(quiet: true);
         _local = me;
         GuestSavePath = savePath;
-        _peer = new ENetMultiplayerPeer();
-        Error err = _peer.CreateClient(address.Trim(), Port);
+        var enet = new ENetMultiplayerPeer();
+        _peer = enet;
+        Error err = enet.CreateClient(address.Trim(), Port);
         if (err != Error.Ok)
         {
             _peer = null;
@@ -170,9 +178,73 @@ public partial class NetSession : Node
         return Error.Ok;
     }
 
+    // ------------------------------------------------------- through Steam
+
+    /// <summary>
+    /// Host through Steam: a friends-only Steam lobby that friends join from
+    /// their friends list or an invite (<see cref="InviteFriends"/>), the game
+    /// itself carried by <see cref="SteamPeer"/>. No address, no port.
+    /// </summary>
+    public Error HostSteam(CharacterRecord me)
+    {
+        if (!SteamAvailable) return Error.Unavailable;
+        Leave(quiet: true);
+        _local = me;
+        _peer = SteamPeer.CreateHost();
+        _api.MultiplayerPeer = _peer;
+        Mode = Role.Host;
+        _members.Add(MemberFor(1, me));
+        Status = "Opening a Steam lobby...";
+        Changed?.Invoke();
+        _ = OpenLobby();
+        return Error.Ok;
+    }
+
+    private async System.Threading.Tasks.Task OpenLobby()
+    {
+        Steamworks.Data.Lobby? lobby = await Steamworks.SteamMatchmaking.CreateLobbyAsync(MaxGuests + 1);
+        if (lobby is not Steamworks.Data.Lobby l || Mode != Role.Host || !OverSteam)
+        {
+            if (lobby is Steamworks.Data.Lobby late) late.Leave();
+            if (Mode == Role.Host && OverSteam) { Status = "Steam could not open a lobby. Try again, or host by address."; Changed?.Invoke(); }
+            return;
+        }
+        l.SetFriendsOnly();
+        l.SetJoinable(true);
+        l.SetData("game", "clownsquad");
+        l.SetData("protocol", Protocol.ToString());
+        _lobby = l;
+        Status = "Steam lobby open. Choose INVITE FRIENDS, or friends can join from your Steam profile.";
+        GD.Print($"Steam: lobby {l.Id} open.");
+        Changed?.Invoke();
+    }
+
+    /// <summary>The Steam overlay's invite list, for the host's lobby.</summary>
+    public void InviteFriends()
+    {
+        if (_lobby is Steamworks.Data.Lobby l) Steamworks.SteamFriends.OpenGameInviteOverlay(l.Id);
+    }
+
+    /// <summary>Join a friend's game through Steam, by the host's Steam ID (from a lobby or an invite).</summary>
+    public Error JoinSteam(Steamworks.SteamId host, CharacterRecord me, string? savePath = null)
+    {
+        if (!SteamAvailable) return Error.Unavailable;
+        Leave(quiet: true);
+        _local = me;
+        GuestSavePath = savePath;
+        _peer = SteamPeer.CreateClient(host);
+        _api.MultiplayerPeer = _peer;
+        Mode = Role.Guest;
+        Status = "Connecting through Steam...";
+        GD.Print($"Steam: joining {host}.");
+        Changed?.Invoke();
+        return Error.Ok;
+    }
+
     /// <summary>Leave the game (a host closes it for everyone).</summary>
     public void Leave(bool quiet = false)
     {
+        if (_lobby is Steamworks.Data.Lobby lobby) { lobby.Leave(); _lobby = null; }
         if (_peer is not null)
         {
             _peer.Close();

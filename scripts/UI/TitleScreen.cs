@@ -81,6 +81,16 @@ public partial class TitleScreen : Node3D
         foreach (int pad in Godot.Input.GetConnectedJoypads()) _pads.Add(new MapPad(pad));
         ShowMain();
 
+        // A Steam invite accepted while the game is on the title: straight into that friend's game.
+        ClownSquad.Net.SteamInvites.JoinRequested += OnSteamInvite;
+        TreeExiting += () => ClownSquad.Net.SteamInvites.JoinRequested -= OnSteamInvite;
+        if (ClownSquad.Net.SteamInvites.Pending is not null)
+        {
+            Sfx.PlayMusic("music_title");
+            CallDeferred(MethodName.OpenOnline);
+            return;
+        }
+
         // Back from a stage played online: no opening, straight into the lobby.
         if (ClownSquad.Net.NetSession.Instance is { Mode: not ClownSquad.Net.NetSession.Role.Offline })
         {
@@ -133,6 +143,9 @@ public partial class TitleScreen : Node3D
             ? d.Characters[0]
             : new CharacterRecord { Name = "PIP", Look = "pip" };
         _online = new OnlineMenu(devices, me, recent > 0 ? SaveSystem.SlotPath(recent) : null);
+        // A Steam invite accepted before (or while) this menu was open: join that friend.
+        if (ClownSquad.Net.SteamInvites.Take() is Steamworks.SteamId invited)
+            _online.Ready += () => _online?.JoinViaSteam(invited);
         _online.Closed += () => { _online = null; foreach (MapPad p in _pads) p.Swallow(); };
         _online.HostStarts += () =>
         {
@@ -145,6 +158,13 @@ public partial class TitleScreen : Node3D
             return null;
         };
         AddChild(_online);
+    }
+
+    private void OnSteamInvite(Steamworks.SteamId host)
+    {
+        if (!IsInsideTree()) return;
+        if (_online is not null) { ClownSquad.Net.SteamInvites.Take(); _online.JoinViaSteam(host); return; }
+        OpenOnline();
     }
 
     private void OpenAchievements()

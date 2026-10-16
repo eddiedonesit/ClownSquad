@@ -75,12 +75,13 @@ beside the project; `scripts/Platform/SteamPlatform.cs`.
 - **App ID:** `SteamPlatform.AppId`, set to 480 (Valve's "Spacewar" test app) until Clown Squad has its own. Change that one number and `steam_appid.txt`.
 - **To try it:** open Steam, then start the game. The log says `Steam: signed in as ...`, Shift+Tab opens the overlay and pauses the game, and friends see what you are doing (as Spacewar until the real App ID).
 
-- **Online over Steam:** a `SteamPeer : MultiplayerPeerExtension` (~300 lines)
-  carrying Godot's RPCs over Steam Networking Sockets, plus a Steam lobby.
-  - Host: create the lobby.
-  - Friends: join from the Steam friends list ("Join game") or by invite.
-  - No IP addresses and no port forwarding.
-  - `NetSession` gains `HostSteam()` and `JoinSteam(lobby)`; everything above it (lobby screen, roster, character transfer, phase 2 and later) is unchanged.
+- **Online over Steam (built 2026-10-16, untested until two Steam accounts can try it):**
+  - `SteamPeer : MultiplayerPeerExtension` carries Godot's RPCs over Steam peer-to-peer (Steam relays when it must).
+  - Its handshake: a guest's HELLO, the host's WELCOME, and BYE when either leaves.
+  - Title > ONLINE > HOST ON STEAM (INVITE FRIENDS) opens a friends-only Steam lobby and the invite overlay. The lobby screen keeps an INVITE FRIENDS item.
+  - A friend accepting the invite, choosing "Join game" in Steam, or starting the game from an invite (`+connect_lobby`) enters the lobby. `SteamInvites` finds the host and the title joins them.
+  - Hosting and joining by address (ENet) stay alongside.
+  - Everything above the transport (lobby, stages, rewards) is shared.
 - **Export:**
   - Godot 4.7.2 .NET export templates (another download to approve).
   - `steam_appid.txt` beside the exe for local testing (git-ignored already).

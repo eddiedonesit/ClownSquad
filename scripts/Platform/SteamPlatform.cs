@@ -49,6 +49,7 @@ public sealed class SteamPlatform : IPlatform
         if (!SteamClient.IsValid) return null;
         var steam = new SteamPlatform(local);
         GD.Print($"Steam: signed in as {SteamClient.Name} (app {AppId}).");
+        ClownSquad.Net.SteamInvites.Hook();
         steam.CatchUp();
         return steam;
     }
