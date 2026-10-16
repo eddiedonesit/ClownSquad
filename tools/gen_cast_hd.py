@@ -30,6 +30,7 @@ OUT = os.path.join("assets", "sprites", "cast")
 # ------------------------------------------------------------- materials
 (SUIT, ACCENT, TRIM, SKIN, HAIR, NOSE, INK, EYE, LIP, BLUSH, WHITE, SHOE, SOLE, WOOD, METAL, GOLD,
  FLAME, FLAME2, HATC, PANTS, BALLOON, MOUTH, TOOTH, FUR, STRIPE, BELLY, CART, CART2, BLACK) = range(1, 30)
+FRECK = 30          # freckles, stubble, a scar: per character (spec "freck")
 
 
 def mats(spec):
@@ -39,6 +40,7 @@ def mats(spec):
         ACCENT: Material(s.get("accent", (246, 200, 84))),
         TRIM: Material(s.get("trim", (236, 236, 246)), soft=True),
         SKIN: Material(s.get("skin", (250, 218, 192)), soft=True, cool=0.97),
+        FRECK: Material(s.get("freck", (190, 110, 80))),
         HAIR: Material(s.get("hair", (238, 132, 58))),
         NOSE: Material(s.get("nose_col", (232, 52, 60)), gloss=True),
         INK: Material((34, 22, 40), flat=True),
@@ -467,8 +469,16 @@ class Rig:
     def head(self, c, x, y, r, p):
         k, s = self.k, self.s
         face = s.get("face", "clown")
+        feats = s.get("features", ())
+        hw, hh = s.get("head_w", 1.0), s.get("head_h", 1.0)
         c.part()
-        c.ellipse(x, y + 1 * k, r, r * 1.02, SKIN if face != "mime" else WHITE)
+        c.ellipse(x, y + 1 * k + r * (hh - 1) * 0.5, r * hw, r * 1.02 * hh, SKIN if face != "mime" else WHITE)
+        if s.get("jaw"):
+            # a square jaw: the lower face filled out to a block
+            c.ellipse(x + r * 0.2, y + r * 0.5 * hh, r * 0.85 * hw, r * 0.6, SKIN)
+            c.poly([(x - r * 0.3, y + r * 0.3), (x + r * 0.9, y + r * 0.3), (x + r * 0.85, y + r * 1.0 * hh), (x - r * 0.15, y + r * 0.95 * hh)], SKIN)
+        if "stubble" in feats:
+            c.recolor(lambda xx, yy, m: FRECK if m == SKIN and yy > y + r * 0.35 and xx > x - r * 0.3 and (int(xx / k) + int(yy / k)) % 2 == 0 else m)
         if face == "clown":
             c.recolor(lambda xx, yy, m: WHITE if ((xx - x - r * 0.55) / (r * 0.5)) ** 2 + ((yy - y - r * 0.6) / (r * 0.36)) ** 2 <= 1 else m)
         # ear
@@ -492,20 +502,79 @@ class Rig:
         if face == "mime":
             c.part(line=False)
             c.poly([(ex, ey - r * 0.45), (ex + r * 0.12, ey), (ex, ey + r * 0.45), (ex - r * 0.12, ey)], INK)
+        if "makeup_diamond" in feats:
+            # a clown's painted diamond over the eye
+            c.part(line=False)
+            c.poly([(ex, ey - r * 0.62), (ex + r * 0.28, ey), (ex, ey + r * 0.55), (ex - r * 0.28, ey)], ACCENT)
         c.part(line=False)
         brow = -r * 0.12 if p["eyes"] == "angry" else 0
-        c.stroke(bezier((ex - r * 0.35, ey - r * 0.38 - brow), (ex, ey - r * 0.6), (ex + r * 0.3, ey - r * 0.4 + brow)), 1.1 * k, INK)
+        bstyle = s.get("brow", "")
+        lift = r * 0.14 if bstyle == "high" else 0
+        if bstyle == "unibrow":
+            c.stroke([(ex - r * 0.8, ey - r * 0.4 - brow * 0.5), (ex + r * 0.3, ey - r * 0.42 + brow)], 2.4 * k, HAIR if s.get("hair_style") != "none" else BLACK)
+        elif bstyle != "none":
+            c.stroke(bezier((ex - r * 0.35, ey - r * 0.38 - brow - lift), (ex, ey - r * 0.6 - lift * 1.4), (ex + r * 0.3, ey - r * 0.4 + brow - lift)),
+                     (2.3 if bstyle == "thick" else 1.1) * k, INK)
+        eye = s.get("eye", "")
         if p["eyes"] == "closed":
             c.part(line=False)
             c.stroke(bezier((ex - r * 0.2, ey), (ex, ey - r * 0.15), (ex + r * 0.2, ey)), 1.0 * k, INK)
+        elif eye == "dot":
+            c.part(line=False)
+            c.ellipse(ex + r * 0.05, ey + r * 0.05, r * 0.12, r * 0.17, INK)
+        elif eye == "narrow":
+            c.part(line=False)
+            c.ellipse(ex, ey + r * 0.03, r * 0.2, r * 0.12, EYE)
+            c.part(line=False)
+            c.ellipse(ex + r * 0.08, ey + r * 0.04, r * 0.08, r * 0.1, INK)
+        elif eye == "big":
+            c.part(line=False)
+            c.ellipse(ex, ey, r * 0.24, r * 0.33, EYE)
+            c.part(line=False)
+            c.ellipse(ex + r * 0.08, ey + r * 0.05, r * 0.14, r * 0.22, INK)
+            c.part(line=False)
+            c.ellipse(ex + r * 0.12, ey - r * 0.06, r * 0.05, r * 0.06, EYE)          # the glint
         else:
             c.part(line=False)
             c.ellipse(ex, ey, r * 0.18, r * 0.27, EYE)
             c.part(line=False)
             c.ellipse(ex + r * 0.07, ey + r * 0.04, r * 0.1, r * 0.17, INK)
+        if eye == "lids" and p["eyes"] != "closed":
+            # heavy lids: cool, unimpressed
+            c.part(line=False)
+            c.poly([(ex - r * 0.22, ey - r * 0.3), (ex + r * 0.22, ey - r * 0.3), (ex + r * 0.22, ey - r * 0.02), (ex - r * 0.22, ey - r * 0.06)], SKIN)
+            c.part(line=False)
+            c.stroke([(ex - r * 0.22, ey - r * 0.05), (ex + r * 0.24, ey - r * 0.01)], 1.0 * k, INK)
+        if "lashes" in feats and p["eyes"] != "closed":
+            c.part(line=False)
+            for dx, dy in ((0.1, -0.3), (0.22, -0.22), (0.28, -0.1)):
+                c.stroke([(ex + r * dx * 0.8, ey + r * dy * 0.8), (ex + r * (dx + 0.12), ey + r * (dy - 0.1))], 0.9 * k, INK)
+        if "monocle" in feats:
+            c.part(line=False)
+            c.stroke([(ex + math.cos(t / 16 * math.tau) * r * 0.32, ey + math.sin(t / 16 * math.tau) * r * 0.36) for t in range(17)], 0.9 * k, GOLD)
+            c.stroke(bezier((ex - r * 0.1, ey + r * 0.36), (ex - r * 0.5, ey + r * 1.0), (x - r * 0.2, y + r * 1.25)), 0.5 * k, GOLD)
         if face != "mime":
             c.part(line=False)
             c.ellipse(x + r * 0.05, y + r * 0.38, r * 0.17, r * 0.12, BLUSH)
+        if "freckles" in feats:
+            for fx, fy in ((0.0, 0.28), (0.18, 0.22), (0.12, 0.42), (0.32, 0.3), (-0.12, 0.4)):
+                c.part(line=False)
+                c.ellipse(x + r * fx, y + r * fy, 0.8 * k, 0.8 * k, FRECK)
+        if "scar" in feats:
+            c.part(line=False)
+            c.stroke([(x - r * 0.05, y - r * 0.05), (x + r * 0.35, y + r * 0.5)], 1.0 * k, FRECK)
+            for t in (0.3, 0.6):
+                px_, py_ = x - r * 0.05 + r * 0.4 * t, y - r * 0.05 + r * 0.55 * t
+                c.stroke([(px_ - r * 0.08, py_ + r * 0.05), (px_ + r * 0.08, py_ - r * 0.05)], 0.7 * k, FRECK)
+        if "sideburns" in feats:
+            c.part()
+            c.capsule(x - r * 0.4, y - r * 0.35, x - r * 0.3, y + r * 0.55, r * 0.16, r * 0.12, HAIR if s.get("stache_col") is None else BLACK)
+        if "earring" in feats:
+            c.part(line=False)
+            c.stroke([(x - r * 0.7 + math.cos(t / 10 * math.tau) * r * 0.12, y + r * 0.58 + math.sin(t / 10 * math.tau) * r * 0.14) for t in range(11)], 0.8 * k, GOLD)
+        if "beauty_mark" in feats:
+            c.part(line=False)
+            c.ellipse(x + r * 0.78, y + r * 0.42, 0.9 * k, 0.9 * k, INK)
         # mouth
         mx, my = x + r * 0.55, y + r * 0.62
         if p["mouth"] == "open" or p["mouth"] == "o":
@@ -517,6 +586,20 @@ class Rig:
         else:
             c.part(line=False)
             c.stroke(bezier((mx - r * 0.35, my - r * 0.05), (mx, my + r * 0.3), (mx + r * 0.45, my - r * 0.15)), 1.6 * k, LIP if face != "mime" else INK)
+        if p["mouth"] not in ("open", "o", "flat"):
+            if "gold_tooth" in feats:
+                c.part(line=False)
+                c.ellipse(mx + r * 0.08, my + r * 0.12, r * 0.07, r * 0.08, GOLD)
+            if "buck_teeth" in feats:
+                for dx in (-0.06, 0.08):
+                    c.part()
+                    c.poly([(mx + r * dx, my + r * 0.08), (mx + r * (dx + 0.12), my + r * 0.08), (mx + r * (dx + 0.11), my + r * 0.3), (mx + r * (dx + 0.01), my + r * 0.3)], TOOTH)
+        if "goatee" in feats:
+            c.part()
+            c.ellipse(mx + r * 0.05, my + r * 0.42, r * 0.17, r * 0.22, HAIR if s.get("stache_col") is None else BLACK)
+        if "cleft" in feats:
+            c.part(line=False)
+            c.stroke([(mx + r * 0.2, my + r * 0.4 * hh), (mx + r * 0.22, my + r * 0.55 * hh)], 0.8 * k, INK)
         if s.get("mustache"):
             col = HAIR if s.get("stache_col") is None else BLACK
             big = 1.2 if s.get("mustache") == "handlebar" else 1.0
@@ -528,9 +611,26 @@ class Rig:
                     # the waxed curl at each end
                     c.stroke([(tip[0] + math.cos(t / 6 * math.tau) * 1.6 * k * side, tip[1] - 1.6 * k + math.sin(t / 6 * math.tau) * 1.6 * k)
                               for t in range(5)], 0.8 * k, col)
+        nose = s.get("nose_shape", "")
         if s.get("nose", True):
             c.part()
             c.ellipse(x + r * 1.0, y + r * 0.2, r * 0.36, r * 0.34, NOSE)
+        elif nose == "hook":
+            # long and hooked down at the tip: a schemer's nose
+            c.part()
+            c.poly([(x + r * 0.8, y - r * 0.2), (x + r * 1.25, y + r * 0.22), (x + r * 1.1, y + r * 0.36), (x + r * 0.85, y + r * 0.3)], SKIN)
+        elif nose == "bent":
+            # flattened and knocked sideways: a fighter's nose
+            c.part()
+            c.ellipse(x + r * 0.98, y + r * 0.2, r * 0.24, r * 0.17, SKIN)
+            c.part()
+            c.ellipse(x + r * 0.9, y + r * 0.02, r * 0.12, r * 0.1, SKIN)
+        elif nose == "long":
+            c.part()
+            c.capsule(x + r * 0.85, y + r * 0.05, x + r * 1.35, y + r * 0.2, r * 0.12, r * 0.14, SKIN)
+        elif nose == "bulb":
+            c.part()
+            c.ellipse(x + r * 1.0, y + r * 0.22, r * 0.27, r * 0.25, SKIN)
         else:
             c.part()
             c.ellipse(x + r * 0.95, y + r * 0.15, r * 0.16, r * 0.2, SKIN)
@@ -1172,41 +1272,49 @@ CAST = {
     # ---- bosses
     # Bobo: a clown in a spotted suit with a ruff and striped stockings, juggling up on his ball
     "ballrider": dict(k=1.25, suit=(250, 120, 170), accent=(255, 255, 255), pattern="dots", hair=(120, 220, 210),
-                      hat="cone", hat_col=(250, 200, 80), neck="ruff", juggles="pin", belt="plain", legwear="stripes"),
+                      hat="cone", hat_col=(250, 200, 80), neck="ruff", juggles="pin", belt="plain", legwear="stripes",
+                    eye="big", brow="high", features=("makeup_diamond",)),
     # Madame Stripes, the lion tamer: a red hussar jacket with gold frogging and
     # epaulettes, white jodhpurs, tall black riding boots, pith helmet, whip and chair
     "trainer": dict(k=1.3, suit=(200, 40, 50), accent=(250, 200, 80), pattern="plain", hair_style="bun", hair=(90, 50, 40),
                     hat="pith", hat_col=(240, 230, 210), neck="collar", face="plain", nose=False, shoes="boot",
                     shoe=(40, 32, 44), pants=(245, 240, 225), lip=(200, 40, 70), cw=300, shift=-40,
-                    frogging=True, epaulettes=True, jodhpurs=True, riding_boots=True, belt="plain"),
+                    frogging=True, epaulettes=True, jodhpurs=True, riding_boots=True, belt="plain",
+                    eye="lids", features=("lashes", "beauty_mark"), skin=(238, 196, 164)),
     # Stretch, the india-rubber man: a banded rubber suit, a star on the chest, everything too long
     "elastic": dict(k=1.3, suit=(120, 70, 210), accent=(150, 100, 236), pattern="star", leg=1.5, torso=1.25, arm=1.15,
                     hair_style="slick", hair=(250, 230, 120), hat="none", neck="collar", trim=(250, 220, 80),
-                    shoe=(250, 220, 80), shoes="boot", ch=340, legwear="stripes", limb_rings=True, belt="plain"),
+                    shoe=(250, 220, 80), shoes="boot", ch=340, legwear="stripes", limb_rings=True, belt="plain",
+                    eye="dot", head_h=1.3, head_w=0.85, nose_shape="long", features=("buck_teeth",)),
     # the Flying Fratelli: sequinned leotards with a sash, taped wrists, soft boots
     "trapeze_a": dict(k=1.2, suit=(40, 170, 200), accent=(250, 250, 255), pattern="leotard", hair_style="slick", hair=(50, 40, 40),
                       hat="none", neck="none", face="plain", nose=False, mustache="handlebar", shoes="boot", shoe=(250, 250, 255),
-                      pants=(40, 170, 200), cuffs=False, sequins=True, sash=True, wristbands=True),
+                      pants=(40, 170, 200), cuffs=False, sequins=True, sash=True, wristbands=True,
+                    eye="narrow", brow="thick", jaw=True, features=("sideburns", "cleft"), skin=(232, 188, 150)),
     "trapeze_b": dict(k=1.2, suit=(240, 90, 170), accent=(250, 250, 255), pattern="leotard", hair_style="long", hair=(240, 200, 90),
                       hat="none", neck="none", face="plain", nose=False, shoes="boot", shoe=(250, 250, 255),
-                      pants=(240, 90, 170), cuffs=False, sequins=True, sash=True, wristbands=True),
+                      pants=(240, 90, 170), cuffs=False, sequins=True, sash=True, wristbands=True,
+                    eye="big", brow="high", features=("lashes", "freckles"), freck=(214, 120, 96)),
     # Pyro Pete: bandana, open vest, flames up his trousers, a torch in each hand
     "fireeater": dict(k=1.3, suit=(120, 40, 40), accent=(250, 170, 60), pattern="vest", hair_style="none", hat="bandana",
                       hat_col=(220, 60, 40), mustache="handlebar", face="plain", nose=False, bare_arms=True, gloves=False,
                       neck="none", pants=(60, 40, 60), shoes="boot", shoe=(60, 40, 50), juggles="torch",
-                      flame_hem=True, belt="plain", wristbands=True),
+                      flame_hem=True, belt="plain", wristbands=True,
+                    eye="narrow", brow="thick", nose_shape="bulb", features=("scar", "earring", "stubble", "goatee"), skin=(196, 128, 96), freck=(120, 70, 60)),
     # Iron Ivan, the strongman: a one-strap leopard leotard, a championship belt,
     # leather wristbands, a waxed handlebar moustache, bald as a cannonball
     "strongman": dict(k=1.5, build="muscle", suit=(240, 200, 120), accent=(120, 70, 40), stripe=(70, 40, 30),
                       pattern="spots", bare_arms=True, gloves=False, hair_style="none", hat="none", neck="none",
                       mustache="handlebar", stache_col=1, face="plain", nose=False, shoes="boot", shoe=(60, 40, 40),
-                      pants=(240, 200, 120), cw=260, strap=True, belt="champ", wristbands=True),
+                      pants=(240, 200, 120), cw=260, strap=True, belt="champ", wristbands=True,
+                    eye="dot", brow="unibrow", head_w=1.12, jaw=True, nose_shape="bent", features=("cleft",), skin=(244, 198, 170)),
     # the Ringmaster: red tailcoat with gold frogging and epaulettes, white
     # breeches, tall black riding boots, top hat, a waxed moustache
     "ringmaster": dict(k=1.35, suit=(200, 30, 50), accent=(252, 204, 72), pattern="tux", tails=True, hair=(40, 30, 30),
                        hair_style="slick", hat="top", hat_col=(40, 30, 50), neck="bowtie", mustache="handlebar", stache_col=1,
                        face="plain", nose=False, shoes="boot", shoe=(30, 24, 34), pants=(245, 240, 230), leg=1.15, torso=1.1,
-                       cw=300, shift=-40, frogging=True, epaulettes=True, riding_boots=True),
+                       cw=300, shift=-40, frogging=True, epaulettes=True, riding_boots=True,
+                    eye="narrow", brow="thick", nose_shape="hook", features=("monocle", "gold_tooth", "sideburns")),
 }
 
 BEASTS = {
