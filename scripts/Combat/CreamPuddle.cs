@@ -33,7 +33,8 @@ public partial class CreamPuddle : Node3D
     {
         var p = new CreamPuddle { _owner = owner, _radius = radius, _left = seconds, _life = seconds, _color = color ?? Cream };
         parent.AddChild(p);
-        p.GlobalPosition = new Vector3(at.X, 0.02f, at.Z);
+        float floor = ClownSquad.World.Terrain.Current?.HeightAt(at) ?? 0f;
+        p.GlobalPosition = new Vector3(at.X, floor + 0.02f, at.Z);
     }
 
     public override void _Ready()

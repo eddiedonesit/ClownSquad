@@ -165,6 +165,7 @@ public partial class GameRoot : Node3D
             ClownSquad.Actors.CastFighter.SheetSwaps[swap[0]] = swap[1];
         GameClock.Reset();
         AttackTokens.Reset();
+        Terrain.Current = null;          // flat until a scrolling stage lays its own
         ClownSquad.Net.NetRegistry.Reset();
         Engine.TimeScale = GameClock.Speed;
         AddChild(new ClownSquad.Audio.Sfx());
@@ -431,6 +432,7 @@ public partial class GameRoot : Node3D
         Fighter.GravityScale = 1f;
         Fighter.KnockScale = 1f;
         Fighter.HostileHealthScale = 1f;
+        Terrain.Current = null;
         Fighter.HitLanded -= OnHitLanded;
         Fighter.HitLanded -= OnPracticeHit;
         Arena.Current = null;

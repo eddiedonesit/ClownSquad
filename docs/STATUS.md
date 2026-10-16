@@ -126,8 +126,9 @@ cloud saves), controller rebinding, localisation.
 
 ## Known simplifications
 
-- **No floor collider.** The arena is a flat plane and ground contact is a clamp
-  at y=0 in `Fighter`. Platforms or uneven terrain need real collision shapes.
+- **No floor collider.** Ground contact is a height lookup: `World.Terrain`
+  (scrolling stages) gives terraces, ramps and round obstacles, and `Fighter`
+  stands on its height; elsewhere the floor is y = 0.
 - **No colliders on props either**, so fighters walk through the boxes.
 - **Hits resolve by box and radius queries**, not physics hitboxes.
 - **A floored fighter has no art**; it is the hit pose squashed flat.
@@ -179,3 +180,16 @@ run-based or level-based structure, and max player count.
 - A comic-style story card the first time the squad reaches each world names what's wrong there and who is headlining.
 - A last card, THE LAST LAUGH, plays after the Ringmaster falls.
 - Each card shows once per save (`CampaignState.StorySeen`); `-- storyshot N` takes a picture of card N without touching the save.
+
+## Terrain (built 2026-10-16)
+
+`World.Terrain.Lay` builds each scrolling stage's ground from the stage id alone, so an online guest gets the same.
+
+- **Terraces:** most encounters have a raised terrace along the back of the walkway (0.75 to 1.05 high) with a ramp at one end.
+- **Obstacles:** between encounters, one to three of the world's obstacles stand on the walkway (barrels, pins, candy trees, mushrooms, rocks, crystals, mirrors, pines, cacti, statues, trophies, stars), drawn from the 3D kit.
+- **Movement:**
+  - A ledge stops you: jump up, or take the ramp.
+  - Enemies (and test bots) hop up after you.
+  - Anyone below a terrace's top (just spawned there) is lifted onto it.
+  - Obstacles push fighters round them.
+- **On the ground:** shadows, telegraphs, puddles and crates sit on whatever height is under them.

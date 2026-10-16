@@ -268,12 +268,26 @@ public partial class Fighter : CharacterBody3D
         Visual?.Tick(dt);
 
         bool wasAirborne = !Grounded;
+        Vector3 before = GlobalPosition;
         MoveAndSlide();
         float fallSpeed = -Velocity.Y;
 
-        if (GlobalPosition.Y <= 0f && Velocity.Y <= 0f)
+        // The ground under them: terraces, ramps, and round obstacles (World.Terrain); flat y = 0 without.
+        float ground = 0f;
+        if (ClownSquad.World.Terrain.Current is ClownSquad.World.Terrain terrain)
         {
-            GlobalPosition = new Vector3(GlobalPosition.X, 0f, GlobalPosition.Z);
+            (ground, bool ledge) = terrain.Settle(this, before);
+            // a ledge in the way: enemies (and bots) hop up after you
+            if (ledge && Grounded && AutoClimb && ground - GlobalPosition.Y < 1.6f)
+            {
+                Velocity = new Vector3(Velocity.X, 8.5f, Velocity.Z);
+                Grounded = false;
+            }
+        }
+
+        if (GlobalPosition.Y <= ground && Velocity.Y <= 0f)
+        {
+            GlobalPosition = new Vector3(GlobalPosition.X, ground, GlobalPosition.Z);
             Velocity = new Vector3(Velocity.X, 0f, Velocity.Z);
             Grounded = true;
             if (wasAirborne) OnLanded(fallSpeed);
@@ -306,6 +320,9 @@ public partial class Fighter : CharacterBody3D
         _stunRemaining = Mathf.Max(_stunRemaining, seconds);
         OnInterrupted();
     }
+
+    /// <summary>Hops up a ledge it walks into (enemies; bots too). A player takes the ramp, or jumps.</summary>
+    protected virtual bool AutoClimb => Hostile;
 
     /// <summary>Per-frame logic for a fighter able to act.</summary>
     protected virtual void Tick(float dt) { }
@@ -455,9 +472,10 @@ public partial class Fighter : CharacterBody3D
     private void UpdateShadow()
     {
         if (_shadow is null || _shadowMat is null) return;
-        float h = Mathf.Max(0f, GlobalPosition.Y);
+        float floor = ClownSquad.World.Terrain.Current?.HeightAt(GlobalPosition) ?? 0f;
+        float h = Mathf.Max(0f, GlobalPosition.Y - floor);
         float k = 1f / (1f + h * 0.35f);
-        _shadow.GlobalPosition = new Vector3(GlobalPosition.X, 0.012f, GlobalPosition.Z);
+        _shadow.GlobalPosition = new Vector3(GlobalPosition.X, floor + 0.012f, GlobalPosition.Z);
         _shadow.Scale = new Vector3(k, 1f, k);
         _shadowMat.AlbedoColor = new Color(1f, 1f, 1f, k * (Visual.Visible ? 1f : 0.4f));
     }

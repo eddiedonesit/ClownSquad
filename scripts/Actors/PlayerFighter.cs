@@ -149,6 +149,8 @@ public partial class PlayerFighter : Fighter
     private bool WearsGear => !Hostile && !ArtStyle.Classic && ResourceLoader.Exists(ClownSquad.Progression.Roster.BareSheet(Look, Weapon));
     private GearOverlay? _gear;
 
+    protected override bool AutoClimb => Hostile || Source is not (ClownSquad.Input.LocalDeviceInput or ClownSquad.Net.RemoteInput);
+
     public override void _Ready()
     {
         base._Ready();

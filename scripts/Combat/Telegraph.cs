@@ -58,7 +58,8 @@ public partial class Telegraph : Node3D
         t._mat = Paint(t._color);
         t.AddChild(new MeshInstance3D { Mesh = mesh, MaterialOverride = t._mat, CastShadow = GeometryInstance3D.ShadowCastingSetting.Off });
         parent.AddChild(t);
-        t.GlobalPosition = new Vector3(at.X, 0.03f, at.Z);
+        float floor = ClownSquad.World.Terrain.Current?.HeightAt(at) ?? 0f;
+        t.GlobalPosition = new Vector3(at.X, floor + 0.03f, at.Z);
         t.Rotation = new Vector3(0f, yaw, 0f);
         return t;
     }

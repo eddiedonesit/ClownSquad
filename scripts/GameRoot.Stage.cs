@@ -101,6 +101,22 @@ public partial class GameRoot
     }
 
     /// <summary>Spread the stage's groups along the road, put the exit past the last, and fill in crates.</summary>
+    /// <summary>The stage's encounter stops: where the camera holds for each wave.</summary>
+    private static float[] EncounterStops(StageDef st)
+    {
+        var at = new float[st.Waves.Length];
+        for (int i = 0; i < at.Length; i++) at[i] = FirstEncounter + EncounterSpacing * i;
+        return at;
+    }
+
+    /// <summary>Terraces, ramps and obstacles for this stage (World.Terrain), built and shown.</summary>
+    private void LayTerrain(float[] stops, float exitX)
+    {
+        if (_scenery is null || _stage is null || ArtStyle.Classic) return;
+        Terrain.Current = Terrain.Lay(_stage.Id, stops, exitX, StageScenery.BandFar, StageScenery.BandNear);
+        _scenery.PlaceTerrain(Terrain.Current);
+    }
+
     private void ConfigureEncounters(StageDef st)
     {
         var at = new float[st.Waves.Length];
@@ -119,6 +135,7 @@ public partial class GameRoot
     private void PlaceStageObjects()
     {
         if (_scenery is null || _director?.EncounterX is not float[] at) return;
+        LayTerrain(at, _director.ExitX);
         _scenery.PlaceCrates(this, at, _director.ExitX);
         _scenery.PlaceExit(_director.ExitX);
     }

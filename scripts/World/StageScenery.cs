@@ -199,6 +199,62 @@ public partial class StageScenery : Node3D
         }
     }
 
+    /// <summary>Each world's two kinds of obstacle (from the 3D kit) and how wide each stands.</summary>
+    private static readonly (string a, string b)[] ObstacleKinds =
+    {
+        ("barrel", "pins"), ("candytree", "barrel"), ("mushroom", "rock"), ("barrel", "pins"), ("crystal", "mirror"),
+        ("rock", "pine"), ("cactus", "barrel"), ("crystal", "rock"), ("statue", "barrel"), ("trophy", "starprop"),
+    };
+
+    /// <summary>
+    /// The terrain built: each terrace a raised deck in the world's ground
+    /// colour, edged in its fence colour, its ramp a slope up to it; each
+    /// obstacle one of the world's props, standing on the walkway.
+    /// </summary>
+    public void PlaceTerrain(Terrain t)
+    {
+        Look l = Looks[_world - 1];
+        var top = new StandardMaterial3D { AlbedoColor = l.Ground.Lightened(0.08f), Roughness = 0.9f };
+        var side = new StandardMaterial3D { AlbedoColor = l.Ground.Darkened(0.32f), Roughness = 0.95f };
+        var trim = new StandardMaterial3D { AlbedoColor = l.FenceColor, Roughness = 0.7f };
+        foreach (Terrain.Block b in t.Blocks)
+        {
+            float w = b.X1 - b.X0, d = b.Z1 - b.Z0;
+            float cx = (b.X0 + b.X1) * 0.5f, cz = (b.Z0 + b.Z1) * 0.5f;
+            if (b.Ramp == 0)
+            {
+                AddChild(new MeshInstance3D { Mesh = new BoxMesh { Size = new Vector3(w, b.Height, d) }, MaterialOverride = side, Position = new Vector3(cx, b.Height * 0.5f, cz) });
+                AddChild(new MeshInstance3D { Mesh = new BoxMesh { Size = new Vector3(w, 0.05f, d) }, MaterialOverride = top, Position = new Vector3(cx, b.Height + 0.005f, cz) });
+                // a trim along the front edge, so the ledge reads
+                AddChild(new MeshInstance3D { Mesh = new BoxMesh { Size = new Vector3(w, 0.1f, 0.12f) }, MaterialOverride = trim, Position = new Vector3(cx, b.Height - 0.02f, b.Z1 - 0.04f) });
+                continue;
+            }
+            // the ramp: a wedge, high at the terrace end
+            var st = new SurfaceTool();
+            st.Begin(Mesh.PrimitiveType.Triangles);
+            float lo = b.Ramp > 0 ? b.X0 : b.X1, hi = b.Ramp > 0 ? b.X1 : b.X0;
+            Vector3 A = new(lo, 0f, b.Z0), B = new(lo, 0f, b.Z1), C = new(hi, 0f, b.Z1), D = new(hi, 0f, b.Z0);
+            Vector3 E = new(hi, b.Height, b.Z1), F = new(hi, b.Height, b.Z0);
+            void Tri(Vector3 p, Vector3 q, Vector3 r) { st.AddVertex(p); st.AddVertex(q); st.AddVertex(r); }
+            void Quad(Vector3 p, Vector3 q, Vector3 r, Vector3 s) { Tri(p, q, r); Tri(p, r, s); }
+            Quad(A, B, E, F);           // the slope
+            Quad(A, F, E, B);           // (both windings: seen from any side)
+            Tri(B, C, E); Tri(B, E, C); // the side facing the camera
+            Tri(A, D, F); Tri(A, F, D);
+            Quad(C, D, F, E); Quad(C, E, F, D);
+            st.GenerateNormals();
+            AddChild(new MeshInstance3D { Mesh = st.Commit(), MaterialOverride = top });
+        }
+        (string ka, string kb) = ObstacleKinds[_world - 1];
+        foreach (Terrain.Obstacle o in t.Obstacles)
+        {
+            Node3D prop = Kit3D.Make(o.Kind == "a" ? ka : kb, _kit, l.A, l.B);
+            prop.Position = new Vector3(o.X, 0f, o.Z);
+            prop.Scale = Vector3.One * 0.8f;
+            AddChild(prop);
+        }
+    }
+
     /// <summary>Crates along the walkway, between the groups, for the squad to smash.</summary>
     public void PlaceCrates(Node parent, float[] encounters, float exitX)
     {
@@ -214,7 +270,9 @@ public partial class StageScenery : Node3D
                 if (cx <= from) continue;
                 var crate = new Crate();
                 parent.AddChild(crate);
-                crate.GlobalPosition = new Vector3(cx, 0f, _rng.RandfRange(BandFar + 0.6f, BandNear - 1.2f));
+                Vector3 spot = new(cx, 0f, _rng.RandfRange(BandFar + 0.6f, BandNear - 1.2f));
+                if (Terrain.Current is Terrain t) { spot = t.Clear(spot, 0.8f); spot.Y = t.HeightAt(spot); }
+                crate.GlobalPosition = spot;
             }
             from = stop;
         }
