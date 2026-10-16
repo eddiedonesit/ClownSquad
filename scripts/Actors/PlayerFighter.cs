@@ -955,7 +955,7 @@ public partial class PlayerFighter : Fighter
                 }
                 break;
             case ChargeMove.BigShot:
-                var cork = PlayerShot.Fire(this, PlayerShot.Cork(2.8f), GlobalPosition + new Vector3(Facing.X * 0.1f, 1.05f, 0f), Facing, 17f);
+                var cork = PlayerShot.Fire(this, PlayerShot.Cork(2.8f), MuzzleOr(new Vector3(Facing.X * 0.1f, 1.05f, 0f)), Facing, 17f);
                 cork.Damage = 30f * _perks.ThrowDamage;
                 cork.Range = 10f * _perks.ThrowRange;
                 cork.Pierce = true;
@@ -1113,6 +1113,24 @@ public partial class PlayerFighter : Fighter
         if (_flipTime >= 0.5f) EndMalletMove();
     }
 
+    /// <summary>
+    /// Where a shot leaves the gun: the muzzle in the frame on show. Point
+    /// blank (someone between the clown and the muzzle) it leaves from the
+    /// body instead, so it cannot fly out past them.
+    /// </summary>
+    private Vector3 MuzzleOr(Vector3 body)
+    {
+        if (Visual.Anchor("tip") is not Vector3 tip) return GlobalPosition + body;
+        float reach = Mathf.Abs(tip.X);
+        foreach (Fighter other in Opponents())
+        {
+            Vector3 to = other.GlobalPosition - GlobalPosition;
+            float ahead = to.X * Facing.X;
+            if (ahead > -0.2f && ahead < reach + 0.2f && Mathf.Abs(to.Z) < 0.8f) return GlobalPosition + body;
+        }
+        return GlobalPosition + tip;
+    }
+
     /// <summary>A pop-gun shot: one cork (two with DOUBLE BARREL) straight down the lane.</summary>
     private void FireCork(in AttackStep step)
     {
@@ -1120,8 +1138,7 @@ public partial class PlayerFighter : Fighter
         for (int i = 0; i < n; i++)
         {
             float z = n == 1 ? 0f : (i - (n - 1) * 0.5f) * 0.12f;
-            // Fired from the body, not the muzzle, so a shot at point blank still lands.
-            Vector3 from = GlobalPosition + new Vector3(Facing.X * 0.1f, 1.05f, 0f);
+            Vector3 from = MuzzleOr(new Vector3(Facing.X * 0.1f, 1.05f, 0f));
             var cork = PlayerShot.Fire(this, PlayerShot.Cork(1.3f), from, new Vector3(Facing.X, 0f, z), 18f);
             cork.Damage = step.Damage * (n > 1 ? 0.65f : 1f);
             cork.Range = step.Range * _perks.ThrowRange;

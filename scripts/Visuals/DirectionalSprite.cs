@@ -126,6 +126,29 @@ public partial class DirectionalSprite : Node3D
 
     public void Flash(float seconds = 0.12f) => _flash = seconds;
 
+    /// <summary>The sheet frame on show right now.</summary>
+    public int SheetFrame => _sprite is null ? 0 : FrameLibrary.FrameIndex(_sheetPath, _sprite.Animation, _sprite.Frame);
+
+    /// <summary>The sheet this sprite draws from.</summary>
+    public string SheetPath => _sheetPath;
+
+    /// <summary>
+    /// A named point of the frame on show (the weapon's tip, a hand, the head),
+    /// as an offset from this node in the world, mirrored with the sprite; null
+    /// where the frame has none (a somersault, lying down).
+    /// </summary>
+    public Vector3? Anchor(string name)
+    {
+        if (_sprite is null || FrameLibrary.Anchor(_sheetPath, SheetFrame, name) is not Vector2 a) return null;
+        FrameLibrary.SheetInfo info = FrameLibrary.Info(_sheetPath);
+        float x = (a.X - info.FrameWidth * 0.5f) * _pixelSize;
+        if (_sprite.FlipH) x = -x;
+        return new Vector3(x, (info.Baseline - a.Y) * _pixelSize, 0f);
+    }
+
+    /// <summary>Whether the sprite is drawn mirrored (facing left) right now.</summary>
+    public bool Mirrored => _sprite is not null && _sprite.FlipH;
+
     public void Squash(float amount) => _squash = Mathf.Max(_squash, amount);
 
     /// <summary>Decay the impact effects. Call once per physics frame.</summary>

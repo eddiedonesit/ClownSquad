@@ -122,7 +122,7 @@ public static class EnemyCatalog
         "juggler" => ("THE JUGGLER", "juggler", "Keeps away and lobs pins where you stand. Watch the circles, then close in."),
         "unicyclist" => ("THE UNICYCLIST", "unicyclist", "Charges down a lane. Step off it - he is dizzy after."),
         "balloonist" => ("THE BALLOON ARTIST", "balloonist", "Twists balloon dogs. Reach the artist first."),
-        "balloondog" => ("BALLOON DOG", "balloondog", "Quick and nippy. Two good hits pop it."),
+        "balloondog" => ("BALLOON DOG", "balloondog", "Floats over and drops on your head: move off its shadow. Two good hits pop it."),
         "mime" => ("THE MIME", "mime", "Throws an invisible rope down a lane - and walls you off. Leave the lane."),
         "stiltwalker" => ("THE STILT-WALKER", "stiltwalker", "Hard to hurt standing. Four quick hits topple him."),
         "weightlifter" => ("THE WEIGHTLIFTER", "weightlifter", "Blocks from the front and grabs. Hit him from behind."),

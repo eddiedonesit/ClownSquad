@@ -1,8 +1,8 @@
 {
- "frame_width": 110,
- "frame_height": 100,
- "baseline": 86,
- "count": 15,
+ "frame_width": 120,
+ "frame_height": 110,
+ "baseline": 98,
+ "count": 18,
  "clips": {
   "idle": [
    0,
@@ -26,10 +26,13 @@
    12
   ],
   "air": [
-   13
+   13,
+   14,
+   15,
+   16
   ],
   "down": [
-   14
+   17
   ]
  },
  "fps": {

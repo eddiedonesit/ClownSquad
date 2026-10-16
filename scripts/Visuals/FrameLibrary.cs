@@ -21,6 +21,8 @@ public static class FrameLibrary
     // Packed sheets: where each frame's trimmed box sits on the sheet, and its offset in the full frame.
     private static readonly Dictionary<string, (Rect2 region, Vector2 offset)[]> Packed = new();
     private static readonly Dictionary<string, Dictionary<string, int[]>> ClipIndex = new();
+    // Named points in each frame (head, hands, feet, the weapon's tip), in frame pixels: tools/gen_sprite_hd.py writes them.
+    private static readonly Dictionary<string, Dictionary<string, Vector2>?[]> Anchors = new();
 
     /// <summary>
     /// Geometry for a loaded sheet. Baseline is the pixel row the feet stand on;
@@ -36,6 +38,14 @@ public static class FrameLibrary
         Load(sheetPath, ArtStyle.FramesFor(sheetPath));
         return ClipIndex.TryGetValue(sheetPath, out var idx) && idx.TryGetValue(clip, out int[]? ids) && ids.Length > 0
             ? ids[System.Math.Min(i, ids.Length - 1)] : 0;
+    }
+
+    /// <summary>A named point in a frame (in frame pixels), if the sheet has one there: "head", "hat", "brim", "neck", "hip", "nhand", "fhand", "nfoot", "ffoot", "tip".</summary>
+    public static Vector2? Anchor(string sheetPath, int frame, string name)
+    {
+        Load(sheetPath, ArtStyle.FramesFor(sheetPath));
+        return Anchors.TryGetValue(sheetPath, out var list) && frame >= 0 && frame < list.Length
+               && list[frame] is { } d && d.TryGetValue(name, out Vector2 v) ? v : null;
     }
 
     /// <summary>Where a frame's own box sits on the sheet, and where that box sits inside the full frame.</summary>
@@ -101,6 +111,23 @@ public static class FrameLibrary
             index[key.AsString()] = ids;
         }
         ClipIndex[sheetPath] = index;
+        if (meta.ContainsKey("anchors"))
+        {
+            var list = meta["anchors"].AsGodotArray();
+            var anchors = new Dictionary<string, Vector2>?[list.Count];
+            for (int i = 0; i < list.Count; i++)
+            {
+                if (list[i].VariantType != Variant.Type.Dictionary) continue;
+                var d = new Dictionary<string, Vector2>();
+                foreach (var kv in list[i].AsGodotDictionary())
+                {
+                    var xy = kv.Value.AsGodotArray();
+                    d[kv.Key.AsString()] = new Vector2((float)xy[0], (float)xy[1]);
+                }
+                anchors[i] = d;
+            }
+            Anchors[sheetPath] = anchors;
+        }
 
         var frames = new SpriteFrames();
         frames.RemoveAnimation("default");

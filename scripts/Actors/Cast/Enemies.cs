@@ -225,12 +225,77 @@ public partial class BalloonDog : CastFighter
     public override string DeathSound => "pop";
     public override string AttackSound => "squeak";
 
+    private const float FloatHeight = 2.5f;          // high enough to be out of reach, low enough to stay on screen
+    private const float DriftSpeed = 2.4f;
+    private const float NormalGravity = 26f;
+    private bool _dropping;
+    private float _dropAt;
+
     public override void _Ready()
     {
         MaxHealth = 18f;
-        MoveSpeed = 5.2f;
+        MoveSpeed = 3.2f;
         DamageMultiplier = 0.4f;
         base._Ready();
+        // Being a balloon, it floats: up out of reach, drifting slowly over whoever it's after,
+        // a shadow on the floor to warn them, then it drops on their head.
+        AddMove("float", 0f, 16f, 3.5f,
+            () =>
+            {
+                _dropping = false;
+                Fx.Sound("squeak", 1.5f, -4f);
+            },
+            dt =>
+            {
+                Gravity = 0f;
+                PinClipFrame("air", (int)(MoveTime * 5f) % 4);
+                Fighter? t = Target();
+                if (!_dropping)
+                {
+                    Vector3 to = t is null ? Vector3.Zero : Flat(t.GlobalPosition - GlobalPosition);
+                    float rise = (FloatHeight - GlobalPosition.Y) * 2.2f;
+                    Vector3 drift = to.Length() > 0.35f ? to.Normalized() * DriftSpeed : Vector3.Zero;
+                    Velocity = new Vector3(drift.X, rise, drift.Z);
+                    if (Mathf.Abs(to.X) > 0.2f) Facing = new Vector3(Mathf.Sign(to.X), 0f, 0f);
+                    bool above = GlobalPosition.Y > FloatHeight - 0.5f && to.Length() < 0.5f;
+                    if (above || MoveTime > 7f)
+                    {
+                        _dropping = true;
+                        _dropAt = MoveTime;
+                        Track(Telegraph.Circle(Stage, Flat(GlobalPosition), 0.95f, 0.5f));
+                        Fx.Sound("slide_down", 1.6f, -6f);
+                    }
+                    return false;
+                }
+                // a moment's hang, then down it comes
+                if (MoveTime - _dropAt < 0.45f)
+                {
+                    Velocity = new Vector3(0f, 0.4f, 0f);
+                    return false;
+                }
+                Gravity = 46f;
+                if (Grounded)
+                {
+                    HitPlayers(f => Near(f, GlobalPosition, 1.0f), 12f, 4f, 3.5f, 0.7f, 0.1f);
+                    Fx.Sound("boing", 1.3f);
+                    Fx.Impact(Stage, GlobalPosition + new Vector3(0f, 0.2f, 0f), 0.8f);
+                    Gravity = NormalGravity;
+                    return true;
+                }
+                return MoveTime - _dropAt > 3f;
+            });
+    }
+
+    // It would rather float than walk: the special comes round often and from anywhere on screen.
+    public override BrawlerAi MakeAi(int gruntCooldownMs) =>
+        new(this, attackRange: 1.0f, backoffRange: 0.5f, attackCooldownMs: (ulong)gruntCooldownMs,
+            specialCooldownMs: 1200, specialRange: 16f, keepAway: 3.5f);
+
+    protected override void TickAlways(float dt)
+    {
+        base.TickAlways(dt);
+        // Knocked out of the air (or between floats), it falls like anything else.
+        if (CurrentMove != "float" || Incapacitated) Gravity = NormalGravity;
     }
 }
 

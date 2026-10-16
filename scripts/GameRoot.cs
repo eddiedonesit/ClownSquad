@@ -308,6 +308,18 @@ public partial class GameRoot : Node3D
         if (Has("skillshot")) StartSkillShot();
         if (Has("stageshot")) StartStageShot();
         if (Has("demo")) StartDemo();
+        // "-- spawn balloondog 3" (debug): bring on some of one act, to watch them.
+        int spawnAt = Array.IndexOf(args, "spawn");
+        if (spawnAt >= 0 && spawnAt + 1 < args.Length)
+        {
+            int count = spawnAt + 2 < args.Length && int.TryParse(args[spawnAt + 2], out int c) ? c : 1;
+            GetTree().CreateTimer(1.5).Timeout += () =>
+            {
+                for (int i = 0; i < count; i++)
+                    if (EnemyCatalog.Create(args[spawnAt + 1]) is PlayerFighter e)
+                        _director?.Summon(e, new Vector3(_camX + 5f + i * 1.2f, 0f, -1f + i * 0.8f));
+            };
+        }
     }
 
     /// <summary>

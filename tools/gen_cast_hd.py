@@ -911,29 +911,66 @@ class Tiger:
 # ------------------------------------------------------------ hand-drawn
 
 def balloon_dog(p, k=1.0):
-    W, H = int(110 * k), int(100 * k)
-    c = HDCanvas(W, H, W // 2, H - int(14 * k))
-    by = -22 * k + p.get("by", 0) * k
+    """A BALLOON DOG, the kind twisted from one long balloon: every part a
+    shiny sausage-shaped bubble of its own, pinched at the joins: a pointed
+    snout, a round head, two long ears, a neck, a body, four stubby legs and a
+    little tail, with a marker-pen eye. Each bubble is its own part, so it
+    shades and shines as one round balloon.
+    p: by (bob), leg (walk swing), wag (tail), bite, float (legs dangling, nose up)."""
+    W, H = int(120 * k), int(110 * k)
+    c = HDCanvas(W, H, W // 2, H - int(12 * k))
+    floating = p.get("float", 0)
+    by = -26 * k + p.get("by", 0) * k
     leg = p.get("leg", 0)
-    for lx, ph in ((-14, leg), (-8, -leg), (10, -leg), (16, leg)):
-        c.part(far=lx in (-8, 16))
-        c.capsule(lx * k, by + 4 * k, lx * k + math.sin(rad(ph)) * 4 * k, -3 * k, 3.6 * k, 3.4 * k, BALLOON)
+    tilt = -10 * floating                              # nose up a little while floating
+    pinches = []
+
+    def bubble(cx, cy, rx, ry, deg, far=False, shine=True):
+        c.part(far=far)
+        c.ellipse_rot(cx, cy, rx, ry, math.radians(deg), BALLOON)
+        if shine:
+            a = math.radians(deg)
+            ux, uy = math.cos(a), math.sin(a)
+            # the shine: a short bright streak along the bubble's upper side
+            sx, sy = cx - uy * ry * 0.45 - ux * rx * 0.15, cy + ux * ry * 0.45 * -1 - uy * rx * 0.15
+            c.part(line=False)
+            c.ellipse_rot(sx, sy, max(1.2, rx * 0.4), max(0.8, ry * 0.22), a, WHITE)
+        # where it pinches into the next bubble
+        a = math.radians(deg)
+        pinches.append((cx + math.cos(a) * rx * 0.95, cy + math.sin(a) * rx * 0.95))
+
+    # far legs (a tone darker)
+    for lx, ph in ((-12, -leg), (14, leg)):
+        dangle = 18 * floating * (1 if lx > 0 else -1)
+        bubble(lx * k + math.sin(math.radians(ph)) * 3 * k, by + 13 * k, 9.5 * k, 3.8 * k, 90 + ph * 0.3 + dangle, far=True, shine=False)
+    # tail, sticking up and wagging
+    wag = p.get("wag", 0)
+    bubble(-22 * k, by - 7 * k, 7 * k, 3.4 * k, -125 + wag * 2 - 15 * floating)
+    # body
+    bubble(0, by + tilt * 0.1 * k, 17 * k, 7.5 * k, tilt * 0.3)
+    # neck, up and forward from the chest
+    bubble(16 * k, by - 9 * k, 8.5 * k, 5 * k, -65 + tilt)
+    # far ear, then the head, the near ear and the snout
+    hx, hy = 21 * k, by - 21 * k
+    bubble(hx - 6 * k, hy - 9 * k, 9 * k, 3.6 * k, -105 + tilt, far=True, shine=False)
+    bubble(hx, hy, 6.5 * k, 6 * k, tilt)
+    bubble(hx - 3 * k, hy - 10 * k, 9.5 * k, 3.8 * k, -95 + tilt)
+    bite = p.get("bite", 0)
+    bubble(hx + 9 * k, hy + 1 * k + bite * 2 * k, 7.5 * k, 4.4 * k, 8 + bite * 18 + tilt)
+    # the knot at the tip of the nose
     c.part()
-    c.capsule(-16 * k, by, 14 * k, by, 8 * k, 8 * k, BALLOON)
-    c.part()
-    c.capsule(-20 * k, by - 2 * k, -28 * k, by - 12 * k + p.get("wag", 0) * k, 3.5 * k, 3 * k, BALLOON)
-    c.part()
-    c.capsule(18 * k, by - 6 * k, 22 * k, by - 22 * k, 6 * k, 6 * k, BALLOON)
-    c.part()
-    c.capsule(22 * k, by - 22 * k, 34 * k, by - 18 * k + (3 if p.get("bite") else 0) * k, 5.5 * k, 4.5 * k, BALLOON)
-    for ex in (-1, 1):
-        c.part()
-        c.capsule(20 * k, by - 26 * k, 16 * k + ex * 3 * k, by - 38 * k, 3.5 * k, 3 * k, BALLOON)
-    for x, y in ((-2, by), (16, by - 5)):
+    c.ellipse(hx + 16.5 * k, hy + 2 * k + bite * 4 * k, 1.8 * k, 1.8 * k, BALLOON)
+    # near legs
+    for lx, ph in ((-15, leg), (11, -leg)):
+        dangle = 18 * floating * (1 if lx > 0 else -1)
+        bubble(lx * k + math.sin(math.radians(ph)) * 3 * k, by + 14 * k, 10 * k, 4 * k, 90 + ph * 0.3 + dangle)
+    # the pinches: little dark twists where bubbles meet
+    for x, y in pinches[:-1]:
         c.part(line=False)
-        c.ellipse(x * k if isinstance(x, int) else x, y, 2 * k, 3 * k, WHITE)
+        c.ellipse(x, y, 1.1 * k, 1.1 * k, MOUTH)
+    # a marker-pen eye
     c.part(line=False)
-    c.ellipse(28 * k, by - 23 * k, 1.6 * k, 1.6 * k, INK)
+    c.ellipse(hx + 2 * k, hy - 1.5 * k, 1.5 * k, 1.9 * k, INK)
     return c
 
 
@@ -1533,7 +1570,9 @@ def render(name):
         for b in (0, 1, 1, 0):
             frames.append(("attack", balloon_dog(dict(bite=b, by=-2 if b else 0))))
         frames.append(("hit", balloon_dog(dict(by=3))))
-        frames.append(("air", balloon_dog(dict(leg=30))))
+        # floating: legs dangling, nose up, bobbing gently (and the drop)
+        for i in range(4):
+            frames.append(("air", balloon_dog(dict(float=1, by=[0, -1, -2, -1][i], wag=[0, 3, 6, 3][i], leg=[6, 0, -6, 0][i]))))
         frames.append(("down", balloon_dog(dict(by=10))))
         m = mats(spec)
         W, H, base = frames[0][1].w, frames[0][1].h, frames[0][1].oy

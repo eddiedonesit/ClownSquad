@@ -526,9 +526,17 @@ def draw(p):
     c.recolor(lambda x, y, mm: RED if 104 - p["ffoot"] < y < 108 - p["ffoot"] else mm)
     frill(c, 44 + fl, 113 - p["ffoot"], 7, True)
     shoe(c, 46 + fl, 128 - p["ffoot"], True)
+    # The far hand: free, or on the weapon too. The heavy ones (the mallet,
+    # the sledge) are swung two-handed, the far hand further up the handle;
+    # the pop gun's far hand holds the forestock under the barrel.
+    fhx, fhy = 39 + p["fa"], 106 - p["lift"]
+    if m is not None and WEAPON in TWO_HANDED:
+        r = math.radians(m[0])
+        up = TWO_HANDED[WEAPON]
+        fhx, fhy = gx + math.cos(r) * up, gy - math.sin(r) * up
     c.part(far=True)
-    c.capsule(41 + ln, 76 + by, 39 + p["fa"], 102 - p["lift"], 5.6, 4.8, SUIT)
-    fist(c, 39 + p["fa"], 106 - p["lift"], True)
+    c.capsule(41 + ln, 76 + by, fhx, fhy - 4, 5.6, 4.8, SUIT)
+    fist(c, fhx, fhy, True)
 
     # torso: a pear of harlequin diamonds, pompom buttons, a belt and buckle
     c.part()
@@ -611,7 +619,23 @@ def draw(p):
     fist(c, gx, gy, False)
     if m is not None and not behind:
         weapon_head(c, gx, gy, m[0], m[1])
+    # Where things are in this frame, in frame pixels: what the game hangs
+    # gear on and fires shots from (FrameLibrary.Anchor). Rotated and floored
+    # frames have none.
+    tip = None
+    if m is not None:
+        r = math.radians(m[0])
+        reach = m[1] * (1.15 if WEAPON == "popgun" else 1.0)
+        tip = (gx + math.cos(r) * reach, gy - math.sin(r) * reach)
+    pts = dict(head=(50 + ln, hy), hat=(hx - 5, hy - 45), brim=(hx, hy - 11), neck=(47 + ln, 68 + by),
+               hip=(47 + ln, hipy), nhand=(gx, gy), fhand=(fhx, fhy),
+               nfoot=(56 + nl, 128 - p["nfoot"]), ffoot=(46 + fl, 128 - p["ffoot"]), tip=tip)
+    c.anchors = {k: (round(v[0] + DRAW_X), round(v[1] + DRAW_Y)) for k, v in pts.items() if v is not None}
     return c
+
+
+# The weapons held in both hands, and how far up the handle (from the near hand) the far hand goes.
+TWO_HANDED = {"mallet": 9, "hammer": 10, "popgun": 13}
 
 
 # ------------------------------------------------------------------ clips
@@ -689,17 +713,17 @@ def player_frames():
         add("attack2", draw(old(lean=-1, near_arm=11, far_arm=1, arm_lift=13, mallet=(97, 26))))
         add("attack2", draw(old(lean=-1, near_arm=10, far_arm=1, arm_lift=12, mallet=(94, 26))))
     elif WEAPON == "popgun":
-        # attack: shouldered and aimed down the lane, a kick of recoil on the shot
-        add("attack", draw(old(lean=-1, near_arm=6, far_arm=7, arm_lift=8, mallet=(6, 26))))
-        add("attack", draw(old(lean=0, near_arm=8, far_arm=8, arm_lift=8, mallet=(2, 26))))
-        add("attack", draw(old(lean=-3, near_arm=5, far_arm=6, arm_lift=10, mallet=(16, 24))))
-        add("attack", draw(old(lean=-1, near_arm=7, far_arm=7, arm_lift=8, mallet=(4, 26))))
+        # attack (the big shot): shouldered, sighted down the barrel, a big kick
+        add("attack", draw(old(lean=-1, near_arm=2, far_arm=7, arm_lift=17, mallet=(2, 26))))
+        add("attack", draw(old(lean=0, near_arm=3, far_arm=8, arm_lift=17, mallet=(0, 26))))
+        add("attack", draw(old(lean=-4, near_arm=1, far_arm=6, arm_lift=18, mallet=(12, 24))))
+        add("attack", draw(old(lean=-2, near_arm=2, far_arm=7, arm_lift=17, mallet=(4, 26))))
     elif WEAPON == "pie":
         # attack: the pie held back, then shoved forward into a face
-        add("attack", draw(old(lean=-3, body_dy=1, near_arm=-8, far_arm=-4, arm_lift=6, mallet=(140, 14))))
-        add("attack", draw(old(lean=0, near_arm=-2, far_arm=-1, arm_lift=8, mallet=(90, 14))))
-        add("attack", draw(old(lean=4, near_arm=10, far_arm=4, arm_lift=8, mallet=(10, 14))))
-        add("attack", draw(old(lean=5, body_dy=1, near_arm=13, far_arm=5, arm_lift=6, mallet=(0, 14))))
+        add("attack", draw(old(lean=-3, body_dy=1, near_arm=-8, far_arm=-4, arm_lift=11, mallet=(140, 14))))
+        add("attack", draw(old(lean=0, near_arm=-2, far_arm=-1, arm_lift=13, mallet=(90, 14))))
+        add("attack", draw(old(lean=4, near_arm=10, far_arm=4, arm_lift=13, mallet=(10, 14))))
+        add("attack", draw(old(lean=5, body_dy=1, near_arm=13, far_arm=5, arm_lift=11, mallet=(0, 14))))
     else:
         # attack: mallet arcs from behind the head, out to 45 degrees, down to ground
         add("attack", draw(old(lean=-3, body_dy=1, near_arm=-6, far_arm=-4, arm_lift=5, mallet=(165, 26))))
@@ -712,25 +736,25 @@ def player_frames():
     if WEAPON == "seltzer":
         pass                                      # its sprays are above
     elif WEAPON == "popgun":
-        # from the hip, then from the shoulder
-        add("attack1", draw(old(lean=0, body_dy=1, near_arm=8, far_arm=6, arm_lift=3, mallet=(-4, 26))))
-        add("attack1", draw(old(lean=1, body_dy=1, near_arm=9, far_arm=7, arm_lift=3, mallet=(-6, 26))))
-        add("attack1", draw(old(lean=-2, body_dy=1, near_arm=7, far_arm=6, arm_lift=5, mallet=(6, 24))))
-        add("attack1", draw(old(lean=0, body_dy=1, near_arm=8, far_arm=6, arm_lift=3, mallet=(-4, 26))))
-        add("attack2", draw(old(lean=-1, near_arm=7, far_arm=7, arm_lift=11, mallet=(10, 26))))
-        add("attack2", draw(old(lean=0, near_arm=8, far_arm=8, arm_lift=12, mallet=(8, 26))))
-        add("attack2", draw(old(lean=-3, near_arm=6, far_arm=6, arm_lift=13, mallet=(22, 24))))
-        add("attack2", draw(old(lean=-1, near_arm=7, far_arm=7, arm_lift=12, mallet=(10, 26))))
+        # shouldered and level both times; a little kick on each shot
+        add("attack1", draw(old(lean=0, near_arm=2, far_arm=7, arm_lift=16, mallet=(0, 26))))
+        add("attack1", draw(old(lean=1, near_arm=3, far_arm=8, arm_lift=16, mallet=(0, 26))))
+        add("attack1", draw(old(lean=-2, near_arm=1, far_arm=7, arm_lift=17, mallet=(8, 25))))
+        add("attack1", draw(old(lean=0, near_arm=2, far_arm=7, arm_lift=16, mallet=(2, 26))))
+        add("attack2", draw(old(lean=0, near_arm=2, far_arm=7, arm_lift=17, mallet=(2, 26))))
+        add("attack2", draw(old(lean=1, near_arm=3, far_arm=8, arm_lift=17, mallet=(0, 26))))
+        add("attack2", draw(old(lean=-2, near_arm=1, far_arm=7, arm_lift=18, mallet=(9, 25))))
+        add("attack2", draw(old(lean=0, near_arm=2, far_arm=7, arm_lift=17, mallet=(2, 26))))
     elif WEAPON == "pie":
         # an underhand lob, then a sidearm fling
         add("attack1", draw(old(lean=-2, body_dy=2, near_arm=-6, far_arm=-3, arm_lift=-2, mallet=(-60, 14))))
-        add("attack1", draw(old(lean=1, body_dy=1, near_arm=2, far_arm=0, arm_lift=0, mallet=(-20, 14))))
+        add("attack1", draw(old(lean=1, body_dy=1, near_arm=2, far_arm=0, arm_lift=5, mallet=(-20, 14))))
         add("attack1", draw(old(lean=4, body_dy=2, near_arm=13, far_arm=4, arm_lift=-4, mallet=(20, 14))))
         add("attack1", draw(old(lean=5, body_dy=1, near_arm=14, far_arm=5, arm_lift=-1, mallet=(40, 14))))
-        add("attack2", draw(old(lean=-3, near_arm=-10, far_arm=-5, arm_lift=8, mallet=(170, 14))))
-        add("attack2", draw(old(lean=0, near_arm=0, far_arm=-2, arm_lift=9, mallet=(120, 14))))
-        add("attack2", draw(old(lean=2, body_dy=-1, near_arm=7, far_arm=4, arm_lift=15, mallet=(5, 14))))
-        add("attack2", draw(old(lean=4, near_arm=10, far_arm=5, arm_lift=13, mallet=(-5, 14))))
+        add("attack2", draw(old(lean=-3, near_arm=-10, far_arm=-5, arm_lift=13, mallet=(170, 14))))
+        add("attack2", draw(old(lean=0, near_arm=0, far_arm=-2, arm_lift=14, mallet=(120, 14))))
+        add("attack2", draw(old(lean=2, body_dy=-1, near_arm=7, far_arm=4, arm_lift=20, mallet=(5, 14))))
+        add("attack2", draw(old(lean=4, near_arm=10, far_arm=5, arm_lift=18, mallet=(-5, 14))))
     else:
         # Melee: swipe across, backhand swipe back, then swipe across again, hard.
         # Seen side-on a flat swing runs through depth: the weapon is drawn
@@ -944,8 +968,9 @@ def write_sheet(name, frames, mats):
     for i, (n, _) in enumerate(frames):
         clips.setdefault(n, []).append(i)
     with open(os.path.join("assets", "sprites", name + ".frames.json"), "w", newline=chr(10)) as f:
+        anchors = [getattr(cv, "anchors", None) for _, cv in frames]
         json.dump({"frame_width": W, "frame_height": H, "baseline": BASELINE,
-                   "count": len(shaded), "clips": clips, "fps": FPS, "rects": rects}, f, indent=1)
+                   "count": len(shaded), "clips": clips, "fps": FPS, "rects": rects, "anchors": anchors}, f, indent=1)
     print("wrote {} (+ normal map)  {}x{} packed  {} frames ({:.0%} of a strip)".format(out, sw, sh, len(shaded), sw * sh / (W * len(shaded) * H)))
 
 

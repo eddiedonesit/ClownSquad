@@ -48,6 +48,12 @@ public static class Portraits
             side = (y1 - y0) * 0.7f;
             inFrame = new Rect2(x1 - side, y0, side, side);
         }
+        // The balloon dog: its head is up at the front, between the ears and the snout.
+        if (sheet.Contains("balloondog"))
+        {
+            side = (y1 - y0) * 0.62f;
+            inFrame = new Rect2(x1 - side * 1.05f, y0, side, side);
+        }
         r = FrameLibrary.FrameToSheet(sheet, frame, inFrame);
         Cache[sheet] = r;
         return r;
