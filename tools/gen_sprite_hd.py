@@ -184,8 +184,13 @@ def hammer_head(c, hx, hy, angle, length):
             return GOLD                               # brass bands near each end
         if abs(a) > half - 4:
             return METAL                              # polished striking faces
-        if b > thick - 3:
-            return DARKWOOD if False else m           # (keep the top plain)
+        if abs(a) < half * 0.55 - 2.6:
+            # the middle is painted in the clown's colour, like a fairground
+            # strength tester's mallet, with a white star stamped on it
+            ang = math.atan2(b, a)
+            if math.hypot(a, b) < 7.5 * (0.55 + 0.45 * abs(math.cos(2.5 * ang))):
+                return WHITE
+            return RED
         return m
     c.recolor(detail)
 
@@ -194,7 +199,12 @@ def hammer_handle(c, hx, hy, angle, length):
     r = math.radians(angle)
     c.part()
     c.capsule(hx, hy, hx + math.cos(r) * (length - 2), hy - math.sin(r) * (length - 2), 3.4, 3.4, DARKWOOD)
-    c.recolor(lambda x, y, m: GOLD if abs(((x - hx) * math.cos(r) - (y - hy) * math.sin(r)) - 4) < 1.5 else m)
+    # a fairground handle: barber-pole stripes above the grip
+    c.recolor(lambda x, y, m: (GOLD if abs(((x - hx) * math.cos(r) - (y - hy) * math.sin(r)) - 4) < 1.5
+                               else WHITE if ((x - hx) * math.cos(r) - (y - hy) * math.sin(r)) > 10
+                               and math.floor(((x - hx) * math.cos(r) - (y - hy) * math.sin(r)
+                                               + ((x - hx) * math.sin(r) + (y - hy) * math.cos(r)) * 1.2) / 4) % 2 == 0
+                               else m))
 
 
 def chicken_body(c, hx, hy, angle, length):
@@ -420,7 +430,8 @@ def carry():
 def dodge_carry():
     return DODGE_CARRY_FOR.get(WEAPON, DODGE_CARRY)
 
-POSE = dict(by=0, ln=0, hd=0, nl=0, fl=0, nfoot=0, ffoot=0, na=0, fa=0, lift=0, mallet=None)
+POSE = dict(by=0, ln=0, hd=0, nl=0, fl=0, nfoot=0, ffoot=0, na=0, fa=0, lift=0, mallet=None,
+            hair=(0, 0), pom=(0, 0))
 
 
 def pose(**over):
@@ -430,13 +441,18 @@ def pose(**over):
 
 
 def old(mallet=None, body_dy=0, lean=0, head_dy=0, near_leg=0, far_leg=0,
-        near_arm=0, far_arm=0, arm_lift=0, nfoot=0, ffoot=0):
+        near_arm=0, far_arm=0, arm_lift=0, nfoot=0, ffoot=0, hair=(0, 0), pom=(0, 0)):
     """A pose written in the original sheet's units, doubled. Every clip keeps
     the timing and staging that was already tuned against the game code; only
-    the drawing changes."""
+    the drawing changes.
+
+    hair and pom are secondary motion: how far the puff of hair and the hat's
+    pompom lag behind the head, (dx, dy), so they trail a run, float on the
+    way up a jump, flop on landing and whip on a hit."""
     m = None if mallet is None else (mallet[0], mallet[1] * 2)
     return pose(by=body_dy * 2, ln=lean * 2, hd=head_dy * 2, nl=near_leg * 2, fl=far_leg * 2,
-                na=near_arm * 2, fa=far_arm * 2, lift=arm_lift * 2, nfoot=nfoot, ffoot=ffoot, mallet=m)
+                na=near_arm * 2, fa=far_arm * 2, lift=arm_lift * 2, nfoot=nfoot, ffoot=ffoot, mallet=m,
+                hair=(hair[0] * 2, hair[1] * 2), pom=(pom[0] * 1.2, pom[1] * 1.2))   # the pompom stays on its tip
 
 
 def draw(p):
@@ -459,7 +475,8 @@ def draw(p):
 
     # clown hair, drawn in Aseprite (hair_back): a big puff of curls bursting
     # out from under the hat, each curl its own part so it shades as a bumpy cloud
-    stamp_hair(c, HAIR_BACK, 50 + ln, hy, material=HAIR)
+    hdx, hdy = p["hair"]
+    stamp_hair(c, HAIR_BACK, 50 + ln + hdx, hy + hdy, material=HAIR)
 
     # far leg, shoe and arm, a tone darker
     c.part(far=True)
@@ -505,7 +522,7 @@ def draw(p):
     c.part()
     c.ellipse(37 + ln, hy + 4, 3.6, 5, SKIN)                     # ear, half under the hair
     c.recolor(lambda x, y, mm: BLUSH if ((x - 37.6 - ln) / 1.6) ** 2 + ((y - hy - 4) / 2.8) ** 2 <= 1 else mm)
-    stamp_hair(c, HAIR_FRONT, 50 + ln, hy, material=HAIR)          # tufts over the ear (Aseprite: hair_front)
+    stamp_hair(c, HAIR_FRONT, 50 + ln + hdx * 0.5, hy + hdy * 0.5, material=HAIR)          # tufts over the ear (Aseprite: hair_front)
 
     # face
     c.part(line=False)
@@ -531,7 +548,7 @@ def draw(p):
     c.ellipse(hx, hy - 11, 19.5, 4.2, YELLOW)
     c.recolor(lambda x, y, mm: WHITE if abs(y - hy + 11) < 0.8 and math.floor(x) % 5 == 0 else mm)
     c.part()
-    px_, py_ = hx - 5, hy - 45
+    px_, py_ = hx - 5 + p["pom"][0], hy - 45 + p["pom"][1]
     c.ellipse(px_, py_, 4.5, 4.5, WHITE)
     for a in range(0, 360, 60):
         c.ellipse(px_ + 3.5 * math.cos(math.radians(a)), py_ + 3.5 * math.sin(math.radians(a)), 2.4, 2.4, WHITE)
@@ -563,7 +580,8 @@ def idle_cycle(n=8):
     out = []
     for i in range(n):
         b = 0.5 - 0.5 * math.cos(2 * math.pi * i / n)
-        out.append(("idle", dict(body_dy=b, head_dy=b, arm_lift=-b)))
+        lag = 0.5 - 0.5 * math.cos(2 * math.pi * i / n - 0.9) - b     # hair and pompom follow a beat late
+        out.append(("idle", dict(body_dy=b, head_dy=b, arm_lift=-b, hair=(0, lag * 1.2), pom=(0, lag * 1.6))))
     return out
 
 
@@ -574,10 +592,12 @@ def walk_cycle(n=8):
     for i in range(n):
         t = 2 * math.pi * i / n
         stride = math.cos(t)
+        bounce = abs(math.cos(t - 0.8)) - abs(stride)                  # the bob, a beat late
         out.append(("walk", dict(near_leg=6 * stride, far_leg=-6 * stride,
                                  near_arm=-2 * stride, far_arm=3 * stride,
                                  body_dy=-abs(stride), lean=abs(stride),
-                                 nfoot=5 * max(0.0, -math.sin(t)), ffoot=5 * max(0.0, math.sin(t)))))
+                                 nfoot=5 * max(0.0, -math.sin(t)), ffoot=5 * max(0.0, math.sin(t)),
+                                 hair=(-1, -bounce * 1.3), pom=(-1.5 + 0.8 * math.sin(t), -bounce * 1.8))))
     return out
 
 
@@ -585,16 +605,18 @@ def walk_cycle(n=8):
 FPS = {"idle": 10, "walk": 22, "empty_idle": 10, "empty_walk": 22, "hit": 8, "empty_hit": 8, "victory": 4}
 
 BASE = idle_cycle() + walk_cycle() + [
-    ("hit", dict(lean=-4, head_dy=-2, body_dy=2, near_arm=-7, far_arm=-5, arm_lift=-2)),
-    ("hit", dict(lean=-2, head_dy=-1, body_dy=1, near_arm=-4, far_arm=-3, arm_lift=-1)),   # catching himself
+    # the hit whips the hair and pompom forward as the head snaps back
+    ("hit", dict(lean=-4, head_dy=-2, body_dy=2, near_arm=-7, far_arm=-5, arm_lift=-2, hair=(2, -2), pom=(3, -2))),
+    ("hit", dict(lean=-2, head_dy=-1, body_dy=1, near_arm=-4, far_arm=-3, arm_lift=-1, hair=(-1, 1), pom=(-1, 1.5))),   # catching himself
     ("dodge", dict(body_dy=8, lean=6, head_dy=3, near_leg=12, far_leg=-6,
-                   near_arm=-10, far_arm=-7, arm_lift=-6)),
+                   near_arm=-10, far_arm=-7, arm_lift=-6, hair=(-1.5, -1.5), pom=(-2, -2))),
     ("dodge", dict(body_dy=15, lean=10, head_dy=6, near_leg=20, far_leg=-10,
-                   near_arm=-15, far_arm=-11, arm_lift=-11)),
+                   near_arm=-15, far_arm=-11, arm_lift=-11, hair=(-2, -2.5), pom=(-3, -3))),
     ("dodge", dict(body_dy=8, lean=5, head_dy=3, near_leg=11, far_leg=-5,
-                   near_arm=-9, far_arm=-6, arm_lift=-6)),
-    ("jump", dict(body_dy=-2, lean=2, near_leg=5, far_leg=-3, near_arm=-6, far_arm=-4, arm_lift=6)),
-    ("jump", dict(lean=-1, near_leg=-4, far_leg=6, near_arm=4, far_arm=-3, arm_lift=2)),
+                   near_arm=-9, far_arm=-6, arm_lift=-6, hair=(-1, 1), pom=(-1, 1.5))),
+    # rising: the puff drags behind and below; at the top it floats up
+    ("jump", dict(body_dy=-2, lean=2, near_leg=5, far_leg=-3, near_arm=-6, far_arm=-4, arm_lift=6, hair=(-1, 2), pom=(-1, 3))),
+    ("jump", dict(lean=-1, near_leg=-4, far_leg=6, near_arm=4, far_arm=-3, arm_lift=2, hair=(0, -1.5), pom=(0, -2.5))),
 ]
 
 HIT_POSE = dict(lean=-4, head_dy=-2, body_dy=2, near_arm=-7, far_arm=-5, arm_lift=-2)
@@ -684,23 +706,23 @@ def player_frames():
 
     # landing: a squash on touching down
     add("land", draw(old(mallet=carry(), body_dy=6, head_dy=3, near_leg=6, far_leg=-6,
-                         near_arm=-4, far_arm=-3, arm_lift=-3)))
+                         near_arm=-4, far_arm=-3, arm_lift=-3, hair=(0, 2.5), pom=(1, 3.5))))
 
     # air dash: stretched out, leaning into it, legs trailing
     add("dash", draw(old(mallet=(5, 26), lean=9, body_dy=3, head_dy=1, near_leg=-12, far_leg=-16,
-                         near_arm=9, far_arm=-9, arm_lift=6)))
+                         near_arm=9, far_arm=-9, arm_lift=6, hair=(-3.5, -0.5), pom=(-4, 0.5))))
 
     # slam: weapon raised high for the dive, then smashed into the floor
     add("slam", draw(old(mallet=(78, 28), lean=1, body_dy=-2, head_dy=-1, near_leg=4, far_leg=-3,
-                         near_arm=12, far_arm=2, arm_lift=15)))
+                         near_arm=12, far_arm=2, arm_lift=15, hair=(0, -2.5), pom=(0, -3.5))))
     add("slam", draw(old(mallet=(-25, 26), lean=5, body_dy=7, head_dy=3, near_leg=9, far_leg=-7,
-                         near_arm=10, far_arm=6, arm_lift=-4)))
+                         near_arm=10, far_arm=6, arm_lift=-4, hair=(0.5, 2.5), pom=(1, 3.5))))
 
     # victory: weapon thrown up in the air, bouncing on the spot
     add("victory", draw(old(mallet=(80, 29), lean=-2, body_dy=-1, head_dy=-2, near_leg=2, far_leg=-2,
-                            near_arm=12, far_arm=-6, arm_lift=15)))
+                            near_arm=12, far_arm=-6, arm_lift=15, hair=(0, 1.5), pom=(0, 2))))
     add("victory", draw(old(mallet=(86, 29), lean=-1, body_dy=1, head_dy=0, near_leg=-2, far_leg=2,
-                            near_arm=11, far_arm=-5, arm_lift=13)))
+                            near_arm=11, far_arm=-5, arm_lift=13, hair=(0, -1.5), pom=(0, -2))))
 
     # the same body with empty hands, for while the mallet is in flight
     for name, kw in BASE:
@@ -863,8 +885,8 @@ def squad_mats(suit, diamond, red, hair):
 
 SQUAD = {
     "poppy": squad_mats((236, 112, 170), (250, 214, 96), (120, 70, 200), (90, 210, 220)),
-    "bingo": squad_mats((236, 140, 56), (70, 130, 230), (40, 150, 110), (110, 70, 40)),
-    "dot": squad_mats((244, 204, 70), (214, 56, 66), (60, 60, 160), (40, 30, 50)),
+    "bingo": squad_mats((236, 140, 56), (70, 130, 230), (40, 150, 110), (232, 52, 52)),     # classic clown red
+    "dot": squad_mats((244, 204, 70), (214, 56, 66), (60, 60, 160), (246, 96, 176)),        # hot pink
 }
 
 

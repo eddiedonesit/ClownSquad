@@ -6,7 +6,7 @@ using ClownSquad.Audio;
 using ClownSquad.Visuals;
 
 /// <summary>The kinds of fire-and-forget effect a fight produces.</summary>
-public enum FxKind : byte { Sound, Impact, Pop, Shake, Punch }
+public enum FxKind : byte { Sound, Impact, Pop, Shake, Punch, Striker }
 
 /// <summary>One effect, as plain data: what can be sent to another machine and replayed there.</summary>
 public readonly record struct FxEvent(FxKind Kind, string Text, Vector3 At, float A, float B, Color Color, bool Flag);
@@ -57,6 +57,13 @@ public static class Fx
         CameraShake.RequestPunch(from, strength);
     }
 
+    /// <summary>Big Bertha's strength tester springing up at a spot, strength 0..1.</summary>
+    public static void Striker(Node parent, Vector3 at, float strength)
+    {
+        Emitted?.Invoke(new FxEvent(FxKind.Striker, "", at, strength, 0f, default, false));
+        HighStriker.Spawn(parent, at, strength);
+    }
+
     /// <summary>Play an effect that came from another machine, here only (never raised again).</summary>
     public static void Replay(FxEvent e, Node scene)
     {
@@ -67,6 +74,7 @@ public static class Fx
             case FxKind.Pop: PopText.Spawn(scene, e.At, e.Text, e.Color, e.A, e.B); break;
             case FxKind.Shake: CameraShake.Request(scene, e.A, e.B); break;
             case FxKind.Punch: CameraShake.RequestPunch(scene, e.A); break;
+            case FxKind.Striker: HighStriker.Spawn(scene, e.At, e.A); break;
         }
     }
 }

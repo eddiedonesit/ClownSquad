@@ -31,6 +31,7 @@ public partial class PlayerFighter : Fighter
     // The hammer's charge move: a ground pound, and (with AFTERSHOCK) a second rumble.
     private const float QuakeRadius = 2.6f;
     private const float QuakeDamage = 30f;
+    private const int StrikerRungs = 3;         // clowns (plus a crit) caught in one pound to ring the bell
     private const float QuakeImpact = 0.18f;
     private const float AftershockAt = 0.62f;
     private float _quakeTime;
@@ -1288,11 +1289,36 @@ public partial class PlayerFighter : Fighter
             Fx.Sound("kaboom", first ? 0.7f : 0.55f, -3f);
             Fx.Shake(this, first ? 0.2f : 0.13f, 0.35f);
             bool crit = RollCrit();
-            DamageInRadius(radius, Scaled(damage, crit), 6f * _perks.Knockback, 0.1f, first ? 5.5f * _perks.Launch : 3.5f, 0.6f);
+            int hits = DamageInRadius(radius, Scaled(damage, crit), 6f * _perks.Knockback, 0.1f, first ? 5.5f * _perks.Launch : 3.5f, 0.6f);
             if (crit) Fx.Sound("crit");
+            if (first && _weapon.Kind == WeaponKind.Hammer) TestYourStrength(hits, crit, radius, damage);
         }
 
         if (_quakeTime >= (_perks.Aftershock ? AftershockAt + 0.2f : 0.55f)) EndMalletMove();
+    }
+
+    /// <summary>
+    /// Big Bertha is the carnival strength tester's sledge: every ground pound
+    /// springs up a High Striker beside you, and the puck flies as high as the
+    /// pound was good, a rung for each clown caught in it and one for a crit.
+    /// Three rungs ring the bell, and the bell rings out a second shockwave
+    /// that leaves everyone near dizzy.
+    /// </summary>
+    private void TestYourStrength(int hits, bool crit, float radius, float damage)
+    {
+        float strength = (hits + (crit ? 1 : 0)) / (float)StrikerRungs;
+        Fx.Striker(GetParent(), GlobalPosition - Facing * 0.8f + new Vector3(0f, 0f, -0.3f), strength);
+        if (strength < 1f) return;
+        GetTree().CreateTimer(HighStriker.RiseTime + 0.08f, false).Timeout += () =>
+        {
+            if (!IsInstanceValid(this) || IsDead) return;
+            Fx.Sound("ding", 1f, 2f);
+            Fx.Sound("ding", 1.5f, -2f);
+            Fx.Impact(GetParent(), GlobalPosition + new Vector3(0f, 0.4f, 0f), 2.6f);
+            Fx.Shake(this, 0.16f, 0.3f);
+            DamageInRadius(radius * 1.35f, Scaled(damage * 0.6f, false), 4f * _perks.Knockback, 0.06f, 3f * _perks.Launch, 1.1f);
+            if (!Hostile) ClownSquad.Services.Achievements.Award("ring_bell");
+        };
     }
 
     /// <summary>The slapstick's charge: one enormous clap that stuns everything in front.</summary>

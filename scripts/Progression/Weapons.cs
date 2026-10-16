@@ -116,9 +116,10 @@ public static class Weapons
             new("jugglers_luck", "JUGGLER'S LUCK", "+30% crit damage and better loot.", 2, 3),
         });
 
-    // Big Bertha: slow and enormous. Hits like a truck; the charge is a ground pound.
+    // Big Bertha: the carnival strength tester's sledge. Slow and enormous; the
+    // charge pounds the ground and springs up a High Striker: catch three and ring the bell.
     private static readonly WeaponDef HammerDef = new(
-        WeaponKind.Hammer, "BIG BERTHA", "A circus sledgehammer. Slow swings, huge hits, and a held charge pounds the ground.",
+        WeaponKind.Hammer, "BIG BERTHA", "The strength tester's sledge. Huge, slow hits. Hold to pound the ground: catch three clowns in it and ring the bell for a second shockwave.",
         new AttackStep[]
         {
             new(0.14f, 0.08f, 0.24f, 16f, 3.5f, 0.080f, 2.1f, 0f),

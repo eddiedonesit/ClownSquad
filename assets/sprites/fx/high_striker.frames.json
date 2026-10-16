@@ -1,0 +1,23 @@
+{
+  "frame_width": 56,
+  "frame_height": 208,
+  "baseline": 205,
+  "count": 3,
+  "clips": {
+    "tower": [
+      0
+    ],
+    "ring": [
+      1
+    ],
+    "puck": [
+      2
+    ]
+  },
+  "fps": {
+    "tower": 10.0,
+    "ring": 10.0,
+    "puck": 10.0
+  },
+  "source": "aseprite"
+}

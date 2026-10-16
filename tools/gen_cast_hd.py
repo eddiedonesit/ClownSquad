@@ -245,6 +245,8 @@ class Rig:
 
         # far arm, far leg (a tone darker)
         self.arm(c, far_sh, p["fa"], p["fe"], p["item_f"], p, far=True)
+        if s.get("epaulettes"):
+            self.epaulette(c, far_sh, k, far=True)
         self.leg(c, hip_x - 4 * k, hip_y, p["ff"], p["ffl"], legs, p, far=True, leg_len=leg_len, lift=lift)
 
         if legs == "unicycle":
@@ -262,6 +264,7 @@ class Rig:
         else:
             c.ellipse(hip_x + lx * 0.5, hip_y - torso_h * 0.45, 13.5 * k, torso_h * 0.6, SUIT)
         self.pattern(c, hip_x, hip_y, sh_y, k)
+        self.costume(c, hip_x, hip_y, sh_x, sh_y, torso_h, lx, k)
 
         # near leg
         self.leg(c, hip_x + 4 * k, hip_y, p["nf"], p["nfl"], legs, p, far=False, leg_len=leg_len, lift=lift)
@@ -274,6 +277,8 @@ class Rig:
 
         # near arm on top
         self.arm(c, near_sh, p["na"], p["ne"], p["item_n"], p, far=False)
+        if s.get("epaulettes"):
+            self.epaulette(c, near_sh, k, far=False)
 
         # juggled pins / torches in the air
         if p["juggle"] is not None:
@@ -287,6 +292,51 @@ class Rig:
                     pin(c, ax, ay, t * 360, k * 1.25)
         return c
 
+    def costume(self, c, hip_x, hip_y, sh_x, sh_y, torso_h, lx, k):
+        """The costume's details, on the torso (the current part) and over it.
+
+        frogging     gold braid across a jacket front (the ringmaster, the tamer)
+        sequins      a scatter of sparkles over the suit (the trapeze act)
+        sash         a band from shoulder to hip
+        strap        a one-shouldered leotard: bare chest above, one strap (the strongman)
+        belt         a wide belt; "champ" a championship belt with a big gold plate"""
+        s = self.s
+        cx = hip_x + lx * 0.5
+        if s.get("strap"):
+            # the chest bare above a line, one strap over the far shoulder
+            # (the cut runs from the far shoulder down to under the near arm)
+            c.recolor(lambda x, y, m: SKIN if y < sh_y + torso_h * 0.12 + (x - cx) * 0.55 else m)
+        if s.get("frogging"):
+            rows = [sh_y + torso_h * f for f in (0.28, 0.42, 0.56, 0.7)]
+            c.recolor(lambda x, y, m: GOLD if x > cx - 5 * k and any(abs(y - r) < 1.0 * k for r in rows) else m)
+            c.recolor(lambda x, y, m: GOLD if any((x - cx + 5 * k) ** 2 + (y - r) ** 2 < (1.9 * k) ** 2 for r in rows) else m)
+        if s.get("sequins"):
+            c.recolor(lambda x, y, m: (TRIM if (math.floor(x / (3 * k)) * 7 + math.floor(y / (3 * k)) * 13) % 11 == 0
+                                       else GOLD if (math.floor(x / (3 * k)) * 5 + math.floor(y / (3 * k)) * 3) % 17 == 0 else m)
+                      if m == SUIT else m)
+        if s.get("sash"):
+            c.recolor(lambda x, y, m: ACCENT if abs((x - cx) + (y - (sh_y + hip_y) / 2) * 0.9) < 3.2 * k else m)
+        belt = s.get("belt")
+        if belt:
+            by = hip_y - 3 * k
+            c.recolor(lambda x, y, m: BLACK if abs(y - by) < (3.6 if belt == "champ" else 2.4) * k else m)
+            c.part()
+            if belt == "champ":
+                c.ellipse(cx + 6 * k, by, 8 * k, 6.5 * k, GOLD)
+                c.part(line=False)
+                c.ellipse(cx + 6 * k, by, 4.5 * k, 3.6 * k, ACCENT)
+            else:
+                c.ellipse(cx + 8 * k, by, 3.4 * k, 3 * k, GOLD)
+
+    def epaulette(self, c, sh, k, far):
+        """A gold shoulder board with a fringe."""
+        x, y = sh
+        c.part(far=far)
+        c.ellipse(x, y - 1 * k, 7.5 * k, 3.4 * k, GOLD)
+        for i in range(5):
+            c.part(far=far, line=False)
+            c.capsule(x + (i - 2) * 2.8 * k, y + 1 * k, x + (i - 2) * 3.0 * k, y + 5.5 * k, 0.9 * k, 0.9 * k, GOLD)
+
     def pattern(self, c, hip_x, hip_y, sh_y, k):
         pat = self.s.get("pattern", "plain")
         if pat == "diamond":
@@ -297,8 +347,13 @@ class Rig:
             c.recolor(lambda x, y, m: ACCENT if math.floor(x / (5 * k)) % 2 == 0 else m)
         elif pat == "dots":
             c.recolor(lambda x, y, m: ACCENT if ((x / k) % 9 - 4.5) ** 2 + ((y / k) % 9 - 4.5) ** 2 < 6 else m)
-        elif pat == "spots":   # leopard
-            c.recolor(lambda x, y, m: STRIPE if ((x / k + 3 * math.sin(y / k)) % 11 - 5) ** 2 + ((y / k) % 10 - 5) ** 2 < 5 else m)
+        elif pat == "spots":   # leopard: dark broken rings round a brown middle
+            def rosette(x, y, m):
+                u = (x / k + 3 * math.sin(y / (2 * k)) + 7 * (math.floor(y / (12 * k)) % 2)) % 14 - 7
+                v = (y / k) % 12 - 6
+                d = u * u / 1.4 + v * v
+                return ACCENT if d < 4 else STRIPE if d < 10 and math.atan2(v, u) % 2.1 > 0.5 else m
+            c.recolor(rosette)
         elif pat == "tux":
             # a white shirt front and gold buttons down the chest
             front = hip_x + 6 * k
@@ -334,8 +389,19 @@ class Rig:
         c.part(far=far)
         width = 8.5 * k if s.get("build") != "muscle" else 10 * k
         c.capsule(x, y, fx, fy - 10 * k, width, width * 0.75, PANTS)
+        kx, ky = (x + fx) / 2, (y + fy - 10 * k) / 2           # the knee
+        if s.get("jodhpurs"):
+            # riding breeches, flared out at the thigh
+            c.ellipse(x + (kx - x) * 0.4 - 1.5 * k, y + (ky - y) * 0.45, width * 1.35, width * 1.2, PANTS)
         if s.get("legwear") == "stripes":
             c.recolor(lambda xx, yy, m: ACCENT if math.floor(yy / (5 * k)) % 2 == 0 else m)
+        if s.get("flame_hem"):
+            # flames licking up from the cuffs
+            c.recolor(lambda xx, yy, m: (FLAME2 if yy > fy - 12 * k + 4 * k * math.sin(xx / (2.2 * k)) + 2 * k
+                                         else FLAME if yy > fy - 16 * k + 5 * k * math.sin(xx / (2.2 * k)) else m))
+        if s.get("riding_boots"):
+            # tall polished boots to just under the knee, a gold cuff at the top
+            c.recolor(lambda xx, yy, m: SHOE if yy > ky + 2 * k else (GOLD if yy > ky - 0.5 * k else m))
         self.shoe(c, fx + 2 * k, fy, far)
 
     def shoe(self, c, x, base, far, small=False):
@@ -449,9 +515,16 @@ class Rig:
             c.part(line=False)
             c.stroke(bezier((mx - r * 0.35, my - r * 0.05), (mx, my + r * 0.3), (mx + r * 0.45, my - r * 0.15)), 1.6 * k, LIP if face != "mime" else INK)
         if s.get("mustache"):
+            col = HAIR if s.get("stache_col") is None else BLACK
+            big = 1.2 if s.get("mustache") == "handlebar" else 1.0
             for side in (-1, 1):
                 c.part()
-                c.stroke(bezier((mx + r * 0.05, my - r * 0.25), (mx + r * 0.05 + side * r * 0.4, my - r * 0.15), (mx + r * 0.05 + side * r * 0.55, my - r * 0.4)), 2.2 * k, HAIR if s.get("stache_col") is None else BLACK)
+                tip = (mx + r * 0.05 + side * r * 0.55 * big, my - r * 0.4 * big)
+                c.stroke(bezier((mx + r * 0.05, my - r * 0.25), (mx + r * 0.05 + side * r * 0.4 * big, my - r * 0.12), tip), 2.0 * k, col)
+                if big > 1:
+                    # the waxed curl at each end
+                    c.stroke([(tip[0] + math.cos(t / 6 * math.tau) * 1.6 * k * side, tip[1] - 1.6 * k + math.sin(t / 6 * math.tau) * 1.6 * k)
+                              for t in range(5)], 0.8 * k, col)
         if s.get("nose", True):
             c.part()
             c.ellipse(x + r * 1.0, y + r * 0.2, r * 0.36, r * 0.34, NOSE)
@@ -523,6 +596,11 @@ class Rig:
         c.capsule(sx, sy, ex, ey, thick, thick * 0.9, SKIN if s.get("bare_arms") else SUIT)
         c.part(far=far)
         c.capsule(ex, ey, hx, hy, thick * 0.9, thick * 0.8, SKIN if s.get("bare_arms") else SUIT)
+        if s.get("limb_rings"):
+            c.recolor(lambda xx, yy, m: ACCENT if math.floor((xx * math.sin(rad(a + e)) + yy * math.cos(rad(a + e))) / (4 * k)) % 2 == 0 else m)
+        if s.get("wristbands"):
+            c.part(far=far)
+            c.ellipse(hx - math.sin(rad(a + e)) * 3 * k, hy - math.cos(rad(a + e)) * 3 * k, thick * 0.95, 2.4 * k, ACCENT)
         if s.get("cuffs", True) and not s.get("bare_arms"):
             c.part(far=far)
             c.ellipse(hx - math.sin(rad(a + e)) * 2 * k, hy - math.cos(rad(a + e)) * 2 * k, 5 * k, 2.6 * k, WHITE)
@@ -1089,31 +1167,43 @@ CAST = {
     "tot": dict(k=0.62, build="tiny", suit=(240, 90, 90), accent=(250, 230, 120), pattern="dots", hair=(120, 210, 250),
                 hat="cone", hat_col=(120, 210, 250), neck="ruff", cw=260, ch=320),
     # ---- bosses
+    # Bobo: a clown in a spotted suit with a ruff and striped stockings, juggling up on his ball
     "ballrider": dict(k=1.25, suit=(250, 120, 170), accent=(255, 255, 255), pattern="dots", hair=(120, 220, 210),
-                      hat="cone", hat_col=(250, 200, 80), neck="ruff", juggles="pin"),
-    "trainer": dict(k=1.3, suit=(200, 40, 50), accent=(250, 200, 80), pattern="tux", hair_style="bun", hair=(90, 50, 40),
+                      hat="cone", hat_col=(250, 200, 80), neck="ruff", juggles="pin", belt="plain", legwear="stripes"),
+    # Madame Stripes, the lion tamer: a red hussar jacket with gold frogging and
+    # epaulettes, white jodhpurs, tall black riding boots, pith helmet, whip and chair
+    "trainer": dict(k=1.3, suit=(200, 40, 50), accent=(250, 200, 80), pattern="plain", hair_style="bun", hair=(90, 50, 40),
                     hat="pith", hat_col=(240, 230, 210), neck="collar", face="plain", nose=False, shoes="boot",
-                    shoe=(50, 40, 50), pants=(245, 240, 225), lip=(200, 40, 70), cw=300, shift=-40),
-    "elastic": dict(k=1.3, suit=(120, 70, 210), accent=(250, 220, 80), pattern="star", leg=1.5, torso=1.25, arm=1.15,
+                    shoe=(40, 32, 44), pants=(245, 240, 225), lip=(200, 40, 70), cw=300, shift=-40,
+                    frogging=True, epaulettes=True, jodhpurs=True, riding_boots=True, belt="plain"),
+    # Stretch, the india-rubber man: a banded rubber suit, a star on the chest, everything too long
+    "elastic": dict(k=1.3, suit=(120, 70, 210), accent=(150, 100, 236), pattern="star", leg=1.5, torso=1.25, arm=1.15,
                     hair_style="slick", hair=(250, 230, 120), hat="none", neck="collar", trim=(250, 220, 80),
-                    shoe=(250, 220, 80), shoes="boot", ch=340),
+                    shoe=(250, 220, 80), shoes="boot", ch=340, legwear="stripes", limb_rings=True, belt="plain"),
+    # the Flying Fratelli: sequinned leotards with a sash, taped wrists, soft boots
     "trapeze_a": dict(k=1.2, suit=(40, 170, 200), accent=(250, 250, 255), pattern="leotard", hair_style="slick", hair=(50, 40, 40),
-                      hat="none", neck="none", face="plain", nose=False, mustache=True, shoes="boot", shoe=(250, 250, 255),
-                      pants=(40, 170, 200), cuffs=False),
+                      hat="none", neck="none", face="plain", nose=False, mustache="handlebar", shoes="boot", shoe=(250, 250, 255),
+                      pants=(40, 170, 200), cuffs=False, sequins=True, sash=True, wristbands=True),
     "trapeze_b": dict(k=1.2, suit=(240, 90, 170), accent=(250, 250, 255), pattern="leotard", hair_style="long", hair=(240, 200, 90),
                       hat="none", neck="none", face="plain", nose=False, shoes="boot", shoe=(250, 250, 255),
-                      pants=(240, 90, 170), cuffs=False),
+                      pants=(240, 90, 170), cuffs=False, sequins=True, sash=True, wristbands=True),
+    # Pyro Pete: bandana, open vest, flames up his trousers, a torch in each hand
     "fireeater": dict(k=1.3, suit=(120, 40, 40), accent=(250, 170, 60), pattern="vest", hair_style="none", hat="bandana",
-                      hat_col=(220, 60, 40), mustache=True, face="plain", nose=False, bare_arms=True, gloves=False,
-                      neck="none", pants=(60, 40, 60), shoes="boot", shoe=(60, 40, 50), juggles="torch"),
-    "strongman": dict(k=1.5, build="muscle", suit=(240, 200, 120), accent=(250, 240, 200), stripe=(70, 40, 30),
+                      hat_col=(220, 60, 40), mustache="handlebar", face="plain", nose=False, bare_arms=True, gloves=False,
+                      neck="none", pants=(60, 40, 60), shoes="boot", shoe=(60, 40, 50), juggles="torch",
+                      flame_hem=True, belt="plain", wristbands=True),
+    # Iron Ivan, the strongman: a one-strap leopard leotard, a championship belt,
+    # leather wristbands, a waxed handlebar moustache, bald as a cannonball
+    "strongman": dict(k=1.5, build="muscle", suit=(240, 200, 120), accent=(120, 70, 40), stripe=(70, 40, 30),
                       pattern="spots", bare_arms=True, gloves=False, hair_style="none", hat="none", neck="none",
-                      mustache=True, stache_col=1, face="plain", nose=False, shoes="boot", shoe=(60, 40, 40),
-                      pants=(240, 200, 120), cw=260),
+                      mustache="handlebar", stache_col=1, face="plain", nose=False, shoes="boot", shoe=(60, 40, 40),
+                      pants=(240, 200, 120), cw=260, strap=True, belt="champ", wristbands=True),
+    # the Ringmaster: red tailcoat with gold frogging and epaulettes, white
+    # breeches, tall black riding boots, top hat, a waxed moustache
     "ringmaster": dict(k=1.35, suit=(200, 30, 50), accent=(252, 204, 72), pattern="tux", tails=True, hair=(40, 30, 30),
-                       hair_style="slick", hat="top", hat_col=(40, 30, 50), neck="bowtie", mustache=True, stache_col=1,
-                       face="plain", nose=False, shoes="boot", shoe=(40, 30, 40), pants=(245, 240, 230), leg=1.15, torso=1.1,
-                       cw=300, shift=-40),
+                       hair_style="slick", hat="top", hat_col=(40, 30, 50), neck="bowtie", mustache="handlebar", stache_col=1,
+                       face="plain", nose=False, shoes="boot", shoe=(30, 24, 34), pants=(245, 240, 230), leg=1.15, torso=1.1,
+                       cw=300, shift=-40, frogging=True, epaulettes=True, riding_boots=True),
 }
 
 BEASTS = {
