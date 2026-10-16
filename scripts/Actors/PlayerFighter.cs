@@ -16,7 +16,7 @@ using ClownSquad.Net;
 /// </summary>
 public partial class PlayerFighter : Fighter
 {
-    private enum State { Free, Attacking, Dodging, Special, Charging, Spinning, Throwing, Flipping, Quaking, Lunging }
+    private enum State { Free, Attacking, Dodging, Special, Charging, Spinning, Throwing, Flipping, Quaking, Lunging, AirDashing, Slamming }
 
     // The combo comes from the weapon in hand (Weapons.cs): an escalating chain
     // where only the finisher launches, so a full string is what opens a juggle.
@@ -44,6 +44,25 @@ public partial class PlayerFighter : Fighter
 
     // A ranged weapon fires once per combo step.
     private bool _fired;
+
+    // Air moves (players only): one extra jump and one dash per time in the air,
+    // and a slam (down + attack in the air) that dives and shocks the ground.
+    private const float DoubleJumpSpeed = 7.8f;
+    private const float AirDashSpeed = 12.5f;
+    private const float AirDashTime = 0.2f;
+    private const float SlamDiveSpeed = 24f;
+    private const float SlamRadius = 2.4f;
+    private const float SlamDamage = 22f;
+    private const float SlamRecover = 0.22f;
+    private bool _usedAirJump;
+    private bool _usedAirDash;
+    private float _airTime;
+    private float _somersault;          // time left on the double jump's tumble, for the pose
+    private Vector3 _airDashDir;
+    private bool _slamLanded;
+
+    /// <summary>Double jump, air dash and slam belong to the squad; enemies keep their simpler air game.</summary>
+    protected virtual bool HasAirMoves => !Hostile && HasMalletMoves;
 
     private const float ComboWindow = 0.45f;
     private const float DodgeDuration = 0.35f;
@@ -153,6 +172,8 @@ public partial class PlayerFighter : Fighter
         State.Flipping => "FLIP",
         State.Quaking => _weapon.Charge == ChargeMove.Clap ? "CLAP" : "QUAKE",
         State.Lunging => "LUNGE",
+        State.AirDashing => "AIRDASH",
+        State.Slamming => "SLAM",
         _ => Armed ? "free" : "free (unarmed)",
     };
 
@@ -304,6 +325,11 @@ public partial class PlayerFighter : Fighter
             _chargeLock = false;
         }
 
+        // Touching down gives the air moves back.
+        if (Grounded) { _usedAirJump = false; _usedAirDash = false; _airTime = 0f; }
+        else _airTime += dt;
+        if (_somersault > 0f) _somersault -= dt;
+
         switch (_state)
         {
             case State.Free: TickFree(cmd, dt); break;
@@ -316,6 +342,8 @@ public partial class PlayerFighter : Fighter
             case State.Flipping: TickFlipping(dt); break;
             case State.Quaking: TickQuake(dt); break;
             case State.Lunging: TickLunge(dt); break;
+            case State.AirDashing: TickAirDash(dt); break;
+            case State.Slamming: TickSlam(dt); break;
         }
     }
 
@@ -342,6 +370,15 @@ public partial class PlayerFighter : Fighter
 
         if (!Grounded)
         {
+            if (HasAirMoves)
+            {
+                // Down + attack in the air: the slam.
+                if (_bufferedAttack && cmd.Move.Y > 0.5f && Armed) { StartSlam(); return; }
+                // Jump again: the double jump (a moment after leaving the ground, so one press is not both).
+                if (cmd.JumpPressed && !_usedAirJump && _airTime > 0.08f) { DoubleJump(); return; }
+                // Dodge in the air: the air dash.
+                if (cmd.DodgePressed && !_usedAirDash) { StartAirDash(move); return; }
+            }
             // Attack in the air is the front flip, whether tapped or still held
             // from before the jump.
             bool wantsFlip = _bufferedAttack || (_heldTime > 0.08f && !_chargeLock);
@@ -393,8 +430,9 @@ public partial class PlayerFighter : Fighter
         {
             if (!Grounded)
             {
-                // Tuck while rising, reach while falling.
-                PinClipFrame("jump", Velocity.Y > 0f ? 0 : 1);
+                // The double jump tumbles once; otherwise tuck while rising, reach while falling.
+                if (_somersault > 0f) PinClipFrame("flip", Mathf.Clamp((int)((1f - _somersault / 0.36f) * 8f), 0, 7));
+                else PinClipFrame("jump", Velocity.Y > 0f ? 0 : 1);
             }
             else
             {
@@ -878,6 +916,101 @@ public partial class PlayerFighter : Fighter
         if (t > dash + 0.18f) EndMalletMove();
     }
 
+    // ----------------------------------------------------------- air moves
+
+    private void DoubleJump()
+    {
+        _usedAirJump = true;
+        _bufferedAttack = false;
+        Velocity = new Vector3(Velocity.X, DoubleJumpSpeed, Velocity.Z);
+        _somersault = 0.36f;
+        Dust(0.45f);
+        Fx.Sound("boing_small", 1.5f);
+        Fx.Sound("whoosh", 1.6f, -8f);
+    }
+
+    /// <summary>A short burst sideways that holds its height, briefly untouchable.</summary>
+    private void StartAirDash(Vector3 move)
+    {
+        _usedAirDash = true;
+        _bufferedAttack = false;
+        _airDashDir = Mathf.Abs(move.X) > 0.1f ? new Vector3(Mathf.Sign(move.X), 0f, 0f) : Facing;
+        Facing = _airDashDir;
+        _dodgeTime = 0f;
+        _state = State.AirDashing;
+        Dust(0.35f);
+        Fx.Sound("zip", 1.3f);
+    }
+
+    private void TickAirDash(float dt)
+    {
+        _dodgeTime += dt;
+        float t = _dodgeTime / AirDashTime;
+        // Fast out, easing off; gravity is held off (it is added after this tick).
+        Velocity = new Vector3(_airDashDir.X * AirDashSpeed * (1f - 0.5f * t), Gravity * dt, Velocity.Z * 0.5f);
+        PinClipFrame("dodge", 1);
+        if (_dodgeTime >= AirDashTime || Grounded)
+        {
+            Velocity = new Vector3(Velocity.X * 0.4f, 0f, Velocity.Z);
+            _state = State.Free;
+        }
+    }
+
+    /// <summary>Down + attack in the air: a short hang, then straight down, and a shockwave on landing.</summary>
+    private void StartSlam()
+    {
+        _bufferedAttack = false;
+        _flipTime = 0f;
+        _slamLanded = false;
+        _hitThisSwing.Clear();
+        _state = State.Slamming;
+        Fx.Sound("whoosh", 0.8f);
+    }
+
+    private void TickSlam(float dt)
+    {
+        _flipTime += dt;
+        if (!_slamLanded)
+        {
+            // A beat at the top so it reads, then the dive.
+            if (_flipTime < 0.1f)
+            {
+                Velocity = new Vector3(0f, Gravity * dt + 1.5f, 0f);
+                PinClipFrame("attack", 1);
+                return;
+            }
+            Velocity = new Vector3(0f, -SlamDiveSpeed, 0f);
+            PinClipFrame("attack", 3);
+            // Anyone under the dive is struck on the way down.
+            foreach (Fighter other in Opponents())
+            {
+                if (_hitThisSwing.Contains(other)) continue;
+                Vector3 to = other.GlobalPosition - GlobalPosition;
+                if (new Vector2(to.X, to.Z).Length() > 1.1f || to.Y > 0.5f || to.Y < -2.2f) continue;
+                _hitThisSwing.Add(other);
+                Strike(other, SlamDamage * 0.5f, Facing, 2f, 0.05f, 0f, 0.3f);
+            }
+            if (!Grounded) return;
+            _slamLanded = true;
+            _flipTime = 0f;
+            Vector3 at = GlobalPosition + new Vector3(0f, 0.15f, 0f);
+            Fx.Impact(GetParent(), at, 2.4f);
+            Dust(1.3f);
+            Fx.Sound("kaboom", 0.8f, -2f);
+            Fx.Sound("thump", 0.7f);
+            Fx.Shake(this, 0.18f, 0.32f);
+            Visual.Squash(0.45f);
+            bool crit = RollCrit();
+            DamageInRadius(SlamRadius, Scaled(SlamDamage * _perks.Damage, crit), 5.5f * _perks.Knockback, 0.1f, 5.5f * _perks.Launch, 0.55f);
+            if (crit) Fx.Sound("crit");
+            return;
+        }
+        // A brief recovery on the ground: the price of the slam.
+        ApplyGroundMovement(Vector3.Zero, dt);
+        PinClipFrame("attack", 3);
+        if (_flipTime >= SlamRecover) EndMalletMove();
+    }
+
     /// <summary>Big Bertha's charge: a ground pound that hits everyone around.</summary>
     private void StartQuake()
     {
@@ -1069,7 +1202,9 @@ public partial class PlayerFighter : Fighter
     }
 
     // UNSTOPPABLE: a hit lands but does not stop the swing.
-    protected override bool HasPoise => _perks.Unstoppable && _state is State.Attacking or State.Quaking or State.Lunging;
+    // A slam cannot be knocked out of mid-dive; UNSTOPPABLE also keeps swings going.
+    protected override bool HasPoise => (_state == State.Slamming && !_slamLanded)
+        || (_perks.Unstoppable && _state is State.Attacking or State.Quaking or State.Lunging);
 
     /// <summary>THICK SKIN softens hits; SECOND WIND catches a player about to go down.</summary>
     public override void TakeDamage(in DamageInfo info)
@@ -1089,6 +1224,7 @@ public partial class PlayerFighter : Fighter
     /// <summary>Invulnerable through the middle of the roll, not its edges.</summary>
     public override bool CanBeHit()
     {
+        if (_state == State.AirDashing && _dodgeTime <= AirDashTime * 0.7f) return false;
         if (_state == State.Dodging && _dodgeTime >= IFrameStart && _dodgeTime <= IFrameEnd * _perks.DodgeFrames)
             return false;
         return base.CanBeHit();

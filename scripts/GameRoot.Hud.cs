@@ -108,7 +108,7 @@ public partial class GameRoot
 
         sb.AppendLine();
         sb.AppendLine("WASD move | J attack | Space jump | K dodge      pad: stick | X | A | B");
-        sb.AppendLine("hold attack: the weapon's charge move (throw, quake, pie lob, pin fan, clap, big cork, lunge) | hold attack + left/right: spin | attack in air: flip");
+        sb.AppendLine("hold attack: the weapon's charge move (throw, quake, pie lob, pin fan, clap, big cork, lunge) | hold attack + left/right: spin | in the air: attack flips, jump again double-jumps, dodge air-dashes, down + attack slams");
         _hud.Text = sb.ToString();
     }
 }

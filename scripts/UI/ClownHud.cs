@@ -323,15 +323,15 @@ public partial class ClownHud : CanvasLayer
         _hint = new Label
         {
             Text = "move WASD/stick   attack J/X   jump Space/A   dodge K/B\n" +
-                   "hold attack: weapon charge   +left/right: spin   air: flip\n" +
+                   "hold attack: charge   +left/right: spin   air: attack flip, jump again, dodge dash, down+attack slam\n" +
                    "TAB/SELECT stats   F1 controls   F3 debug",
             HorizontalAlignment = HorizontalAlignment.Right,
             LabelSettings = Style(11, new Color(1f, 1f, 1f, 0.95f), 4),
         };
         // Top right: clear of the boss bar, the combo and the player panels.
         _hint.SetAnchorsPreset(Control.LayoutPreset.TopRight);
-        _hint.Position = new Vector2(-442, 10);
-        _hint.Size = new Vector2(430, 60);
+        _hint.Position = new Vector2(-602, 10);
+        _hint.Size = new Vector2(590, 60);
         AddChild(_hint);
         // Shown for the first moments of a fight, then out of the way.
         CreateTween().TweenProperty(_hint, "modulate:a", 0f, 1.2f).SetDelay(9.0);
