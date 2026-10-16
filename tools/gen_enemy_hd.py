@@ -13,6 +13,7 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from pixelart_hd import HDCanvas, Material, shade, to_rows, bezier
+from clown_parts import HAIR_BACK, stamp_hair
 from pixelpng import write_png
 
 # Headroom above the original's frame, which cut the hat's pompom off.
@@ -110,10 +111,8 @@ def draw(p):
         c.ellipse(cx + ln, 58 + by + abs(cx - 68) * 0.06, 7, 6, WHITE if i % 2 == 0 else YELLOW)
 
     hy = 36 + by + hd
-    # wild green hair behind
-    for x, y, rx_, ry_ in ((46, hy + 6, 14, 12), (50, hy - 12, 10, 8), (42, hy - 4, 9, 9)):
-        c.part()
-        c.ellipse(x + ln, y, rx_, ry_, HAIR)
+    # wild green hair behind: the clown puff, drawn in Aseprite (clown_parts), at his head's size
+    stamp_hair(c, HAIR_BACK, 68 + ln, hy - 1, 23, material=HAIR)
 
     # head, large enough to carry the grin
     c.part()

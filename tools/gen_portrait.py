@@ -15,6 +15,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from pixelart_hd import HDCanvas, Material, shade, to_rows, bezier
 from pixelpng import write_png
 import gen_sprite_hd as hd
+from clown_parts import HAIR_BACK, stamp_hair
 
 W, H = 300, 320
 MOUTH, TONGUE, TOOTH = 19, 20, 21
@@ -87,11 +88,10 @@ def portrait(mats, mood):
 
     mallet(c, 214, 276, 96, 192)                          # over the right shoulder, face out
 
-    # hair, behind the head: big springy curls either side
-    for x, y, r in ((62, 102, 24), (48, 132, 26), (56, 164, 22), (74, 188, 16),
-                    (182, 100, 22), (196, 128, 24), (190, 160, 20), (174, 184, 15)):
-        c.part()
-        c.ellipse(x, y, r, r * 0.92, hd.HAIR)
+    # hair, behind the head: the clown puff (Aseprite, clown_parts) on both
+    # sides, the far side mirrored, since the portrait faces us
+    stamp_hair(c, HAIR_BACK, hx + 4, hy - 2, material=hd.HAIR, scale=2.6)
+    stamp_hair(c, HAIR_BACK, hx - 4, hy - 2, material=hd.HAIR, scale=2.6, mirror=True)
 
     # shoulders: the harlequin suit, a pompom button
     c.part()

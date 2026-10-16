@@ -22,6 +22,7 @@ from multiprocessing import Pool
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from pixelart_hd import HDCanvas, Material, shade, to_rows, bezier, rotated, laid_down, touches_border
+from clown_parts import HAIR_BACK, HAIR_FRONT, stamp_hair
 from pixelpng import write_png
 
 OUT = os.path.join("assets", "sprites", "cast")
@@ -385,9 +386,8 @@ class Rig:
     def hair_back(self, c, x, y, r):
         k, style = self.k, self.s.get("hair_style", "curls")
         if style == "curls":
-            for dx, dy, rr in ((-14, -10, 6), (-19, -2, 7.5), (-22, 7, 7), (-18, 15, 6.5)):
-                c.part()
-                c.ellipse(x + dx * k * r / (18 * k), y + dy * k * r / (18 * k), rr * k, rr * 0.9 * k, HAIR)
+            # the clown puff, drawn in Aseprite (clown_parts), scaled to this head
+            stamp_hair(c, HAIR_BACK, x, y, r, material=HAIR)
         elif style == "bun":
             c.part()
             c.ellipse(x - r * 0.9, y - r * 0.4, r * 0.45, r * 0.45, HAIR)
@@ -407,8 +407,7 @@ class Rig:
         c.ellipse(x - r * 0.7, y + r * 0.2, r * 0.2, r * 0.28, SKIN if face != "mime" else WHITE)
         style = s.get("hair_style", "curls")
         if style == "curls":
-            c.part()
-            c.ellipse(x - r * 0.95, y + r * 0.05, r * 0.25, r * 0.4, HAIR)
+            stamp_hair(c, HAIR_FRONT, x, y, r, material=HAIR)
         elif style == "slick":
             c.part()
             c.ellipse(x - r * 0.2, y - r * 0.72, r * 0.95, r * 0.45, HAIR)

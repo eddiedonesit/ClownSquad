@@ -18,7 +18,6 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from pixelart_hd import HDCanvas, Material, shade, to_rows, bezier, rotated, laid_down, crop, touches_border
 from pixelpng import write_png
-from aseprite_import import read_png
 
 BODY_W, BODY_H = 96, 128
 TOP_PAD, BOTTOM_PAD = 88, 72
@@ -69,46 +68,9 @@ MATS = {
 MATS[SKIN].tones = [(150, 84, 82), (226, 160, 138), (250, 218, 192), (255, 232, 211), (255, 243, 231)]
 
 # --------------------------------------------------------- Aseprite parts
-# Hand-drawn pieces live in Aseprite (art/aseprite/clown_head.aseprite, one
-# layer each), exported to art/aseprite/export/ by tools/aseprite/export_layers.lua
-# (tools/refresh_sprites.sh runs it). Every layer shares one anchor, the head
-# anchor of draw() (x = 50 + lean, y = head centre), at pixel (56, 24).
-#   hair_back, hair_front: shapes only; each colour is one curl, painted with the
-#     clown's own hair and shaded by the generator as a part of its own.
-#   eye_open, eye_hit, mouth_hit, blush, nose_shine: finished colours, painted
-#     over the shaded frame by hand_face().
-
-PARTS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "art", "aseprite", "export")
-HEAD_AX, HEAD_AY = 56, 24
-
-
-def _head_layer(name):
-    """The opaque pixels of one layer: [(x, y, rgba)] relative to the anchor."""
-    w, h, rows = read_png(os.path.join(PARTS_DIR, "clown_head_" + name + ".png"))
-    return [(x - HEAD_AX, y - HEAD_AY, rows[y][x]) for y in range(h) for x in range(w) if rows[y][x][3] > 0]
-
-
-def _groups(pixels):
-    """Pixels grouped by colour, in order of first appearance: one group per curl."""
-    out = {}
-    for x, y, c in pixels:
-        out.setdefault(c, []).append((x, y))
-    return list(out.values())
-
-
-HEAD = {n: _head_layer(n) for n in ("hair_back", "hair_front", "eye_open", "eye_hit", "mouth_hit", "blush", "nose_shine")}
-HAIR_BACK = _groups(HEAD["hair_back"])
-HAIR_FRONT = _groups(HEAD["hair_front"])
-
-
-def stamp_shapes(c, groups, ax, ay, material):
-    """Paint Aseprite shapes into the canvas as parts of one material, at the head anchor (canvas pixels)."""
-    for group in groups:
-        c.part()
-        for x, y in group:
-            X, Y = ax + x, ay + y
-            if 0 <= X < c.w and 0 <= Y < c.h:
-                c._set(X, Y, material)
+# The hair and PIP's face pieces are drawn in Aseprite and shared by every
+# generator: see clown_parts.py (art/aseprite/clown_head.aseprite).
+from clown_parts import HEAD, HAIR_BACK, HAIR_FRONT, stamp_hair
 
 
 # ------------------------------------------------------------------- parts
@@ -497,7 +459,7 @@ def draw(p):
 
     # clown hair, drawn in Aseprite (hair_back): a big puff of curls bursting
     # out from under the hat, each curl its own part so it shades as a bumpy cloud
-    stamp_shapes(c, HAIR_BACK, c.face[0], c.face[1], HAIR)
+    stamp_hair(c, HAIR_BACK, 50 + ln, hy, material=HAIR)
 
     # far leg, shoe and arm, a tone darker
     c.part(far=True)
@@ -543,7 +505,7 @@ def draw(p):
     c.part()
     c.ellipse(37 + ln, hy + 4, 3.6, 5, SKIN)                     # ear, half under the hair
     c.recolor(lambda x, y, mm: BLUSH if ((x - 37.6 - ln) / 1.6) ** 2 + ((y - hy - 4) / 2.8) ** 2 <= 1 else mm)
-    stamp_shapes(c, HAIR_FRONT, c.face[0], c.face[1], HAIR)        # tufts over the ear (Aseprite: hair_front)
+    stamp_hair(c, HAIR_FRONT, 50 + ln, hy, material=HAIR)          # tufts over the ear (Aseprite: hair_front)
 
     # face
     c.part(line=False)
