@@ -232,7 +232,7 @@ public partial class TotStackBoss : BossFighter
 public partial class StrongmanBoss : BossFighter
 {
     protected override string Cast => "strongman";
-    protected override float DrawScale => 1.22f;
+    protected override float DrawScale => 1.06f;
     public override float BodyHeight => 2.6f * Big;
     public override float BodyHalfWidth => 0.95f * Big;
     protected override float ReachScale => 1.45f * Big;

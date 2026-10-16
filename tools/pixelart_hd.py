@@ -447,3 +447,46 @@ def touches_border(c):
             if c.mat[y][x] and (x < 2 or y < 2 or x >= c.w - 2 or y >= c.h - 2):
                 return True
     return False
+
+
+# ------------------------------------------------------------------ packing
+
+def pack_frames(frames_px, normals_px, fw, fh, max_w=4096, pad=2):
+    """Trim every frame to the pixels it uses and shelf-pack them, in order,
+    into a sheet no wider than max_w (GPUs cap a texture's side, 16384 on most;
+    4096 is safe everywhere). The normal maps are packed identically.
+
+    Returns (sheet_w, sheet_h, rows, normal_rows, rects): each rect is
+    [x, y, w, h, ox, oy], the frame's place on the sheet and the offset of that
+    trimmed box inside the full fw x fh frame, which the game adds back as a
+    margin, so every frame still stands exactly where it did."""
+    boxes = []
+    for px in frames_px:
+        ys = [y for y in range(fh) if any(p[3] for p in px[y])]
+        if not ys:
+            boxes.append((0, 0, 1, 1))
+            continue
+        xs = [x for x in range(fw) if any(px[y][x][3] for y in ys)]
+        boxes.append((min(xs), min(ys), max(xs) - min(xs) + 1, ys[-1] - ys[0] + 1))
+    rects, x, y, shelf_h, sheet_w = [], pad, pad, 0, 0
+    for (bx, by, bw, bh) in boxes:
+        if x + bw + pad > max_w:
+            x, y, shelf_h = pad, y + shelf_h + pad, 0
+        rects.append([x, y, bw, bh, bx, by])
+        x += bw + pad
+        shelf_h = max(shelf_h, bh)
+        sheet_w = max(sheet_w, x)
+    sheet_h = y + shelf_h + pad
+
+    def blit(src_list):
+        canvas = [bytearray(sheet_w * 4) for _ in range(sheet_h)]
+        for src, (sx, sy, bw, bh, bx, by) in zip(src_list, rects):
+            for r in range(bh):
+                row = src[by + r]
+                line = canvas[sy + r]
+                for c in range(bw):
+                    p = row[bx + c]
+                    o = (sx + c) * 4
+                    line[o:o + 4] = bytes(p)
+        return canvas
+    return sheet_w, sheet_h, blit(frames_px), blit(normals_px), rects

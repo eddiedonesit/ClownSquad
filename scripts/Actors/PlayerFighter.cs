@@ -44,6 +44,7 @@ public partial class PlayerFighter : Fighter
 
     // A ranged weapon fires once per combo step.
     private bool _fired;
+    private bool _trailDone;      // the swing's smear has been drawn this step
 
     // Air moves (players only): one extra jump and one dash per time in the air,
     // and a slam (down + attack in the air) that dives and shocks the ground.
@@ -294,6 +295,17 @@ public partial class PlayerFighter : Fighter
     }
 
     private bool IsPowerHit => _comboIndex == System.Math.Min(PowerHit, Combo.Length - 1);
+
+    /// <summary>The swing for this hit of the combo; sheets drawn before the per-hit swings use "attack" for all.</summary>
+    private string SwingClip
+    {
+        get
+        {
+            if (IsPowerHit) return "attack";
+            string clip = _comboIndex % 2 == 0 ? "attack1" : "attack2";
+            return Has(clip) ? clip : "attack";
+        }
+    }
     private bool _powerFxDone;
 
     /// <summary>The third hit lands: it should feel like the big one.</summary>
@@ -510,6 +522,7 @@ public partial class PlayerFighter : Fighter
         _phaseTime = 0f;
         _hitThisSwing.Clear();
         _impactSpawned = false;
+        _trailDone = false;
         _fired = false;
         _powerFxDone = false;
         _kaboomed = false;
@@ -573,13 +586,23 @@ public partial class PlayerFighter : Fighter
         }
 
         // Pin the swing frame to the phase, so the visible swing is the hitbox.
+        // Each hit of the combo has its own swing: a swipe, an uppercut, then
+        // the overhead power hit (follow-ups alternate the first two).
         if (!InHitAnim)
         {
             int frame = _phaseTime < step.Startup * 0.5f ? 0
                       : _phaseTime < activeStart ? 1
                       : _phaseTime < activeStart + step.Active * 0.5f ? 2
                       : 3;
-            PinClipFrame("attack", frame);
+            PinClipFrame(SwingClip, frame);
+        }
+
+        // The smear: as the hit window opens, a crescent behind the weapon (squad only, melee only).
+        if (!_trailDone && _phaseTime >= activeStart && !Hostile && HasMalletMoves && !_weapon.Ranged)
+        {
+            _trailDone = true;
+            string trail = SwingClip switch { "attack1" => "swipe", "attack2" => "rise", _ => "arc" };
+            SwingTrail.Spawn(this, trail, 1.15f * step.Range / 1.9f * (IsPowerHit ? 1.15f : 1f), trail == "swipe" ? 0.8f : 0.62f);
         }
 
         if (_weapon.Ranged && HasMalletMoves)
@@ -1052,6 +1075,7 @@ public partial class PlayerFighter : Fighter
     {
         _flipTime += dt;
         bool striking = _flipTime >= 0.12f && _flipTime < 0.28f;
+        if (striking && _flipTime - dt < 0.12f) SwingTrail.Spawn(this, "thrust", 1.6f, 0.55f);
         ApplyGroundMovement(striking ? Facing * 7f : Vector3.Zero, dt);       // drives forward as it strikes
         PinClipFrame("attack", _flipTime < 0.12f ? 1 : 3);
         if (striking)
@@ -1118,7 +1142,7 @@ public partial class PlayerFighter : Fighter
         PinClipFrame("attack", 3);
         if (t < dash)
         {
-            if (t - dt < 0f) { Fx.Sound("whoosh", 1.3f); Dust(0.4f); }
+            if (t - dt < 0f) { Fx.Sound("whoosh", 1.3f); Dust(0.4f); SwingTrail.Spawn(this, "thrust", 1.6f, 0.55f); }
             Velocity = new Vector3(Facing.X * LungeSpeed, Velocity.Y, 0f);
             foreach (Fighter other in Opponents())
             {

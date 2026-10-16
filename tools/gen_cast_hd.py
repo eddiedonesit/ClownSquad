@@ -3,8 +3,8 @@
 One flexible humanoid rig draws most of them: body build, outfit pattern,
 face, hair, hat, legs (feet, stilts or a unicycle), and whatever they hold
 (pins, torches, a whip and chair, a barbell, balloons, a cane), posed by
-shoulder and elbow angles. A quadruped rig draws the tiger and the pony; the
-balloon dog, the clown car and the ringmaster's carriage are drawn by hand.
+shoulder and elbow angles. The tiger has a rig of its own; the balloon dog,
+the clown car and the ringmaster's carriage are drawn by hand.
 
 Every sheet has the clips the game expects: idle, walk, attack (4 frames, in
 step with the swing), hit, down, air, plus each character's specials. Same
@@ -561,110 +561,170 @@ def star_in(dx, dy, r):
     return d < edge
 
 
-# ----------------------------------------------------------- quadrupeds
+# ----------------------------------------------------------- the tiger
 
-class Beast:
-    """Tiger and pony: a body, four legs, a head and a tail, in profile."""
+class Tiger:
+    """RAJAH, in profile, facing right: drawn the way a tiger is built.
+
+    A long, low body (about twice as long as it is tall at the shoulder), a
+    deep chest under a shoulder hump, the hips a touch higher than the back,
+    heavy forelegs on big round paws, hind legs bent back at the hock, and a
+    tail nearly as long as the body, ringed, with a black tip. A broad head:
+    white cheek ruff, white muzzle and brows, small round ears, amber eyes.
+    Stripes are dark wedges that start thick at the spine and taper down the
+    flanks, wrapping the haunch and the legs; the belly is white."""
 
     def __init__(self, spec):
         self.s = spec
         self.k = spec.get("k", 1.0)
-        self.W = int(spec.get("cw", 300) * self.k)
-        self.H = int(spec.get("ch", 200) * self.k)
-        self.base = self.H - int(26 * self.k)
+        self.W = int(spec.get("cw", 320) * self.k)
+        self.H = int(spec.get("ch", 190) * self.k)
+        self.base = self.H - int(22 * self.k)
 
     def canvas(self):
-        return HDCanvas(self.W, self.H, self.W // 2, self.base)
+        return HDCanvas(self.W, self.H, self.W // 2 + int(6 * self.k), self.base)
 
     def draw(self, p):
-        k, s = self.k, self.s
+        k = self.k
         c = self.canvas()
-        tiger = s.get("kind") == "tiger"
-        leg = 22 * k * s.get("leg", 1.0)
-        body_len = 44 * k * s.get("body", 1.0)
-        by = -leg - 14 * k + p.get("by", 0) * k
-        crouch = p.get("crouch", 0) * k
-        by += crouch
-        stretch = p.get("stretch", 1.0)
-        hx, hy = body_len * 0.5 * stretch, by - 4 * k + p.get("head_dy", 0) * k     # shoulders
-        rx = -body_len * 0.5 * stretch                                            # haunch x
-        # tail
-        c.part(far=True)
+        st = p.get("stretch", 1.0)
+        by = (-50 + p.get("by", 0) + p.get("crouch", 0)) * k        # the body's centre line
+        sx, sy = 30 * st * k, by - 2 * k                              # the chest
+        hx = -40 * st * k                                             # the hip
+        top = by - 22 * k                                             # the line of the back
+
+        def body_stripes(x, y, m):
+            if m != FUR:
+                return m
+            v = (y - top) / (40 * k)                                  # 0 at the spine, 1 at the belly
+            for i, x0 in enumerate(range(-62, 44, 9)):
+                cx = (x0 * st + 3 * math.sin(i * 2.3) - 5 * v) * k
+                w = (2.9 - 2.0 * v) * k * (0.8 if i % 3 == 1 else 1.0)
+                stop = 0.62 + 0.18 * ((i * 7) % 3) / 2
+                if v < stop and abs(x - cx - math.sin(v * 5 + i) * 1.5 * k) < w:
+                    return STRIPE
+            return m
+
+        # tail: a long sweep from the rump, ringed, with a black tip
         t = p.get("tail", 0)
-        c.stroke(bezier((rx - 6 * k, by - 4 * k), (rx - 30 * k, by - 20 * k + t * k), (rx - 44 * k, by - 34 * k + t * k), 10), 3 * k, FUR)
-        if tiger:
-            c.recolor(lambda x, y, m: STRIPE if math.floor(x / (5 * k)) % 3 == 0 else m)
+        pts = bezier((hx - 16 * k, by - 12 * k), (hx - 56 * k, by - 6 * k + t * k), (hx - 70 * k, by - 40 * k + t * 1.4 * k), 14)
+        c.part(far=True)
+        for i, (a, b) in enumerate(zip(pts, pts[1:])):
+            r = (5.2 - 2.0 * i / len(pts)) * k
+            c.capsule(a[0], a[1], b[0], b[1], r, r - 0.15 * k, STRIPE if i >= len(pts) - 3 or i % 3 == 2 else FUR)
+
         # far legs
-        for (lx, phase) in ((hx - 6 * k, p.get("ff", 0)), (rx + 6 * k, p.get("bf", 0))):
-            self.limb(c, lx, by + 8 * k, phase, p.get("lift_f", 0), leg, True)
-        # body
+        self.foreleg(c, sx - 8 * k, by, p.get("ff", 0), p.get("lift_f", 0), True)
+        self.hindleg(c, hx - 4 * k, by, p.get("bf", 0), p.get("lift_f", 0), True)
+
+        # body: haunch, belly, chest and the shoulder hump as one shape
         c.part()
-        c.ellipse(0, by, body_len * 0.62 * stretch, 16 * k, FUR)
-        c.ellipse(hx - 4 * k, by - 2 * k, 17 * k, 17 * k, FUR)
-        c.ellipse(rx + 6 * k, by - 1 * k, 15 * k, 15 * k, FUR)
-        c.recolor(lambda x, y, m: BELLY if y > by + 7 * k else m)
-        if tiger:
-            c.recolor(lambda x, y, m: STRIPE if m == FUR and (math.floor((x + (y - by) * 0.4) / (7 * k)) % 2 == 0) and abs((x + (y - by) * 0.4) % (7 * k)) < 2.5 * k else m)
-        if s.get("saddle"):
-            c.part()
-            c.ellipse(0, by - 13 * k, 14 * k, 5 * k, CART)
-            c.recolor(lambda x, y, m: CART2 if abs(y - (by - 13 * k)) < 1.2 * k else m)
+        c.poly([(hx - 2 * k, top + 1 * k), (sx, top - 2 * k), (sx + 4 * k, by + 18 * k), (hx, by + 16 * k)], FUR)
+        c.ellipse(0, by + 3 * k, 46 * st * k, 17 * k, FUR)
+        c.ellipse(sx, sy, 24 * k, 22 * k, FUR)
+        c.ellipse(sx - 4 * k, top + 6 * k, 16 * k, 9 * k, FUR)
+        c.ellipse(hx, by - 2 * k, 22 * k, 21 * k, FUR)
+        c.recolor(lambda x, y, m: BELLY if (y > by + 11 * k and x > hx + 6 * k) or (x > sx + 12 * k and y > sy + 2 * k) else m)
+        c.recolor(body_stripes)
+        # the haunch: stripes curve round it
+        c.recolor(lambda x, y, m: STRIPE if m == FUR and ((x - hx) ** 2 + (y - by) ** 2) < (19 * k) ** 2
+                  and abs(math.hypot(x - hx - 6 * k, y - by + 2 * k) % (8 * k) - 4 * k) < 1.3 * k and x < hx + 8 * k else m)
+
         # near legs
-        for (lx, phase) in ((hx - 2 * k, p.get("nf", 0)), (rx + 10 * k, p.get("nb", 0))):
-            self.limb(c, lx, by + 10 * k, phase, p.get("lift_n", 0), leg, False)
+        self.hindleg(c, hx + 2 * k, by, p.get("nb", 0), p.get("lift_n", 0), False)
+        self.foreleg(c, sx - 2 * k, by, p.get("nf", 0), p.get("lift_n", 0), False)
+
         # head
         ha = p.get("head_ang", 0)
-        hcx, hcy = hx + 16 * k + math.sin(rad(ha)) * 4 * k, hy - 14 * k - p.get("head_up", 0) * k
-        if not tiger:   # the pony's neck
-            c.part()
-            c.capsule(hx, hy, hcx - 2 * k, hcy + 4 * k, 9 * k, 7 * k, FUR)
-            c.part()
-            c.stroke(bezier((hx - 4 * k, hy - 8 * k), (hcx - 10 * k, hcy - 10 * k), (hcx - 4 * k, hcy - 12 * k)), 3.5 * k, HAIR)
+        hcx = sx + 30 * k + math.sin(rad(ha)) * 3 * k
+        hcy = by - 18 * k - p.get("head_up", 0) * k + p.get("head_dy", 0) * k
+        angry = p.get("angry")
+        k = self.k * 1.3                                              # a big cat's big head
+        # ears: small and round, flattened back when angry
+        ex, ey = (hcx - 10 * k, hcy - 11 * k) if angry else (hcx - 6 * k, hcy - 15 * k)
         c.part()
-        if tiger:
-            c.ellipse(hcx, hcy, 14 * k, 13 * k, FUR)
-            c.ellipse(hcx + 11 * k, hcy + 4 * k, 8 * k, 6.5 * k, BELLY)
-            c.recolor(lambda x, y, m: STRIPE if m == FUR and abs((y - hcy + 10 * k) % (6 * k)) < 1.6 * k and x < hcx + 6 * k else m)
-            for ex in (-6, 4):
-                c.part()
-                c.ellipse(hcx + ex * k, hcy - 12 * k, 4.5 * k, 5 * k, FUR)
+        c.ellipse(ex, ey, 6 * k, 5 * k if angry else 6.5 * k, FUR)
+        c.recolor(lambda x, y, m: STRIPE if (x - ex) ** 2 + (y - ey) ** 2 > (4.6 * k) ** 2 else m)
+        c.part(line=False)
+        c.ellipse(ex + 1 * k, ey + 1 * k, 3 * k, 3.4 * k, BELLY)
+        # the white cheek ruff, flaring back, with its own stripes
+        c.part()
+        c.poly([(hcx - 6 * k, hcy - 4 * k), (hcx - 22 * k, hcy + 4 * k), (hcx - 14 * k, hcy + 8 * k), (hcx - 20 * k, hcy + 14 * k),
+                (hcx - 6 * k, hcy + 18 * k), (hcx + 6 * k, hcy + 12 * k)], BELLY)
+        c.recolor(lambda x, y, m: STRIPE if abs(((x - hcx) * 0.8 + (y - hcy)) % (7 * k) - 3.5 * k) < 1.0 * k and x < hcx - 12 * k else m)
+        # skull and nose bridge
+        c.part()
+        c.ellipse(hcx, hcy, 16 * k, 14.5 * k, FUR)
+        c.capsule(hcx + 2 * k, hcy - 3 * k, hcx + 21 * k, hcy + 0 * k, 7 * k, 5 * k, FUR)
+        c.recolor(lambda x, y, m: STRIPE if y < hcy - 6 * k and abs((y - hcy + 15 * k) % (4.5 * k) - 2.2 * k) < 0.9 * k
+                  and hcx - 9 * k < x < hcx + 5 * k else m)                     # the forehead's bars
+        c.recolor(lambda x, y, m: STRIPE if hcx - 14 * k < x < hcx - 4 * k and abs(((x - hcx) * 0.5 - (y - hcy)) % (6 * k) - 3 * k) < 0.9 * k
+                  and y > hcy - 4 * k else m)                                   # down the side of the face
+        # white muzzle and chin
+        c.part()
+        c.ellipse(hcx + 15 * k, hcy + 5 * k, 10 * k, 7.5 * k, BELLY)
+        mouth_open = p.get("mouth") == "open"
+        if mouth_open:
+            c.part()
+            c.ellipse(hcx + 15 * k, hcy + 12 * k, 9 * k, 6.5 * k, MOUTH)
+            for fx in (10, 19):                                       # fangs, top and bottom
+                c.part(line=False)
+                c.poly([(hcx + fx * k, hcy + 7 * k), (hcx + (fx + 2.6) * k, hcy + 7 * k), (hcx + (fx + 1.3) * k, hcy + 12 * k)], TOOTH)
+            c.part()
+            c.ellipse(hcx + 12 * k, hcy + 19 * k, 8 * k, 3.6 * k, BELLY)       # the dropped jaw
+            c.part(line=False)
+            c.poly([(hcx + 15 * k, hcy + 17 * k), (hcx + 17.5 * k, hcy + 17 * k), (hcx + 16.2 * k, hcy + 13 * k)], TOOTH)
         else:
-            c.ellipse(hcx, hcy, 9 * k, 9 * k, FUR)
-            c.capsule(hcx, hcy, hcx + 12 * k, hcy + 6 * k, 7 * k, 5.5 * k, FUR)
             c.part()
-            c.ellipse(hcx - 2 * k, hcy - 10 * k, 3 * k, 5 * k, FUR)
-            c.part()
-            c.ellipse(hcx - 4 * k, hcy - 10 * k, 4 * k, 3.5 * k, ACCENT)   # a plume
-        # face
+            c.ellipse(hcx + 11 * k, hcy + 12 * k, 8 * k, 4 * k, BELLY)
+            c.part(line=False)
+            c.stroke([(hcx + 9 * k, hcy + 9.5 * k), (hcx + 15 * k, hcy + 10.5 * k), (hcx + 22 * k, hcy + 8 * k)], 0.7 * k, INK)
+        # nose, whisker spots
+        c.part()
+        c.poly([(hcx + 21 * k, hcy - 2 * k), (hcx + 26.5 * k, hcy - 1.5 * k), (hcx + 25 * k, hcy + 2.5 * k), (hcx + 22 * k, hcy + 2 * k)], NOSE)
+        for wx, wy in ((13, 3), (16, 4), (19, 3), (14.5, 6), (17.5, 6.5)):
+            c.part(line=False)
+            c.ellipse(hcx + wx * k, hcy + wy * k, 0.7 * k, 0.7 * k, STRIPE)
+        # white brow, amber eye, black liner
         c.part(line=False)
-        c.ellipse(hcx + 5 * k, hcy - 3 * k, 2.6 * k, 2.8 * k, EYE if not p.get("angry") else FLAME2)
+        c.ellipse(hcx + 6 * k, hcy - 9 * k, 4.5 * k, 2.2 * k, BELLY)
         c.part(line=False)
-        c.ellipse(hcx + 6 * k, hcy - 3 * k, 1.3 * k, 2.2 * k, INK)
+        c.ellipse(hcx + 8 * k, hcy - 4 * k, 3 * k, 2.4 * k if angry else 2.8 * k, ACCENT)
         c.part(line=False)
-        nose_x = hcx + (18 if tiger else 17) * k
-        c.ellipse(nose_x, hcy + 2 * k, 2.5 * k, 2 * k, INK)
-        if p.get("mouth") == "open":
-            c.part()
-            c.ellipse(hcx + 12 * k, hcy + 9 * k, 7 * k, 5 * k, MOUTH)
-            if tiger:
-                for fx in (8, 15):
-                    c.part(line=False)
-                    c.poly([(hcx + fx * k, hcy + 5 * k), (hcx + (fx + 2) * k, hcy + 5 * k), (hcx + (fx + 1) * k, hcy + 9 * k)], TOOTH)
+        c.ellipse(hcx + 9 * k, hcy - 4 * k, 1.4 * k, 1.6 * k, INK)
+        c.part(line=False)
+        c.stroke([(hcx + 11 * k, hcy - 3 * k), (hcx + 14 * k, hcy + 0 * k)], 0.6 * k, INK)
+        if angry:
+            c.part(line=False)
+            c.stroke([(hcx + 3 * k, hcy - 8 * k), (hcx + 11 * k, hcy - 6.2 * k)], 0.9 * k, STRIPE)
         return c
 
-    def limb(self, c, x, y, phase, lift, leg, far):
+    def foreleg(self, c, x, by, phase, lift, far):
         k = self.k
-        fx = x + math.sin(rad(phase)) * 10 * k
+        fx = x + 6 * k + math.sin(rad(phase)) * 14 * k
         fy = -max(0.0, math.cos(rad(phase))) * lift * k
+        ex, ey = x + 1 * k + math.sin(rad(phase)) * 5 * k, by + 18 * k
         c.part(far=far)
-        c.capsule(x, y, fx, fy - 4 * k, 6.5 * k, 5 * k, FUR)
-        if self.s.get("kind") == "tiger":
-            c.recolor(lambda xx, yy, m: STRIPE if math.floor(yy / (6 * k)) % 3 == 0 else m)
+        c.capsule(x, by + 2 * k, ex, ey, 11 * k, 8.5 * k, FUR)
+        c.capsule(ex, ey, fx, fy - 6 * k, 8.5 * k, 6.5 * k, FUR)
+        c.recolor(lambda xx, yy, m: STRIPE if yy < -14 * k and abs((yy + 40 * k) % (8 * k) - 4 * k) < 1.1 * k and xx < ex + 2 * k else m)
         c.part(far=far)
-        if self.s.get("kind") == "tiger":
-            c.ellipse(fx + 2 * k, fy - 3 * k, 6.5 * k, 3.5 * k, FUR)
-        else:
-            c.ellipse(fx + 1 * k, fy - 2.5 * k, 4.5 * k, 3 * k, SOLE)
+        c.ellipse(fx + 3 * k, fy - 4 * k, 8.5 * k, 4.6 * k, BELLY if not far else FUR)
+
+    def hindleg(self, c, x, by, phase, lift, far):
+        k = self.k
+        sw = math.sin(rad(phase))
+        fx = x + sw * 14 * k
+        fy = -max(0.0, math.cos(rad(phase))) * lift * k
+        kx, ky = x + 10 * k + sw * 4 * k, by + 16 * k                  # knee, forward
+        hx, hy = fx - 7 * k, fy - 15 * k                                # hock, back
+        c.part(far=far)
+        c.capsule(x, by, kx, ky, 15 * k, 9 * k, FUR)
+        c.capsule(kx, ky, hx, hy, 8.5 * k, 6 * k, FUR)
+        c.capsule(hx, hy, fx, fy - 5 * k, 6 * k, 5.5 * k, FUR)
+        c.recolor(lambda xx, yy, m: STRIPE if by + 6 * k < yy < -10 * k and abs((yy - xx * 0.4) % (8 * k) - 4 * k) < 1.1 * k else m)
+        c.part(far=far)
+        c.ellipse(fx + 2 * k, fy - 3.6 * k, 7.5 * k, 4 * k, BELLY if not far else FUR)
 
 
 # ------------------------------------------------------------ hand-drawn
@@ -696,120 +756,296 @@ def balloon_dog(p, k=1.0):
     return c
 
 
+def car_clown(c, fx, fy, r, hair, hat, face=1, squish=1.0, o=False):
+    """One clown head crammed into the car: the puff, white muzzle, red nose, a hat."""
+    c.part(far=False)
+    stamp_hair(c, HAIR_BACK, fx, fy, r, material=hair, mirror=face < 0)
+    c.part()
+    c.ellipse(fx, fy, r, r * squish, SKIN)
+    c.recolor(lambda x, y, m: WHITE if ((x - fx - face * r * 0.4) / (r * 0.5)) ** 2 + ((y - fy - r * 0.55 * squish) / (r * 0.35)) ** 2 <= 1 else m)
+    c.part()
+    c.ellipse(fx + face * r * 0.92, fy + r * 0.15, r * 0.36, r * 0.36, NOSE)
+    for ex in ((0.3, 0.62) if o else (0.35,)):
+        c.part(line=False)
+        c.ellipse(fx + face * r * ex, fy - r * 0.25, r * 0.16, r * 0.26, INK)
+    c.part(line=False)
+    if o:
+        c.ellipse(fx + face * r * 0.45, fy + r * 0.62 * squish, r * 0.2, r * 0.22, MOUTH)
+    else:
+        c.stroke(bezier((fx + face * r * 0.1, fy + r * 0.5), (fx + face * r * 0.5, fy + r * 0.9), (fx + face * r * 0.9, fy + r * 0.5)), r * 0.1, LIP)
+    if hat == "cone":
+        c.part()
+        c.poly([(fx - r * 0.8, fy - r * 0.7), (fx + r * 0.8, fy - r * 0.7), (fx - face * r * 0.3, fy - r * 3.0)], HATC)
+        c.recolor(lambda x, y, m: ACCENT if math.floor((y - fy) / (r * 0.4)) % 2 == 0 else m)
+        c.part()
+        c.ellipse(fx - face * r * 0.3, fy - r * 3.0, r * 0.32, r * 0.32, WHITE)
+    elif hat == "derby":
+        c.part()
+        c.ellipse(fx, fy - r * 0.75, r * 1.15, r * 0.25, BLACK)
+        c.ellipse(fx, fy - r * 1.05, r * 0.7, r * 0.55, BLACK)
+        c.recolor(lambda x, y, m: NOSE if abs(y - (fy - r * 0.85)) < r * 0.1 else m)
+
+
 def clown_car(p, k=1.0):
-    W, H = int(370 * k), int(240 * k)
-    c = HDCanvas(W, H, W // 2 + int(14 * k), H - int(16 * k))
+    """THE JALOPY: a tiny round bubble car (the circus kind, an old Fiat or
+    Isetta made smaller still) with clowns crammed into every opening: one
+    at the wheel, one up through the sunroof, one squashed at the side window,
+    a pair of big shoes kicking out of the back. Polka-dot paint, mismatched
+    wheels, a bulb horn, a googly headlamp and a flower on a spring aerial."""
+    W, H = int(370 * k), int(250 * k)
+    c = HDCanvas(W, H, W // 2 + int(6 * k), H - int(16 * k))
     by = p.get("by", 0) * k
     sq = p.get("squash", 0)
-    wheel_r = 26 * k
     spin = p.get("wheel", 0)
-    # body
-    c.part()
-    c.poly([(-120 * k, -40 * k + by), (-110 * k, -84 * k + by), (-70 * k, -92 * k + by), (-56 * k, -130 * k + by),
-            (40 * k, -132 * k + by), (66 * k, -92 * k + by), (118 * k, -86 * k + by), (126 * k, -44 * k + by),
-            (116 * k, -28 * k + by), (-112 * k, -26 * k + by)], CART)
-    c.recolor(lambda x, y, m: CART2 if abs(y - (-58 * k + by)) < 4 * k else m)
-    # windows
-    for (x0, x1) in ((-60, -10), (-2, 46)):
-        c.part()
-        c.poly([(x0 * k, -96 * k + by), (x1 * k, -96 * k + by), (x1 * k - 6 * k, -126 * k + by), (x0 * k + 6 * k, -126 * k + by)], BELLY)
-    # a clown squeezed into every window, hats poking through the roof
-    for i, wx in enumerate((-35, 22)):
-        if not p.get("faces", True):
-            break
-        fx, fy = wx * k, -108 * k + by - (i * 2 + (p.get("door", 0) > 0) * 3) * k
-        c.part()
-        c.ellipse(fx, fy, 12 * k, 12 * k, SKIN)
-        c.recolor(lambda x, y, m, fx=fx, fy=fy: WHITE if ((x - fx - 5 * k) / (6 * k)) ** 2 + ((y - fy - 7 * k) / (4 * k)) ** 2 <= 1 else m)
-        c.part()
-        c.ellipse(fx - 11 * k, fy - 1 * k, 5 * k, 7 * k, HAIR if i == 0 else ACCENT)
-        c.part()
-        c.ellipse(fx + 11 * k, fy + 2 * k, 4.5 * k, 4.5 * k, NOSE)
-        c.part(line=False)
-        c.ellipse(fx + 4 * k, fy - 3 * k, 2.2 * k, 3.2 * k, INK)
-        c.part(line=False)
-        c.stroke(bezier((fx + 1 * k, fy + 7 * k), (fx + 6 * k, fy + 11 * k), (fx + 11 * k, fy + 7 * k)), 1.2 * k, LIP)
-        c.part()
-        c.poly([(fx - 10 * k, fy - 9 * k), (fx + 10 * k, fy - 9 * k), (fx - 1 * k, fy - 40 * k)], SHOE if i == 0 else HATC)
-        c.recolor(lambda x, y, m: ACCENT if math.floor(y / (5 * k)) % 2 == 0 else m)
-    # door (opens)
     door = p.get("door", 0)
-    c.part()
-    if door <= 0:
-        c.poly([(-10 * k, -34 * k + by), (40 * k, -34 * k + by), (40 * k, -92 * k + by), (-10 * k, -92 * k + by)], CART)
-        c.recolor(lambda x, y, m: CART2 if abs(x - 34 * k) < 2 * k and abs(y - (-66 * k + by)) < 3 * k else m)
-    else:
-        c.poly([(40 * k, -34 * k + by), (40 * k + 40 * k * door, -40 * k + by), (40 * k + 40 * k * door, -96 * k + by), (40 * k, -92 * k + by)], CART)
+    faces = p.get("faces", True)
+    yb = lambda y: (y * (1 - sq * 0.6)) * k + by                    # body heights squash down onto the wheels
+
+    # the flower on its spring aerial, behind everything
+    c.part(far=True)
+    zz = [(-82 * k + (3 * k if i % 2 else -3 * k), yb(-78 - i * 9)) for i in range(7)]
+    c.stroke(zz, 1.2 * k, METAL)
+    flx, fly = zz[-1][0] - 2 * k, zz[-1][1] - 8 * k
+    for a in range(5):
         c.part()
-        c.poly([(-10 * k, -34 * k + by), (40 * k, -34 * k + by), (40 * k, -92 * k + by), (-10 * k, -92 * k + by)], BLACK)
-    # bumpers, lamp, horn
+        ang = a / 5 * math.tau + spin * 0.02
+        c.ellipse(flx + math.cos(ang) * 6 * k, fly + math.sin(ang) * 6 * k, 4.5 * k, 4.5 * k, NOSE)
     c.part()
-    c.ellipse(124 * k, -38 * k + by, 9 * k, 7 * k, METAL)
+    c.ellipse(flx, fly, 3.6 * k, 3.6 * k, GOLD)
+
+    # a clown up through the sunroof: arms flung up, cone hat
+    if faces:
+        c.part()
+        c.capsule(-10 * k, yb(-120), -10 * k, yb(-142), 11 * k, 10 * k, SUIT)
+        c.recolor(lambda x, y, m: ACCENT if math.floor(x / (4 * k)) % 2 == 0 else m)
+        for s in (-1, 1):
+            c.part()
+            c.capsule(-10 * k + s * 8 * k, yb(-140), -10 * k + s * 24 * k, yb(-168 + (4 if p.get("puff") else 0) * s), 4 * k, 3.6 * k, SUIT)
+            c.part()
+            c.ellipse(-10 * k + s * 25 * k, yb(-172 + (4 if p.get("puff") else 0) * s), 5.5 * k, 5.5 * k, WHITE)
+        car_clown(c, -8 * k, yb(-154), 13 * k, HAIR, "cone", o=bool(p.get("puff")))
+
+    # the cabin: a bubble, glass all round
     c.part()
-    c.ellipse(-120 * k, -36 * k + by, 9 * k, 7 * k, METAL)
+    c.ellipse(-6 * k, yb(-96), 66 * k, 44 * k, TRIM)
     c.part()
-    c.ellipse(116 * k, -70 * k + by, 7 * k, 8 * k, FLAME2)
+    c.poly([(26 * k, yb(-90)), (54 * k, yb(-88)), (36 * k, yb(-128)), (14 * k, yb(-132))], BELLY)        # windscreen
     c.part()
-    c.capsule(60 * k, -100 * k + by, 74 * k, -112 * k + by, 3 * k, 6 * k, GOLD)
+    c.ellipse(-24 * k, yb(-106), 28 * k, 20 * k, BELLY)                                             # side window
     c.part()
-    c.ellipse(58 * k, -98 * k + by, 6 * k, 6 * k, BLACK)
-    # exhaust puff
+    c.ellipse(-62 * k, yb(-100), 9 * k, 15 * k, BELLY)                                              # back window
+    if faces:
+        car_clown(c, 32 * k, yb(-108), 12 * k, ACCENT, "derby")                                     # the driver
+        car_clown(c, -24 * k, yb(-103), 13 * k, HAIR, None, squish=0.82, o=True)                    # squashed at the glass
+        c.part()
+        c.ellipse(-42 * k, yb(-94), 6 * k, 6 * k, WHITE)                                            # a glove on the glass
+        # big shoes kicking out of the back window
+        for i, (lx, ly) in enumerate(((-82, -130), (-92, -116))):
+            c.part()
+            c.capsule(-62 * k, yb(-102 + i * 6), lx * k, yb(ly), 4 * k, 4 * k, PANTS)
+            c.recolor(lambda x, y, m: ACCENT if math.floor((x + y) / (4 * k)) % 2 == 0 else m)
+            c.part()
+            c.ellipse(lx * k - 7 * k, yb(ly) - 2 * k, 11 * k, 5.5 * k, SHOE)
+
+    # the body: a fat rounded tub, polka-dotted, with a gold belt line
+    c.part()
+    c.ellipse(0, yb(-62), 106 * k, 32 * k, CART)
+    c.ellipse(76 * k, yb(-52), 42 * k, 24 * k, CART)
+    c.ellipse(-78 * k, yb(-56), 34 * k, 28 * k, CART)
+    c.recolor(lambda x, y, m: CART2 if abs(y - yb(-74)) < 2.5 * k else m)
+    c.recolor(lambda x, y, m: WHITE if m == CART and ((x / k + 11 * (math.floor((y - by) / (22 * k)) % 2)) % 22 - 11) ** 2
+              + (((y - by) / k) % 22 - 11) ** 2 < 24 else m)
+    # the door, opening out to let more clowns out than could possibly fit
+    if door <= 0:
+        c.part(line=True)
+        c.poly([(-6 * k, yb(-36)), (38 * k, yb(-36)), (38 * k, yb(-84)), (-6 * k, yb(-84))], CART)
+        c.recolor(lambda x, y, m: WHITE if ((x / k + 11 * (math.floor((y - by) / (22 * k)) % 2)) % 22 - 11) ** 2
+                  + (((y - by) / k) % 22 - 11) ** 2 < 24 else (CART2 if abs(y - yb(-74)) < 2.5 * k else m))
+        c.part(line=False)
+        c.ellipse(32 * k, yb(-66), 3 * k, 2 * k, GOLD)
+    else:
+        c.part()
+        c.poly([(-6 * k, yb(-36)), (38 * k, yb(-36)), (38 * k, yb(-84)), (-6 * k, yb(-84))], BLACK)
+        if faces:
+            for i in range(3):                                                          # eyes in the dark
+                c.part(line=False)
+                c.ellipse((4 + i * 12) * k, yb(-70 + (i % 2) * 10), 2.5 * k, 3 * k, EYE)
+        c.part()
+        c.poly([(38 * k, yb(-36)), (38 * k + 44 * k * door, yb(-42)), (38 * k + 44 * k * door, yb(-90)), (38 * k, yb(-84))], CART)
+        c.recolor(lambda x, y, m: CART2 if abs(y - yb(-74)) < 2.5 * k else m)
+
+    # bumpers, red and white like a barber's pole
+    for x0, x1 in ((96, 126), (-122, -96)):
+        c.part()
+        c.capsule(x0 * k, yb(-36), x1 * k, yb(-36), 5 * k, 5 * k, WHITE)
+        c.recolor(lambda x, y, m: NOSE if math.floor((x + y) / (5 * k)) % 2 == 0 else m)
+    # googly headlamp
+    c.part()
+    c.ellipse(104 * k, yb(-62), 10 * k, 10 * k, GOLD)
+    c.part(line=False)
+    c.ellipse(105 * k, yb(-62), 7.5 * k, 7.5 * k, EYE)
+    c.part(line=False)
+    look = 2 if p.get("puff") else 0
+    c.ellipse(108 * k, yb(-60 - look), 3.6 * k, 3.6 * k, INK)
+    # bulb horn on the bonnet
+    c.part()
+    c.capsule(70 * k, yb(-82), 90 * k, yb(-92), 2.5 * k, 7 * k, GOLD)
+    c.part()
+    c.ellipse(64 * k, yb(-80), 7 * k if not p.get("puff") else 5.5 * k, 6 * k, NOSE)
+    # exhaust and its puff
+    c.part()
+    c.capsule(-108 * k, yb(-30), -122 * k, yb(-28), 3 * k, 3.5 * k, METAL)
     if p.get("puff"):
         for i in range(3):
             c.part(line=False)
-            c.ellipse(-134 * k - i * 12 * k, -34 * k + by - i * 6 * k, (7 + i * 3) * k, (6 + i * 2) * k, WHITE)
-    # wheels
-    for wx in (-74, 74):
+            c.ellipse(-134 * k - i * 12 * k, yb(-30) - i * 6 * k, (7 + i * 3) * k, (6 + i * 2) * k, WHITE)
+    # wheels: a big one behind, a little one in front, white walls and starry hubs
+    for wx, wr in ((-70, 31), (74, 23)):
+        wr *= k
+        cy = -wr * (1 - sq)
         c.part()
-        c.ellipse(wx * k, -wheel_r * (1 - sq), wheel_r, wheel_r * (1 - sq), BLACK)
+        c.ellipse(wx * k, cy, wr, wr * (1 - sq), BLACK)
         c.part()
-        c.ellipse(wx * k, -wheel_r * (1 - sq), wheel_r * 0.55, wheel_r * 0.55 * (1 - sq), ACCENT)
-        c.recolor(lambda x, y, m, wx=wx: BLACK if ((math.degrees(math.atan2(y + wheel_r, x - wx * k)) - spin) % 60) < 10 else m)
+        c.ellipse(wx * k, cy, wr * 0.68, wr * 0.68 * (1 - sq), WHITE)
         c.part()
-        c.ellipse(wx * k, -wheel_r * (1 - sq), 5 * k, 5 * k, GOLD)
+        c.ellipse(wx * k, cy, wr * 0.5, wr * 0.5 * (1 - sq), CART2)
+        c.recolor(lambda x, y, m, wx=wx, cy=cy: NOSE if ((math.degrees(math.atan2(y - cy, x - wx * k)) - spin * 3) % 72) < 30 else m)
+        c.part()
+        c.ellipse(wx * k, cy, 4.5 * k, 4.5 * k, GOLD)
     if p.get("smoke"):
         for i in range(4):
             c.part(line=False)
-            c.ellipse(-20 * k + i * 18 * k, -150 * k - i * 8 * k, (10 + i * 2) * k, (8 + i * 2) * k, BLACK)
+            c.ellipse(-20 * k + i * 18 * k, yb(-110) - i * 8 * k, (10 + i * 2) * k, (8 + i * 2) * k, BLACK)
     return c
 
 
 def carriage(p, k=1.0):
-    """The Ringmaster's little gilded carriage, pulled by a plumed pony."""
-    W, H = int(380 * k), int(230 * k)
-    c = HDCanvas(W, H, W // 2 - int(30 * k), H - int(18 * k))
-    pony = Beast(dict(kind="pony", k=k * 0.95, fur=(250, 250, 255), hair=(220, 120, 200), accent=(250, 200, 80), saddle=True,
-                      leg=1.1))
+    """The Ringmaster's chariot: no horse, no dog, just the carriage, a little
+    gilded circus parade wagon that rolls itself. A deep open box (he stands
+    in it), a tall carved back panel with a sunburst crest and plumes, a swan
+    neck scroll curling up at the front with a lantern, gold border and a
+    medallion star on the side, a scalloped valance underneath, and sunburst
+    wheels, the back pair bigger than the front."""
+    W, H = int(380 * k), int(250 * k)
+    c = HDCanvas(W, H, W // 2, H - int(18 * k))
     by = p.get("by", 0) * k
-    # the pony, in front
-    pc = pony.draw(dict(ff=p.get("leg", 0), bf=-p.get("leg", 0), nf=-p.get("leg", 0), nb=p.get("leg", 0), lift_f=6, lift_n=6,
-                        by=p.get("pony_by", 0)))
-    paste(c, pc, 62 * k, 0)
-    # shafts
-    c.part()
-    c.capsule(-20 * k, -54 * k + by, 36 * k, -48 * k, 2.4 * k, 2.4 * k, GOLD)
-    # cart body: a scrolled tub
-    if not p.get("broken"):
-        c.part()
-        c.poly([(-90 * k, -40 * k + by), (-20 * k, -40 * k + by), (-8 * k, -64 * k + by), (-14 * k, -96 * k + by),
-                (-30 * k, -86 * k + by), (-86 * k, -86 * k + by), (-100 * k, -104 * k + by), (-104 * k, -64 * k + by)], CART)
-        c.recolor(lambda x, y, m: CART2 if abs(y - (-84 * k + by)) < 2.5 * k or abs(y - (-44 * k + by)) < 2 * k else m)
-        c.part()
-        c.ellipse(-52 * k, -64 * k + by, 12 * k, 12 * k, CART2)
-        c.recolor(lambda x, y, m: CART if ((x + 52 * k) ** 2 + (y + 64 * k - by) ** 2) < (7 * k) ** 2 else m)
-    else:
-        c.part()
-        c.poly([(-90 * k, -30 * k), (-30 * k, -26 * k), (-40 * k, -56 * k), (-96 * k, -60 * k)], CART)
-    wheel_r = 28 * k
     spin = p.get("wheel", 0)
-    for wx in (-56,):
+    broken = p.get("broken")
+    tilt = 0.18 if broken else 0.0
+
+    def P(x, y):
+        """Body points, tipped forward onto the ground when wrecked."""
+        x, y = x * k, y * k
+        if broken:
+            return (x * math.cos(tilt) - (y + 30 * k) * math.sin(tilt), x * math.sin(tilt) + (y + 30 * k) * math.cos(tilt) + 2 * k)
+        return (x, y + by)
+
+    # plumes on the crest, behind
+    if not broken:
+        for i, (dx, col) in enumerate(((-12, ACCENT), (0, HAIR), (12, ACCENT))):
+            c.part(far=True)
+            x0, y0 = P(-92 + dx * 0.4, -150)
+            c.capsule(x0, y0, x0 + dx * k, y0 - (26 - abs(dx)) * k, 4 * k, 6.5 * k, col)
+
+    # the far wheels peek out behind
+    def wheel(wx, wr, far, flat=False):
+        wr *= k
+        if flat:
+            c.part(far=far)
+            c.ellipse(wx * k, -wr * 0.28, wr, wr * 0.28, CART2)
+            c.part(far=far)
+            c.ellipse(wx * k, -wr * 0.28 - 1 * k, wr * 0.75, wr * 0.2, CART)
+            return
+        c.part(far=far)
+        c.ellipse(wx * k, -wr, wr, wr, CART2)
+        c.part(far=far)
+        c.ellipse(wx * k, -wr, wr * 0.8, wr * 0.8, CART)
+        c.recolor(lambda x, y, m, wx=wx, wr=wr: CART2 if ((math.degrees(math.atan2(y + wr, x - wx * k)) - spin) % 30) < 9 else m)
+        c.part(far=far)
+        c.ellipse(wx * k, -wr, wr * 0.26, wr * 0.26, GOLD)
+        c.recolor(lambda x, y, m, wx=wx, wr=wr: CART if (x - wx * k) ** 2 + (y + wr) ** 2 < (wr * 0.1) ** 2 else m)
+
+    if not broken:
+        wheel(-56 + 6, 36, True)
+        wheel(70 + 6, 26, True)
+
+    # the box with its carved back panel and swan-neck front, all one shape
+    c.part()
+    c.poly([P(-104, -40), P(84, -40), P(92, -60), P(88, -94), P(-80, -94), P(-86, -138), P(-98, -150), P(-110, -138), P(-104, -94)], CART)
+    # the swan neck: a scroll rising from the front corner and curling over
+    neck = bezier(P(84, -60), P(116, -84), P(102, -126), 10)
+    c.stroke(neck, 7 * k, CART)
+    cx_, cy_ = P(92, -128)
+    c.ellipse(cx_, cy_, 11 * k, 11 * k, CART)
+    # gold: rims along the top and bottom, a border inset on the side, the crest's edge
+    top, bot = P(0, -94)[1], P(0, -40)[1]
+    c.recolor(lambda x, y, m: CART2 if (not broken and (abs(y - top) < 3 * k or abs(y - bot) < 3 * k
+                                                        or (abs(y - top - 9 * k) < 1.4 * k and -96 * k < x < 76 * k)
+                                                        or (abs(y - bot + 9 * k) < 1.4 * k and -96 * k < x < 76 * k)
+                                                        or (abs(x + 96 * k) < 1.4 * k and top + 9 * k < y < bot - 9 * k)
+                                                        or (abs(x - 76 * k) < 1.4 * k and top + 9 * k < y < bot - 9 * k))) else m)
+    # the scroll's curl: a gold spiral eye
+    c.part()
+    c.ellipse(cx_, cy_, 6 * k, 6 * k, CART2)
+    c.recolor(lambda x, y, m: CART if (x - cx_ + 1 * k) ** 2 + (y - cy_ - 1 * k) ** 2 < (2.6 * k) ** 2 else m)
+    # the crest: a gold sunburst at the top of the back panel
+    sx, sy = P(-98, -134)
+    c.part()
+    c.ellipse(sx, sy, 10 * k, 10 * k, CART2)
+    c.recolor(lambda x, y, m: ACCENT if ((math.degrees(math.atan2(y - sy, x - sx))) % 40) < 14 else m)
+    c.part()
+    c.ellipse(sx, sy, 4 * k, 4 * k, NOSE)
+    # the side medallion: a gold oval with a star
+    mx, my = P(-6, -67)
+    c.part()
+    c.ellipse(mx, my, 20 * k, 16 * k, CART2)
+    c.part()
+    c.ellipse(mx, my, 15.5 * k, 12 * k, HATC)
+    c.recolor(lambda x, y, m: CART2 if star_in((x - mx) / (1.2 * k), (y - my) / k, 10) else m)
+    # gold scrolls either side of the medallion
+    for s in (-1, 1):
         c.part()
-        c.ellipse(wx * k, -wheel_r, wheel_r, wheel_r, CART2)
+        c.stroke(bezier(P(-6 + s * 22, -67), P(-6 + s * 44, -82), P(-6 + s * 62, -66)), 2.2 * k, CART2)
+        x1, y1 = P(-6 + s * 62, -66)
+        c.ellipse(x1, y1 + 2 * k, 3.5 * k, 3.5 * k, CART2)
+    # finials: gold balls on the corners
+    for fx, fy in ((-104, -96), (84, -96)):
+        x0, y0 = P(fx, fy)
         c.part()
-        c.ellipse(wx * k, -wheel_r, wheel_r * 0.8, wheel_r * 0.8, CART)
-        c.recolor(lambda x, y, m, wx=wx: CART2 if ((math.degrees(math.atan2(y + wheel_r, x - wx * k)) - spin) % 45) < 8 else m)
+        c.ellipse(x0, y0 - 4 * k, 4.5 * k, 4.5 * k, GOLD)
+    # the scalloped valance under the box, between the wheels
+    if not broken:
+        for i in range(9):
+            x0, y0 = P(-60 + i * 14, -38)
+            c.part()
+            c.ellipse(x0, y0, 7 * k, 6 * k, ACCENT if i % 2 else HAIR)
+            c.part(line=False)
+            c.ellipse(x0, y0 + 6 * k, 1.6 * k, 2.2 * k, GOLD)
+    # the lantern hung from the swan neck
+    lx, ly = P(108, -94)
+    c.part()
+    c.stroke([P(104, -110), (lx, ly - 6 * k)], 1 * k, GOLD)
+    c.part()
+    c.poly([(lx - 5 * k, ly - 6 * k), (lx + 5 * k, ly - 6 * k), (lx + 4 * k, ly + 7 * k), (lx - 4 * k, ly + 7 * k)], GOLD)
+    c.part(line=False)
+    c.ellipse(lx, ly + 0.5 * k, 2.8 * k, 4.4 * k, FLAME2 if not broken else BLACK)
+    # the near wheels
+    if broken:
+        wheel(-70, 36, False, flat=True)
         c.part()
-        c.ellipse(wx * k, -wheel_r, 5 * k, 5 * k, GOLD)
+        c.ellipse(96 * k, -26 * k, 26 * k, 26 * k, CART2)
+        c.part()
+        c.ellipse(96 * k, -26 * k, 20 * k, 20 * k, CART)
+        c.recolor(lambda x, y, m: CART2 if ((math.degrees(math.atan2(y + 26 * k, x - 96 * k)) + 17) % 30) < 9 else m)
+        for i in range(4):
+            c.part()
+            c.capsule((-30 + i * 22) * k, -3 * k, (-18 + i * 22) * k, -8 * k + (i % 2) * 3 * k, 2.4 * k, 2.4 * k, CART2)
+    else:
+        # the chassis between the axles
+        c.part()
+        c.capsule(-56 * k, -36 * k + by, 70 * k, -26 * k + by, 2.6 * k, 2.6 * k, GOLD)
+        wheel(-56, 36, False)
+        wheel(70, 26, False)
     return c
 
 
@@ -881,7 +1117,8 @@ CAST = {
 }
 
 BEASTS = {
-    "tiger": dict(kind="tiger", k=1.35, fur=(236, 140, 50), stripe=(40, 28, 36), belly=(252, 240, 220)),
+    "tiger": dict(kind="tiger", k=1.2, fur=(238, 132, 40), stripe=(34, 24, 30), belly=(252, 244, 228), nose_col=(214, 120, 118),
+                  accent=(250, 196, 60)),
 }
 
 
@@ -1079,7 +1316,7 @@ def render(name):
         m = mats(CAST[name])
         W, H, base = rig.W, rig.H, rig.base
     elif name in BEASTS:
-        b = Beast(BEASTS[name])
+        b = Tiger(BEASTS[name])
         frames = [(clip, b.draw(p)) for clip, p in beast_clips(name)]
         flat = b.draw(dict(by=8, head_up=-8, tail=-10))
         frames.append(("down", flat))
@@ -1100,8 +1337,9 @@ def render(name):
         m = mats(spec)
         W, H, base = frames[0][1].w, frames[0][1].h, frames[0][1].oy
     elif name == "clowncar":
-        spec = dict(cart=(220, 40, 60), cart2=(252, 210, 80), accent=(80, 200, 230), hat_col=(120, 200, 90),
-                    hair=(250, 140, 60), belly=(170, 220, 250))
+        spec = dict(cart=(226, 52, 66), cart2=(252, 210, 80), accent=(252, 240, 120), hat_col=(120, 200, 90),
+                    hair=(250, 140, 60), belly=(170, 220, 250), trim=(250, 246, 236), suit=(80, 160, 230), pants=(120, 200, 90),
+                    shoe=(230, 60, 70))
         frames = []
         for i in range(4):
             frames.append(("idle", clown_car(dict(by=[0, -2, -3, -2][i], wheel=0))))
@@ -1118,7 +1356,7 @@ def render(name):
         m = mats(spec)
         W, H, base = frames[0][1].w, frames[0][1].h, frames[0][1].oy
     elif name == "carriage":
-        spec = dict(cart=(150, 30, 60), cart2=(252, 204, 72), fur=(250, 250, 255), hair=(220, 120, 200), accent=(250, 200, 80))
+        spec = dict(cart=(160, 28, 52), cart2=(252, 204, 72), hair=(250, 250, 255), accent=(230, 60, 80), hat_col=(40, 60, 140))
         frames = []
         for i in range(4):
             frames.append(("idle", carriage(dict(by=[0, -1, -1, 0][i], pony_by=[0, 1, 1, 0][i]))))

@@ -137,9 +137,12 @@ public partial class ClownHud : CanvasLayer
         ShadowOffset = new Vector2(2f, 3f),
     };
 
+    /// <summary>A head box given in frame coordinates, on a particular sheet (packed sheets store frames trimmed).</summary>
+    private static Rect2 Head(string sheet, Rect2 inFrame) => FrameLibrary.FrameToSheet(sheet, 0, inFrame);
+
     private static TextureRect Face(string sheet, Rect2 region) => new()
     {
-        Texture = new AtlasTexture { Atlas = GD.Load<Texture2D>(sheet), Region = region },
+        Texture = new AtlasTexture { Atlas = GD.Load<Texture2D>(sheet), Region = Head(sheet, region) },
         ExpandMode = TextureRect.ExpandModeEnum.IgnoreSize,
         StretchMode = TextureRect.StretchModeEnum.KeepAspectCentered,
         TextureFilter = CanvasItem.TextureFilterEnum.Nearest,
@@ -389,7 +392,7 @@ public partial class ClownHud : CanvasLayer
             if (_faces[i].Texture is AtlasTexture portrait)
             {
                 string sheet = Roster.Sheet(p.Look);
-                if (portrait.Atlas?.ResourcePath != sheet) portrait.Atlas = GD.Load<Texture2D>(sheet);
+                if (portrait.Atlas?.ResourcePath != sheet) { portrait.Atlas = GD.Load<Texture2D>(sheet); portrait.Region = Head(sheet, ClownHead); }
             }
 
             (Label level, ColorRect xp, Label points) = _progress[i];
@@ -435,8 +438,9 @@ public partial class ClownHud : CanvasLayer
             }
             else
             {
-                at.Atlas = GD.Load<Texture2D>(t is GruntClown ? GruntSheet : PlayerSheet);
-                at.Region = ClownHead;
+                string sheet = t is GruntClown ? GruntSheet : PlayerSheet;
+                at.Atlas = GD.Load<Texture2D>(sheet);
+                at.Region = Head(sheet, ClownHead);
             }
         }
     }
@@ -466,7 +470,7 @@ public partial class ClownHud : CanvasLayer
         if (_bossFace.Texture is AtlasTexture bt)
         {
             if (boss is CastFighter cf) { bt.Atlas = GD.Load<Texture2D>(cf.SheetFile); bt.Region = FaceOf(cf.SheetFile); }
-            else { bt.Atlas = GD.Load<Texture2D>(BossSheet); bt.Region = BossHead; }
+            else { bt.Atlas = GD.Load<Texture2D>(BossSheet); bt.Region = Head(BossSheet, BossHead); }
         }
     }
 

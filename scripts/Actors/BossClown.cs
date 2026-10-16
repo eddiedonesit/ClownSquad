@@ -23,7 +23,9 @@ public partial class BossClown : PlayerFighter, IBoss
 
     // Authored at the same 64px height as the player but rendered larger, so it
     // towers over them without needing a taller canvas.
-    protected override float SpritePixelSize => ArtStyle.Pixel(0.034f);
+    /// <summary>Bertie's size relative to how he was first drawn: 85%, so he dominates without filling the screen.</summary>
+    private const float Size = 0.85f;
+    protected override float SpritePixelSize => ArtStyle.Pixel(0.034f) * Size;
 
     public override bool Hostile => true;
 
@@ -31,11 +33,11 @@ public partial class BossClown : PlayerFighter, IBoss
     public override float AttackPitch => 0.7f;
     public override string HurtSound => "honk_low";
     public override string DeathSound => "kaboom";
-    public override float BodyHeight => 2.25f;
-    public override float BodyHalfWidth => 0.9f;
+    public override float BodyHeight => 2.25f * Size;
+    public override float BodyHalfWidth => 0.9f * Size;
 
     // Its arms and belly cover far more ground than the player's mallet.
-    protected override float ReachScale => 1.45f;
+    protected override float ReachScale => 1.45f * Size;
 
     protected override bool HasMalletMoves => false;
 
@@ -289,8 +291,8 @@ public partial class BossClown : PlayerFighter, IBoss
         _nearFist = MakeFist(sheet);
         _farFist = MakeFist(sheet);
         float f = Facing.X >= 0f ? 1f : -1f;
-        _nearFist.Position = new Vector3(f * 0.72f, 0.85f, 0.14f);
-        _farFist.Position = new Vector3(-f * 0.62f, 0.9f, -0.14f);
+        _nearFist.Position = new Vector3(f * 0.72f, 0.85f, 0.14f) * Size;
+        _farFist.Position = new Vector3(-f * 0.62f, 0.9f, -0.14f) * Size;
     }
 
     private Sprite3D MakeFist(Texture2D sheet)
@@ -318,6 +320,7 @@ public partial class BossClown : PlayerFighter, IBoss
         float bob = Mathf.Sin(_fistClock * 3.1f) * 0.07f;
         float bob2 = Mathf.Sin(_fistClock * 3.1f + 1.7f) * 0.07f;
 
+        bool swinging = false;
         // Resting: one fist just ahead of the belly, one just behind, at the same height.
         Vector3 near = new(f * 0.72f, 0.85f + bob, 0.14f);
         Vector3 far = new(-f * 0.62f, 0.9f + bob2, -0.14f);
@@ -366,6 +369,7 @@ public partial class BossClown : PlayerFighter, IBoss
         }
         else if (TryGetSwing(out int index, out float t, out float startup, out float active, out float reach))
         {
+            swinging = true;
             // Wind back, fling out to land with the hit, hold, reel back in.
             Vector3 wind = new(f * 0.35f, 0.95f, 0.14f);
             Vector3 aim = PunchAim(f, reach);
@@ -387,6 +391,8 @@ public partial class BossClown : PlayerFighter, IBoss
         }
         if (!TryGetSwing(out _, out _, out _, out _, out _)) _whooshedSwing = -1;
 
+        // The poses above are for his old size; a punch already follows his (scaled) reach.
+        if (!swinging) { near *= Size; far *= Size; }
         float k = 1f - Mathf.Exp(-rate * dt);
         _nearFist.Position = _nearFist.Position.Lerp(near, k);
         _farFist.Position = _farFist.Position.Lerp(far, k);

@@ -402,7 +402,7 @@ public partial class BossFighter : CastFighter, IBoss
     /// of being drawn big in their sheets: every boss stands well over the
     /// players. Their sizes and offsets in the code scale with it (Big).
     /// </summary>
-    protected override float DrawScale => 1.35f;
+    protected override float DrawScale => 1.15f;      // was 1.35: still bigger than anyone, without filling the screen
     protected float Big => DrawScale;
 
     /// <summary>Where the sprite sits relative to the body (a rider on a ball, in a carriage).</summary>

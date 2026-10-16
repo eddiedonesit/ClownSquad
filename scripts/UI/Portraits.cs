@@ -20,32 +20,35 @@ public static class Portraits
         if (Cache.TryGetValue(sheet, out Rect2 r)) return r;
         Image img = GD.Load<Texture2D>(sheet).GetImage();
         if (img.IsCompressed()) img.Decompress();
+        FrameLibrary.Load(sheet, ArtStyle.FramesFor(sheet));
         FrameLibrary.SheetInfo info = FrameLibrary.Info(sheet);
-        if (info.FrameWidth <= 64 && info.FrameHeight <= 64)
-        {
-            // Sheet not loaded by a sprite yet: read its frame map ourselves.
-            FrameLibrary.Load(sheet, ArtStyle.FramesFor(sheet));
-            info = FrameLibrary.Info(sheet);
-        }
         // The "hit" pose is the one with nothing in the air above the head (no
         // juggled pins, no raised mallet), so its top is the face. Sheets
-        // without one use their first frame.
-        int ox = 0;
+        // without one use their first frame. Packed sheets store each frame
+        // trimmed somewhere on the sheet: FrameBox says where.
         SpriteFrames frames = FrameLibrary.Load(sheet, ArtStyle.FramesFor(sheet));
-        if (frames.HasAnimation("hit") && frames.GetFrameTexture("hit", 0) is AtlasTexture hit) ox = (int)hit.Region.Position.X;
+        int frame = frames.HasAnimation("hit") ? FrameLibrary.FrameIndex(sheet, "hit") : 0;
+        (Rect2 box, Vector2 off) = FrameLibrary.FrameBox(sheet, frame);
+        int bx = (int)box.Position.X, by = (int)box.Position.Y, bw = (int)box.Size.X, bh = (int)box.Size.Y;
+        // Bounds of the figure, in frame coordinates.
         int x0 = info.FrameWidth, x1 = 0, y0 = info.FrameHeight, y1 = 0;
-        for (int y = 0; y < info.FrameHeight; y += 2)
-            for (int x = 0; x < info.FrameWidth; x += 2)
-                if (img.GetPixel(ox + x, y).A > 0.5f) { x0 = Math.Min(x0, x); x1 = Math.Max(x1, x); y0 = Math.Min(y0, y); y1 = Math.Max(y1, y); }
+        for (int y = 0; y < bh; y += 2)
+            for (int x = 0; x < bw; x += 2)
+                if (img.GetPixel(bx + x, by + y).A > 0.5f)
+                {
+                    int fx = x + (int)off.X, fy = y + (int)off.Y;
+                    x0 = Math.Min(x0, fx); x1 = Math.Max(x1, fx); y0 = Math.Min(y0, fy); y1 = Math.Max(y1, fy);
+                }
         float side = Math.Min(x1 - x0, (y1 - y0) * 0.45f);
         // A little below the very top, so a tall hat does not crowd out the face.
-        r = new Rect2(ox + (x0 + x1) * 0.5f - side * 0.5f, y0 + side * 0.22f, side, side);
+        var inFrame = new Rect2((x0 + x1) * 0.5f - side * 0.5f, y0 + side * 0.22f, side, side);
         // A long figure (a tiger, a car) faces right: its face is at the front end, not the middle.
         if (x1 - x0 > (y1 - y0) * 1.3f)
         {
             side = (y1 - y0) * 0.7f;
-            r = new Rect2(ox + x1 - side, y0, side, side);
+            inFrame = new Rect2(x1 - side, y0, side, side);
         }
+        r = FrameLibrary.FrameToSheet(sheet, frame, inFrame);
         Cache[sheet] = r;
         return r;
     }

@@ -16,7 +16,7 @@ import os
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from pixelart_hd import HDCanvas, Material, shade, to_rows, bezier, rotated, laid_down, crop, touches_border
+from pixelart_hd import HDCanvas, Material, shade, to_rows, bezier, rotated, laid_down, crop, touches_border, pack_frames
 from pixelpng import write_png
 
 BODY_W, BODY_H = 96, 128
@@ -622,8 +622,41 @@ def player_frames():
         # attack: mallet arcs from behind the head, out to 45 degrees, down to ground
         add("attack", draw(old(lean=-3, body_dy=1, near_arm=-6, far_arm=-4, arm_lift=5, mallet=(165, 26))))
         add("attack", draw(old(lean=0, body_dy=-1, near_arm=-2, far_arm=-1, arm_lift=9, mallet=(120, 30))))
-        add("attack", draw(old(lean=3, body_dy=-1, near_arm=6, far_arm=3, arm_lift=5, mallet=(45, 30))))
-        add("attack", draw(old(lean=4, body_dy=1, near_arm=9, far_arm=5, arm_lift=-2, mallet=(0, 26))))
+        add("attack", draw(old(lean=4, body_dy=1, near_arm=8, far_arm=4, arm_lift=3, mallet=(22, 30))))
+        add("attack", draw(old(lean=5, body_dy=3, near_arm=10, far_arm=5, arm_lift=-3, mallet=(-14, 27), near_leg=3, far_leg=-2)))
+
+    # The combo's first two hits get swings of their own; the third, the power
+    # hit, is the overhead "attack" above. Hit 1 is a low swipe swung underhand
+    # from behind; hit 2 a rising uppercut in front.
+    if WEAPON == "popgun":
+        # from the hip, then from the shoulder
+        add("attack1", draw(old(lean=0, body_dy=1, near_arm=8, far_arm=6, arm_lift=3, mallet=(-4, 26))))
+        add("attack1", draw(old(lean=1, body_dy=1, near_arm=9, far_arm=7, arm_lift=3, mallet=(-6, 26))))
+        add("attack1", draw(old(lean=-2, body_dy=1, near_arm=7, far_arm=6, arm_lift=5, mallet=(6, 24))))
+        add("attack1", draw(old(lean=0, body_dy=1, near_arm=8, far_arm=6, arm_lift=3, mallet=(-4, 26))))
+        add("attack2", draw(old(lean=-1, near_arm=7, far_arm=7, arm_lift=11, mallet=(10, 26))))
+        add("attack2", draw(old(lean=0, near_arm=8, far_arm=8, arm_lift=12, mallet=(8, 26))))
+        add("attack2", draw(old(lean=-3, near_arm=6, far_arm=6, arm_lift=13, mallet=(22, 24))))
+        add("attack2", draw(old(lean=-1, near_arm=7, far_arm=7, arm_lift=12, mallet=(10, 26))))
+    elif WEAPON == "pie":
+        # an underhand lob, then a sidearm fling
+        add("attack1", draw(old(lean=-2, body_dy=2, near_arm=-6, far_arm=-3, arm_lift=-2, mallet=(-60, 14))))
+        add("attack1", draw(old(lean=1, body_dy=1, near_arm=2, far_arm=0, arm_lift=0, mallet=(-20, 14))))
+        add("attack1", draw(old(lean=4, body_dy=2, near_arm=13, far_arm=4, arm_lift=-4, mallet=(20, 14))))
+        add("attack1", draw(old(lean=5, body_dy=1, near_arm=14, far_arm=5, arm_lift=-1, mallet=(40, 14))))
+        add("attack2", draw(old(lean=-3, near_arm=-10, far_arm=-5, arm_lift=8, mallet=(170, 14))))
+        add("attack2", draw(old(lean=0, near_arm=0, far_arm=-2, arm_lift=9, mallet=(120, 14))))
+        add("attack2", draw(old(lean=2, body_dy=-1, near_arm=7, far_arm=4, arm_lift=15, mallet=(5, 14))))
+        add("attack2", draw(old(lean=4, near_arm=10, far_arm=5, arm_lift=13, mallet=(-5, 14))))
+    else:
+        add("attack1", draw(old(lean=-2, body_dy=2, near_arm=-7, far_arm=-3, arm_lift=1, near_leg=-2, far_leg=2, mallet=(205, 26))))
+        add("attack1", draw(old(lean=1, body_dy=3, near_arm=0, far_arm=1, arm_lift=-3, mallet=(-95, 27))))
+        add("attack1", draw(old(lean=4, body_dy=2, near_arm=9, far_arm=4, arm_lift=-2, near_leg=4, far_leg=-3, mallet=(-35, 29))))
+        add("attack1", draw(old(lean=5, body_dy=1, near_arm=12, far_arm=5, arm_lift=1, near_leg=5, far_leg=-3, mallet=(-8, 28))))
+        add("attack2", draw(old(lean=3, body_dy=3, near_arm=7, far_arm=3, arm_lift=-4, near_leg=3, far_leg=-2, mallet=(-40, 26))))
+        add("attack2", draw(old(lean=2, body_dy=1, near_arm=10, far_arm=4, arm_lift=2, mallet=(10, 28))))
+        add("attack2", draw(old(lean=-1, body_dy=-2, near_arm=9, far_arm=3, arm_lift=13, mallet=(84, 30))))
+        add("attack2", draw(old(lean=-3, body_dy=-3, near_arm=8, far_arm=2, arm_lift=15, mallet=(96, 30))))
 
     # charge: coiled low with the mallet drawn right back, two frames to shudder
     add("charge", draw(old(body_dy=5, lean=-4, head_dy=1, near_leg=5, far_leg=-5,
@@ -801,15 +834,19 @@ def write_sheet(name, frames, mats):
                 hand_face(px, cv.face, "hit" if clip.endswith("hit") else "")
     shaded = [p for p, _ in both]
     out = os.path.join("assets", "sprites", name + ".png")
-    write_png(out, W * len(shaded), H, to_rows(shaded, W, H))
-    write_png(os.path.join("assets", "sprites", name + "_n.png"), W * len(both), H, to_rows([n for _, n in both], W, H))
+    # Trimmed and packed into rows (pixelart_hd.pack_frames): a one-row strip of
+    # this many 208-wide frames would pass the 16384-pixel texture limit, and
+    # most of every frame is empty padding. rects puts each frame back in place.
+    sw, sh, rows, nrows, rects = pack_frames(shaded, [n for _, n in both], W, H)
+    write_png(out, sw, sh, rows)
+    write_png(os.path.join("assets", "sprites", name + "_n.png"), sw, sh, nrows)
     clips = {}
     for i, (n, _) in enumerate(frames):
         clips.setdefault(n, []).append(i)
-    with open(os.path.join("assets", "sprites", name + ".frames.json"), "w") as f:
+    with open(os.path.join("assets", "sprites", name + ".frames.json"), "w", newline=chr(10)) as f:
         json.dump({"frame_width": W, "frame_height": H, "baseline": BASELINE,
-                   "count": len(shaded), "clips": clips, "fps": FPS}, f, indent=2)
-    print("wrote {} (+ normal map)  {}x{}  {} frames".format(out, W * len(shaded), H, len(shaded)))
+                   "count": len(shaded), "clips": clips, "fps": FPS, "rects": rects}, f, indent=1)
+    print("wrote {} (+ normal map)  {}x{} packed  {} frames ({:.0%} of a strip)".format(out, sw, sh, len(shaded), sw * sh / (W * len(shaded) * H)))
 
 
 # The squad: four clowns, one body, each in their own colours. PIP is MATS as

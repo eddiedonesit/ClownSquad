@@ -1,7 +1,7 @@
 {
  "frame_width": 370,
- "frame_height": 240,
- "baseline": 224,
+ "frame_height": 250,
+ "baseline": 234,
  "count": 20,
  "clips": {
   "idle": [

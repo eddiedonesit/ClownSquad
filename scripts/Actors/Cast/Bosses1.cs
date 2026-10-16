@@ -189,7 +189,7 @@ public partial class TrainerBoss : BossFighter
 public partial class TigerFighter : CastFighter
 {
     protected override string Cast => "tiger";
-    protected override float DrawScale => 1.85f;
+    protected override float DrawScale => 1.6f;
     protected override float ReachScale => 1.7f;
     public override float BodyHeight => 2.0f;
     public override float BodyHalfWidth => 1.3f;
@@ -264,7 +264,7 @@ public partial class TigerFighter : CastFighter
 public partial class ClownCarBoss : BossFighter
 {
     protected override string Cast => "clowncar";
-    protected override float DrawScale => 1.12f;
+    protected override float DrawScale => 1.0f;
     public override float BodyHeight => 2.3f * Big;
     public override float BodyHalfWidth => 1.9f * Big;
     protected override float ReachScale => 1.45f * Big;
