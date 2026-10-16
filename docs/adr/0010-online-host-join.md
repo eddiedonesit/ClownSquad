@@ -38,7 +38,7 @@ machines.
 | 1. Connect | `NetSession` (host, join, hello with protocol version and character, roster, kick, leave, disconnect handling); Title > ONLINE lobby showing everyone's clown, level and weapon, and the host's addresses | Built; `nettest host` + `nettest join` |
 | 2. Play a stage | `RemoteInput`; input RPC (unreliable ordered); host snapshots at 20–30 Hz and `Fx` event forwarding; guest puppet scene (fighters, shots, telegraphs, hazards, HUD, camera) | Built; `nettest host` + `nettest join` play stage 1-1 together |
 | 3. Campaign | Host drives the map; results, XP, gold and loot sent to each guest to save; shops, inventory and skills local, changed record sent back | Built: at each stage's end every guest gets their character back and it is written into the save it came from |
-| 4. Polish | Prediction for the guest's own movement, ping display, latency simulation for testing, host-leaves handling mid-stage | Later |
+| 4. Polish | Prediction for the guest's own movement, ping display, latency simulation for testing, host-leaves handling mid-stage | Built: prediction, ping, `-- lag N`; a host leaving sends guests to the title |
 
 ## Consequences
 
@@ -96,3 +96,18 @@ machines.
 - Only a record with the same name and clown is accepted: a host can add to a guest's character but cannot swap in someone else's.
 - A guest with no save can play, but nothing is kept (the lobby says so).
 - Spending skill points and shopping stay local, between sessions.
+
+## Phase 4 as built (2026-10-16)
+
+**Prediction:**
+- The host tells each guest which fighter is theirs and how fast it walks.
+- While that clown is idle or walking on the host, the guest's screen moves it ahead of the last snapshot by the walking the host has not shown yet, and turns it the moment the stick turns.
+- The lead fades as snapshots catch up (over about one round trip) and is capped at half a second of walking, so a mistaken guess corrects itself quickly.
+
+**Ping:**
+- Guests ping the host once a second.
+- The HUD shows the smoothed round trip, in orange above 150 ms.
+
+**Testing:**
+- `-- lag N` on a guest (debug builds) delays its inputs and the host's snapshots by N ms each way.
+- `nettest join lag 150` passes.

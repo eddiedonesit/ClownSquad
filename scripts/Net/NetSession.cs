@@ -62,6 +62,14 @@ public partial class NetSession : Node
     public event Action<FxEvent>? FxReceived;
     /// <summary>A banner from the host: STAGE CLEAR!, GAME OVER.</summary>
     public event Action<string>? StageResult;
+    /// <summary>The guest's own fighter on the host (its NetRegistry number) and how fast it walks: for prediction.</summary>
+    public int MyFighter { get; private set; }
+    public float MySpeed { get; private set; } = 5f;
+    /// <summary>Round trip to the host, in seconds, smoothed (0 until measured).</summary>
+    public double Rtt { get; private set; }
+    /// <summary>Each-way delay a guest's "-- lag N" test adds (the ping shows it too).</summary>
+    public double SimulatedLag { get; set; }
+    private double _pingAt;
 
     // ---- phase 2 (host side) ----
     private readonly Dictionary<long, RemoteInput> _inputs = new();
@@ -178,6 +186,8 @@ public partial class NetSession : Node
         _inputs.Clear();
         GuestStage = null;
         InStage = false;
+        MyFighter = 0;
+        Rtt = 0;
         Status = "";
         if (was && !quiet) Changed?.Invoke();
     }
@@ -337,6 +347,43 @@ public partial class NetSession : Node
     }
 
     public void SendSnapshot(byte[] data) { if (Mode == Role.Host) Rpc(MethodName.Snapshot, data); }
+
+    /// <summary>Host: tell a guest which fighter is theirs.</summary>
+    public void TellFighter(long peer, int id, float speed)
+    {
+        if (Mode == Role.Host) RpcId(peer, MethodName.YourFighter, id, speed);
+    }
+
+    [Rpc(MultiplayerApi.RpcMode.Authority, TransferMode = MultiplayerPeer.TransferModeEnum.Reliable)]
+    private void YourFighter(int id, float speed)
+    {
+        if (Mode != Role.Guest) return;
+        MyFighter = id;
+        MySpeed = speed;
+    }
+
+    public override void _Process(double delta)
+    {
+        // A guest pings the host once a second: the HUD shows it, prediction leans on it.
+        if (Mode != Role.Guest || _peer is null) return;
+        double now = Time.GetTicksMsec() / 1000.0;
+        if (now - _pingAt < 1.0) return;
+        _pingAt = now;
+        RpcId(1, MethodName.Ping, now);
+    }
+
+    [Rpc(MultiplayerApi.RpcMode.AnyPeer, TransferMode = MultiplayerPeer.TransferModeEnum.UnreliableOrdered, TransferChannel = 4)]
+    private void Ping(double sentAt)
+    {
+        if (Mode == Role.Host) RpcId(_api.GetRemoteSenderId(), MethodName.Pong, sentAt);
+    }
+
+    [Rpc(MultiplayerApi.RpcMode.Authority, TransferMode = MultiplayerPeer.TransferModeEnum.UnreliableOrdered, TransferChannel = 4)]
+    private void Pong(double sentAt)
+    {
+        double rtt = Time.GetTicksMsec() / 1000.0 - sentAt + 2 * SimulatedLag;
+        Rtt = Rtt <= 0 ? rtt : Rtt * 0.7 + rtt * 0.3;
+    }
     public void SendDescribe(int id, int version, byte[] data) { if (Mode == Role.Host) Rpc(MethodName.Describe, id, version, data); }
 
     public void SendFx(FxEvent e)

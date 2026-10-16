@@ -35,6 +35,16 @@ public partial class NetGuestView : Node3D
     private float _camX;
     private Func<InputCommand>? _scripted;
 
+    // Prediction: the guest's own clown is drawn ahead of the last snapshot by
+    // the walking the host has not shown yet, so it answers the stick at once.
+    // The lead fades as snapshots catch up (over about one round trip).
+    private Vector3 _lead;
+    private Vector2 _lastMove;
+    // "-- lag 120" (debug builds): pretend the network adds this many ms each way, to test with.
+    private readonly double _lag;
+    private readonly Queue<(double due, Action act)> _delayed = new();
+    private Action<byte[]>? _onSnapshot;
+
     /// <summary>Snapshots taken in, and the puppets standing right now, for tests.</summary>
     public int Received { get; private set; }
     public int PuppetCount => _puppets.Count;
@@ -49,7 +59,19 @@ public partial class NetGuestView : Node3D
         }
     }
 
-    public NetGuestView(Action<float> camera) => _camera = camera;
+    public NetGuestView(Action<float> camera)
+    {
+        _camera = camera;
+        string[] args = OS.IsDebugBuild() ? OS.GetCmdlineUserArgs() : System.Array.Empty<string>();
+        int at = System.Array.IndexOf(args, "lag");
+        if (at >= 0 && at + 1 < args.Length && double.TryParse(args[at + 1], out double ms)) _lag = ms / 1000.0;
+    }
+
+    private void Later(Action act)
+    {
+        if (_lag <= 0) { act(); return; }
+        _delayed.Enqueue((Time.GetTicksMsec() / 1000.0 + _lag, act));
+    }
 
     /// <summary>Tests drive the guest's clown from a script instead of the keyboard.</summary>
     public void Script(Func<InputCommand> input) => _scripted = input;
@@ -61,7 +83,9 @@ public partial class NetGuestView : Node3D
         AddChild(_hud);
         if (NetSession.Instance is NetSession net)
         {
-            net.SnapshotReceived += OnSnapshot;
+            net.SimulatedLag = _lag;
+            _onSnapshot = b => Later(() => OnSnapshot(b));
+            net.SnapshotReceived += _onSnapshot;
             net.DescribeReceived += OnDescribe;
             net.FxReceived += OnFx;
             net.StageResult += _hud.ShowBanner;
@@ -71,7 +95,8 @@ public partial class NetGuestView : Node3D
     public override void _ExitTree()
     {
         if (NetSession.Instance is not NetSession net) return;
-        net.SnapshotReceived -= OnSnapshot;
+
+        if (_onSnapshot is not null) net.SnapshotReceived -= _onSnapshot;
         net.DescribeReceived -= OnDescribe;
         net.FxReceived -= OnFx;
         net.StageResult -= _hud.ShowBanner;
@@ -95,7 +120,17 @@ public partial class NetGuestView : Node3D
         }
         if (_scripted is not null) Take(_scripted());
         else foreach (LocalDeviceInput d in _devices) Take(d.Poll());
-        net.SendInput(move, held, RemoteInput.Pack(_attacks, _dodges, _jumps, _specials));
+        int counts = RemoteInput.Pack(_attacks, _dodges, _jumps, _specials);
+        Later(() => net.SendInput(move, held, counts));
+        _lastMove = move;
+
+        // Walk the clown ahead on this screen while it is free to walk (idle or walking on the host).
+        float dt = (float)delta;
+        bool free = MyPuppetClip() is string clip && (clip.Contains("walk") || clip.Contains("idle"));
+        if (free) _lead += new Vector3(move.X, 0f, move.Y) * net.MySpeed * dt;
+        float settle = (float)Mathf.Max(net.Rtt + 1.0 / NetHost.Rate, 0.05);
+        _lead *= Mathf.Exp(-dt / (free ? settle : settle * 0.3f));
+        if (_lead.Length() > net.MySpeed * 0.5f) _lead = _lead.Normalized() * net.MySpeed * 0.5f;
     }
 
     // -------------------------------------------------------------- the picture
@@ -174,8 +209,19 @@ public partial class NetGuestView : Node3D
         Fx.Replay(e, GetParent());
     }
 
+    /// <summary>The clip the guest's own clown is showing, from the host.</summary>
+    private string? MyPuppetClip()
+    {
+        if (NetSession.Instance is not { MyFighter: > 0 } net || !_puppets.TryGetValue(net.MyFighter, out Puppet? p)) return null;
+        foreach (Node3D n in p.Nodes) if (n is AnimatedSprite3D s) return s.Animation;
+        return null;
+    }
+
     public override void _Process(double delta)
     {
+        double now = Time.GetTicksMsec() / 1000.0;
+        while (_delayed.Count > 0 && _delayed.Peek().due <= now) _delayed.Dequeue().act();
+        if (NetSession.Instance is NetSession pn) _hud.ShowPing(pn.Rtt);
         // Snapshots come thirty times a second; in between, everything glides
         // the rest of the way, which hides the steps without adding much lag.
         float k = 1f - Mathf.Exp(-22f * (float)delta);
@@ -183,7 +229,19 @@ public partial class NetGuestView : Node3D
         {
             if (!p.Placed || p.Nodes.Count == 0 || !IsInstanceValid(p.Nodes[0])) continue;
             Node3D root = p.Nodes[0];
-            root.GlobalTransform = root.GlobalTransform.InterpolateWith(p.Target, k);
+            bool mine = NetSession.Instance is { MyFighter: > 0 } me && _puppets.TryGetValue(me.MyFighter, out Puppet? own) && own == p;
+            Transform3D target = p.Target;
+            if (mine) target.Origin += _lead;
+            root.GlobalTransform = root.GlobalTransform.InterpolateWith(target, k);
+            // and it turns the moment the stick does
+            if (mine && Mathf.Abs(_lastMove.X) > 0.3f)
+                foreach (Node3D n in p.Nodes)
+                    if (n is AnimatedSprite3D s)
+                    {
+                        bool flip = _lastMove.X < 0f;
+                        s.FlipH = flip;
+                        if (s.MaterialOverride is ShaderMaterial sm && sm.Shader is not null) sm.SetShaderParameter("flip", flip);
+                    }
         }
         if (_camPlaced)
         {

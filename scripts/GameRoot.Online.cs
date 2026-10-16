@@ -39,6 +39,7 @@ public partial class GameRoot
             _homes[p] = home;
             p.Died += OnPlayerDied;
             _players.Add(p);
+            net.TellFighter(peer, NetRegistry.IdFor(p), p.MoveSpeed);
             GD.Print($"Online: {record.Name} (peer {peer}) joins the stage as player {index + 1}.");
         }
         _netHost = new NetHost(() => _camX, OnlineHud);

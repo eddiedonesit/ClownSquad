@@ -96,6 +96,14 @@ public partial class NetHud : CanvasLayer
         }
     }
 
+    /// <summary>The round trip to the host, under the ONLINE note.</summary>
+    public void ShowPing(double rtt)
+    {
+        if (_hint is null) return;
+        _hint.Text = rtt > 0 ? $"ONLINE: playing in the host's game   PING {rtt * 1000:F0} MS" : "ONLINE: playing in the host's game";
+        _hint.LabelSettings.FontColor = rtt > 0.15 ? new Color(1f, 0.55f, 0.4f) : new Color(0.85f, 0.82f, 0.95f);
+    }
+
     /// <summary>A big message from the host: STAGE CLEAR!, GAME OVER.</summary>
     public void ShowBanner(string text)
     {
