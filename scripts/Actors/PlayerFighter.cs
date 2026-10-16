@@ -887,8 +887,8 @@ public partial class PlayerFighter : Fighter
             case ChargeMove.Fan:
                 // Everything in the juggle goes at once (at least one, pulled from a pocket).
                 int n = Mathf.Max(1, _pinStock);
+                if (_pinStock >= MaxPins) _pinRegen = 0f;
                 _pinStock = 0;
-                _pinRegen = -PinRegenDelay;
                 for (int i = 0; i < n; i++)
                 {
                     float z = (i - (n - 1) * 0.5f) * 0.16f;
@@ -935,8 +935,9 @@ public partial class PlayerFighter : Fighter
 
     // ------------------------------------------------------- the pin juggle
 
-    private const float PinRegenDelay = 0.35f;     // juggling resumes this long after a throw
-    private const float PinRegenEach = 0.4f;       // then one more pin joins every this long
+    // One more pin joins the juggle every 2 real seconds (in game time, which runs at
+    // GameClock.Speed), on a steady beat that throwing does not interrupt.
+    private const float PinRegenEach = 2.0f * (float)ClownSquad.World.GameClock.Speed;
     private int _pinStock = 5;
     private float _pinRegen;
     private int _pinStreak;
@@ -953,8 +954,8 @@ public partial class PlayerFighter : Fighter
     /// <summary>One pin from the juggle, straight down the lane; every third in a quick run is a power pin.</summary>
     private void ThrowPin()
     {
+        if (_pinStock >= MaxPins) _pinRegen = 0f;     // the beat starts with the first pin out of a full juggle
         _pinStock--;
-        _pinRegen = -PinRegenDelay;
         _pinStreak = ClownSquad.World.GameClock.Seconds - _lastPinAt < 0.7 ? _pinStreak + 1 : 1;
         _lastPinAt = ClownSquad.World.GameClock.Seconds;
         bool power = _pinStreak % 3 == 0;
