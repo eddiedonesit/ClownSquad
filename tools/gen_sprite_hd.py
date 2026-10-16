@@ -62,6 +62,11 @@ MATS = {
     CREAM: Material((252, 246, 232), soft=True),
 }
 
+# Skin, by hand: the generated ramp's shadow tone came out a grey-brown that read
+# as dirt on the faces. These shadows lean warm and rosy instead (darkest first;
+# the darkest is only used for lines, skin being a soft material).
+MATS[SKIN].tones = [(150, 84, 82), (226, 160, 138), (250, 218, 192), (255, 232, 211), (255, 243, 231)]
+
 # ------------------------------------------------------------------- parts
 
 
@@ -398,6 +403,7 @@ def draw(p):
     gx, gy = ex, ey + 4
     m = p["mallet"]
     behind = m is not None and m[0] >= 100   # swung back over the shoulder
+    c.face = (int(round(DRAW_X + 50 + ln)), int(round(DRAW_Y + hy)))  # head anchor, for the hand-drawn face (hand_face)
 
     if behind:
         weapon_head(c, gx, gy, m[0], m[1])
@@ -641,11 +647,143 @@ def mallet_frames():
     return out, MS
 
 
+# ------------------------------------------------------------- the face
+# Hand-drawn, pixel by pixel, over the shaded frame: the generator's face is
+# fine in shape but muddy in detail. Coordinates are relative to the head
+# anchor (draw(): x = 50 + lean, y = head centre). Rotated and floored frames
+# have no anchor and keep the generated face.
+
+FACE_CLOWNS = ("pip",)          # who has the hand-drawn face so far
+
+INK_C = (34, 22, 40)
+EYE_W = (252, 252, 255)
+SKIN_T = MATS[SKIN].tones       # darkest first
+BLUSH_C = (244, 150, 160)
+BLUSH_L = (255, 183, 188)
+NOSE_HI = (255, 160, 156)
+NOSE_GLINT = (255, 236, 232)
+MOUTH_D = (90, 9, 35)
+TONGUE = (216, 68, 81)
+LIP_C = (196, 36, 58)
+
+# The open eye: a tall oval, rounded corners, a big pupil looking ahead with a catchlight.
+EYE_OPEN = [
+    "..KKKKK.",
+    ".KWWWWWK",
+    "KWWWWWWK",
+    "KWWWKKKK",
+    "KWWKOKKK",
+    "KWWKKKKK",
+    "KWWKKKKK",
+    "KWWWKKKK",
+    ".KWWWWWK",
+    "..KKKKK.",
+]
+EYE_X, EYE_Y = 6, -10            # top-left of the grid, from the anchor
+
+# Squeezed shut: an ouch.
+EYE_SHUT = [
+    "........",
+    "........",
+    "..K.....",
+    "...KK...",
+    ".....KK.",
+    "...KK...",
+    "..K.....",
+    "........",
+    "........",
+    "........",
+]
+
+# The open mouth for the hit pose: dark inside, a tongue, a lip rim.
+MOUTH_OPEN = [
+    ".LLLL.",
+    "LMMMML",
+    "LMMMML",
+    "LMTTML",
+    ".LLLL.",
+]
+MOUTH_X, MOUTH_Y = 6, 8
+
+KEYS = {"K": INK_C, "W": EYE_W, "O": EYE_W, "M": MOUTH_D, "T": TONGUE, "L": LIP_C}
+
+
+def _is_skin(px):
+    return px[3] > 0 and tuple(px[:3]) in SKIN_T
+
+
+def hand_face(rows, anchor, expression):
+    """Paint the hand-drawn face onto shaded RGBA rows (a list of lists of tuples)."""
+    ax, ay = anchor
+    h, w = len(rows), len(rows[0])
+
+    def put(x, y, rgb):
+        if 0 <= x < w and 0 <= y < h:
+            rows[y][x] = tuple(rgb) + (255,)
+
+    # 1. Clean cel shading on the skin: one base tone, a small soft light up
+    #    front, and a thin shadow just inside the jaw and against the hair.
+    #    No more mottling. Decided on a copy so the edges do not creep.
+    skin = {(x, y) for y in range(ay - 14, ay + 20) for x in range(ax - 18, ax + 20)
+            if 0 <= x < w and 0 <= y < h and _is_skin(rows[y][x])}
+    for (x, y) in skin:
+        dx, dy = x - ax, y - ay
+        tone = SKIN_T[2]
+        r = ((dx - 2) / 5.0) ** 2 + ((dy + 3) / 3.2) ** 2
+        if r <= 1.0 or (r <= 1.5 and (x + y) % 2 == 0):    # the light, its edge dithered
+            tone = SKIN_T[3]
+        if dy > 3 and (x, y + 2) not in skin and (x, y + 1) in skin:
+            tone = SKIN_T[1]                              # just above the jaw line
+        if dx < -6 and ((x - 2, y) not in skin or (x - 1, y) not in skin):
+            tone = SKIN_T[1]                              # against the hair
+        put(x, y, tone)
+
+    # 2. Blush: a soft oval on the cheek with a lighter middle.
+    for (x, y) in ((-3, 5), (-2, 5), (-1, 5), (0, 5), (-4, 6), (-3, 6), (-2, 6), (-1, 6), (0, 6), (1, 6), (-3, 7), (-2, 7), (-1, 7), (0, 7)):
+        if _is_skin(rows[ay + y][ax + x]):
+            put(ax + x, ay + y, BLUSH_C)
+    for (x, y) in ((-2, 6), (-1, 6)):
+        put(ax + x, ay + y, BLUSH_L)
+
+    # 3. The eye.
+    grid = EYE_SHUT if expression == "hit" else EYE_OPEN
+    if expression == "hit":
+        # skin over the whole eye area (the generator's eye too), then the squeezed lines
+        for y in range(ay + EYE_Y, ay + EYE_Y + len(EYE_OPEN) + 2):
+            for x in range(ax + EYE_X - 1, ax + EYE_X + len(EYE_OPEN[0]) + 1):
+                if 0 <= x < w and 0 <= y < h and rows[y][x][3] > 0:
+                    c = tuple(rows[y][x][:3])
+                    if c in (EYE_W, INK_C) or c in SKIN_T:
+                        put(x, y, SKIN_T[2])
+    for gy, line in enumerate(grid):
+        for gx, k in enumerate(line):
+            if k in KEYS:
+                put(ax + EYE_X + gx, ay + EYE_Y + gy, KEYS[k])
+
+    # 4. The nose: a highlight and a glint up on the lit side.
+    nx, ny = ax + 19, ay + 3
+    for (x, y) in ((-4, -3), (-3, -3), (-2, -3), (-5, -2), (-4, -2), (-3, -2), (-4, -1), (-3, -4), (-2, -4), (-1, -4)):
+        put(nx + x, ny + y, NOSE_HI)
+    for (x, y) in ((-3, -3), (-2, -3), (-3, -2)):
+        put(nx + x, ny + y, NOSE_GLINT)
+
+    # 5. The hit pose: an open "ouch" mouth over the grin.
+    if expression == "hit":
+        for gy, line in enumerate(MOUTH_OPEN):
+            for gx, k in enumerate(line):
+                if k in KEYS:
+                    put(ax + MOUTH_X + gx, ay + MOUTH_Y + gy, KEYS[k])
+
+
 def write_sheet(name, frames, mats):
     clipped = sorted({n for n, cv in frames if touches_border(cv)})
     if clipped:
         print("WARNING: {} art touches the canvas edge in: {}".format(name, ", ".join(clipped)))
     both = [shade(cv, mats, normals=True) for _, cv in frames]
+    if name.split("_")[0] in FACE_CLOWNS:
+        for (clip, cv), (px, _) in zip(frames, both):
+            if getattr(cv, "face", None):
+                hand_face(px, cv.face, "hit" if clip.endswith("hit") else "")
     shaded = [p for p, _ in both]
     out = os.path.join("assets", "sprites", name + ".png")
     write_png(out, W * len(shaded), H, to_rows(shaded, W, H))
