@@ -83,10 +83,20 @@ public static class Loot
         new(ItemSlot.Hat, "Party Hat", AffixKind.Health, 3f, 6f),
         new(ItemSlot.Hat, "Top Hat", AffixKind.Health, 3.5f, 4f),
         new(ItemSlot.Hat, "Jester Cap", AffixKind.Crit, 0.15f, 1.5f),
+        new(ItemSlot.Hat, "Bowler Hat", AffixKind.Health, 3.2f, 5f),
+        new(ItemSlot.Hat, "Propeller Beanie", AffixKind.Speed, 0.2f, 2f),
+        new(ItemSlot.Hat, "Paper Crown", AffixKind.XpGain, 0.3f, 4f),
+        new(ItemSlot.Hat, "Fez", AffixKind.CritDamage, 1.0f, 5f),
         new(ItemSlot.Ruff, "Frilly Ruff", AffixKind.Health, 4f, 8f),
         new(ItemSlot.Ruff, "Bow Tie", AffixKind.CritDamage, 1.2f, 6f),
+        new(ItemSlot.Ruff, "Polka Scarf", AffixKind.Health, 3.6f, 7f),
+        new(ItemSlot.Ruff, "Big Necktie", AffixKind.Damage, 0.5f, 3f),
+        new(ItemSlot.Ruff, "Hero's Medal", AffixKind.LifeOnKill, 0.3f, 2f),
         new(ItemSlot.Shoes, "Floppy Shoes", AffixKind.Speed, 0.25f, 3f),
         new(ItemSlot.Shoes, "Squeaky Sneakers", AffixKind.Speed, 0.3f, 2f),
+        new(ItemSlot.Shoes, "Roller Skates", AffixKind.Speed, 0.35f, 1.5f),
+        new(ItemSlot.Shoes, "Stripy Boots", AffixKind.Health, 3f, 6f),
+        new(ItemSlot.Shoes, "Bunny Slippers", AffixKind.Crit, 0.12f, 1.5f),
     };
 
     private sealed record AffixDef(AffixKind Kind, int Weight, float Min, float Max, float PerLevel, string Prefix, string Suffix);

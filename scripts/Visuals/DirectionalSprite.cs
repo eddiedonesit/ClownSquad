@@ -146,6 +146,9 @@ public partial class DirectionalSprite : Node3D
         return new Vector3(x, (info.Baseline - a.Y) * _pixelSize, 0f);
     }
 
+    /// <summary>A named point of the frame on show, as written (frame pixels; "rot" is the frame's turn in degrees).</summary>
+    public Vector2? AnchorRaw(string name) => _sprite is null ? null : FrameLibrary.Anchor(_sheetPath, SheetFrame, name);
+
     /// <summary>Whether the sprite is drawn mirrored (facing left) right now.</summary>
     public bool Mirrored => _sprite is not null && _sprite.FlipH;
 

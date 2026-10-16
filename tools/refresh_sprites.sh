@@ -23,6 +23,7 @@ python tools/gen_sprite.py
 python tools/gen_effects.py
 python tools/gen_enemy.py
 python tools/gen_sprite_hd.py
+python tools/gen_gear.py
 python tools/gen_portrait.py
 python tools/gen_enemy_hd.py
 python tools/gen_cast_hd.py

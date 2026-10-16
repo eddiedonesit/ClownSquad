@@ -141,7 +141,26 @@ public partial class PlayerFighter : Fighter
     /// <summary>Which squad clown this player looks like (Roster id). Set before the fighter enters the scene.</summary>
     public string Look { get; set; } = "pip";
 
-    protected override string SheetPath => Hostile ? base.SheetPath : ClownSquad.Progression.Roster.Sheet(Look, Weapon);
+    protected override string SheetPath => Hostile ? base.SheetPath
+        : WearsGear ? ClownSquad.Progression.Roster.BareSheet(Look, Weapon)
+        : ClownSquad.Progression.Roster.Sheet(Look, Weapon);
+
+    /// <summary>A squad clown in the HD art wears their gear for all to see: the bare sheet, dressed by a GearOverlay.</summary>
+    private bool WearsGear => !Hostile && !ArtStyle.Classic && ResourceLoader.Exists(ClownSquad.Progression.Roster.BareSheet(Look, Weapon));
+    private GearOverlay? _gear;
+
+    public override void _Ready()
+    {
+        base._Ready();
+        // a squad clown wears their gear: put it on once the body sprite exists
+        if (WearsGear)
+        {
+            _gear = new GearOverlay(this, Visual, SpritePixelSize);
+            AddChild(_gear);
+            if (Record is CharacterRecord worn) _gear.Dress(worn);
+        }
+    }
+
     private float _critMultiplier = 1.75f;
     private float _launchMultiplier = 1f;
     private float _kaboom;
@@ -242,6 +261,7 @@ public partial class PlayerFighter : Fighter
     /// </summary>
     public void ApplyProgression(CharacterRecord record)
     {
+        _gear?.Dress(record);
         Record = record;
         if (_baseMoveSpeed < 0f) _baseMoveSpeed = MoveSpeed;
         // The weapon is taken up once, before the sprite is built; it cannot

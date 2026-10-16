@@ -17,7 +17,7 @@ using ClownSquad.Progression;
 /// </summary>
 public partial class InventoryMenu : CanvasLayer
 {
-    private const int Rows = 9;
+    private const int Rows = 6;
     private static readonly Color Gold = new(1f, 0.85f, 0.3f);
     private static readonly Color Cream = new(1f, 0.97f, 0.9f);
     private static readonly Color Dim = new(0.75f, 0.7f, 0.85f);
@@ -137,6 +137,8 @@ public partial class InventoryMenu : CanvasLayer
         }
 
         List<ItemData> bag = Bag(r);
+        // the picked item, tried on
+        c.Doll?.Show(r, bag.Count > 0 && !c.Done ? bag[Mathf.Clamp(c.Cursor, 0, bag.Count - 1)] : null);
         c.BagTitle.Text = bag.Count == 0 ? "BAG  - EMPTY -" : $"BAG  ({bag.Count})";
         int first = Mathf.Clamp(c.Cursor - Rows / 2, 0, Mathf.Max(0, bag.Count - Rows));
         for (int i = 0; i < Rows; i++)
@@ -184,11 +186,19 @@ public partial class InventoryMenu : CanvasLayer
         c.GoldLabel = new Label { LabelSettings = Style(20, Gold, 5) };
         head.AddChild(c.Title);
         head.AddChild(c.GoldLabel);
-        box.AddChild(new Label { Text = "WEARING", LabelSettings = Style(14, Dim, 3) });
+        // the clown, dressed in what they wear, beside the list of it
+        var dressed = new HBoxContainer();
+        dressed.AddThemeConstantOverride("separation", 6);
+        box.AddChild(dressed);
+        c.Doll = new GearDoll();
+        dressed.AddChild(c.Doll);
+        var wearing = new VBoxContainer { SizeFlagsVertical = Control.SizeFlags.ShrinkCenter };
+        dressed.AddChild(wearing);
+        wearing.AddChild(new Label { Text = "WEARING", LabelSettings = Style(14, Dim, 3) });
         for (int i = 0; i < 4; i++)
         {
-            var l = new Label { LabelSettings = Style(14, Cream, 4), ClipText = true, CustomMinimumSize = new Vector2(350, 0) };
-            box.AddChild(l);
+            var l = new Label { LabelSettings = Style(14, Cream, 4), CustomMinimumSize = new Vector2(214, 0), AutowrapMode = TextServer.AutowrapMode.WordSmart };
+            wearing.AddChild(l);
             c.Worn.Add(l);
         }
         c.BagTitle = new Label { LabelSettings = Style(14, Dim, 3) };
@@ -227,6 +237,7 @@ public partial class InventoryMenu : CanvasLayer
 
     private sealed class Card
     {
+        public GearDoll? Doll;
         public readonly Seat Seat;
         public readonly MenuPad Pad;
         public readonly List<Label> Worn = new(), Lines = new();

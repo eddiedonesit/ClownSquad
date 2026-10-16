@@ -29,6 +29,10 @@ public static class Roster
     /// <summary>The clown a player slot gets when nobody has chosen.</summary>
     public static Clown DefaultFor(int slot) => All[slot % All.Length];
 
+    /// <summary>The clown bare-headed and barefoot, for wearing gear in play (GearOverlay). HD art only.</summary>
+    public static string BareSheet(string id, WeaponKind weapon = WeaponKind.Mallet) =>
+        $"res://assets/sprites/{Get(id).Id}{Weapons.SheetSuffix(weapon)}_bare_hd.png";
+
     /// <summary>A clown's sprite sheet, holding a weapon. The classic art has only one clown, with a mallet.</summary>
     public static string Sheet(string id, WeaponKind weapon = WeaponKind.Mallet) =>
         ArtStyle.Sheet("res://assets/sprites/clown_16bit.png", $"res://assets/sprites/{Get(id).Id}{Weapons.SheetSuffix(weapon)}_hd.png");

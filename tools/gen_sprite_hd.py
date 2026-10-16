@@ -525,7 +525,8 @@ def draw(p):
     c.capsule(42 + ln, hipy, 44 + fl, 112 - p["ffoot"], 8.5, 6.5, SUIT)
     c.recolor(lambda x, y, mm: RED if 104 - p["ffoot"] < y < 108 - p["ffoot"] else mm)
     frill(c, 44 + fl, 113 - p["ffoot"], 7, True)
-    shoe(c, 46 + fl, 128 - p["ffoot"], True)
+    if not BARE:
+        shoe(c, 46 + fl, 128 - p["ffoot"], True)
     # The far hand: free, or on the weapon too. The heavy ones (the mallet,
     # the sledge) are swung two-handed, the far hand further up the handle;
     # the pop gun's far hand holds the forestock under the barrel.
@@ -558,7 +559,8 @@ def draw(p):
     c.capsule(50 + ln, hipy - 1, 52 + nl, 112 - p["nfoot"], 9, 6.8, SUIT)
     c.recolor(lambda x, y, mm: RED if 103 - p["nfoot"] < y < 108 - p["nfoot"] else mm)
     frill(c, 52 + nl, 113 - p["nfoot"], 8, False)
-    shoe(c, 56 + nl, 128 - p["nfoot"], False)
+    if not BARE:
+        shoe(c, 56 + nl, 128 - p["nfoot"], False)
 
     # the ruff: alternating white and yellow scallops, each its own pleat
     for i, x in enumerate(range(30, 67, 6)):
@@ -590,18 +592,22 @@ def draw(p):
     c.ellipse(69 + ln, hy + 3, 6.6, 6.2, NOSE)
 
     # hat, low on the brow, with diagonal stripes, a dotted brim and a pompom
+    # (a bare sheet has none: the game puts on whatever hat is equipped)
     hx = 46 + ln
-    c.part()
-    c.poly([(hx - 17, hy - 11), (hx + 17, hy - 11), (hx + 8, hy - 28), (hx - 4, hy - 43), (hx - 12, hy - 26)], RED)
-    c.recolor(lambda x, y, mm: YELLOW if math.floor((x - ln + (y - by) * 0.75) / 5.0) % 3 == 0 else mm)
-    c.part()
-    c.ellipse(hx, hy - 11, 19.5, 4.2, YELLOW)
-    c.recolor(lambda x, y, mm: WHITE if abs(y - hy + 11) < 0.8 and math.floor(x) % 5 == 0 else mm)
-    c.part()
-    px_, py_ = hx - 5 + p["pom"][0], hy - 45 + p["pom"][1]
-    c.ellipse(px_, py_, 4.5, 4.5, WHITE)
-    for a in range(0, 360, 60):
-        c.ellipse(px_ + 3.5 * math.cos(math.radians(a)), py_ + 3.5 * math.sin(math.radians(a)), 2.4, 2.4, WHITE)
+    if BARE:
+        pass
+    else:
+        c.part()
+        c.poly([(hx - 17, hy - 11), (hx + 17, hy - 11), (hx + 8, hy - 28), (hx - 4, hy - 43), (hx - 12, hy - 26)], RED)
+        c.recolor(lambda x, y, mm: YELLOW if math.floor((x - ln + (y - by) * 0.75) / 5.0) % 3 == 0 else mm)
+        c.part()
+        c.ellipse(hx, hy - 11, 19.5, 4.2, YELLOW)
+        c.recolor(lambda x, y, mm: WHITE if abs(y - hy + 11) < 0.8 and math.floor(x) % 5 == 0 else mm)
+        c.part()
+        px_, py_ = hx - 5 + p["pom"][0], hy - 45 + p["pom"][1]
+        c.ellipse(px_, py_, 4.5, 4.5, WHITE)
+        for a in range(0, 360, 60):
+            c.ellipse(px_ + 3.5 * math.cos(math.radians(a)), py_ + 3.5 * math.sin(math.radians(a)), 2.4, 2.4, WHITE)
 
     # near arm in front: sleeve with a red band, frilled cuff, gloved fist, mallet
     sx, sy = 50 + ln, 76 + by
@@ -633,6 +639,31 @@ def draw(p):
     c.anchors = {k: (round(v[0] + DRAW_X), round(v[1] + DRAW_Y)) for k, v in pts.items() if v is not None}
     return c
 
+
+def turn_anchors(anchors, degrees, cx, cy):
+    """A frame's named points after rotated(frame, degrees, cx, cy), with the
+    turn itself kept as "rot" (so gear turns with the clown)."""
+    r = math.radians(degrees)
+    co, si = math.cos(r), math.sin(r)
+    out = {}
+    for k, (x, y) in anchors.items():
+        dx, dy = x - cx, y - cy
+        out[k] = (round(cx + dx * co - dy * si), round(cy + dx * si + dy * co))
+    out["rot"] = (degrees, 0)
+    return out
+
+
+def laid_anchors(c, cx, cy, baseline):
+    """The named points of laid_down(c, cx, cy, baseline): turned, then dropped to the floor as it is."""
+    out = rotated(c, -90, cx, cy)
+    rows = [y for y in range(out.h) if any(out.mat[y])]
+    shift = (baseline - 1) - rows[-1] if rows else 0
+    turned = turn_anchors(c.anchors, -90, cx, cy)
+    return {k: (v if k == "rot" else (v[0], v[1] + shift)) for k, v in turned.items()}
+
+
+# A bare sheet: the clown without hat or shoes, for the game to dress in the gear equipped.
+BARE = False
 
 # The weapons held in both hands, and how far up the handle (from the near hand) the far hand goes.
 TWO_HANDED = {"mallet": 9, "hammer": 10, "popgun": 13}
@@ -799,7 +830,9 @@ def player_frames():
     tuck = draw(old(body_dy=3, lean=2, head_dy=2, near_leg=6, far_leg=4,
                     near_arm=6, far_arm=4, arm_lift=12, mallet=(70, 24)))
     for step in range(8):
-        add("flip", rotated(tuck, step * 45, 48 + DRAW_X, 76 + DRAW_Y))
+        turned = rotated(tuck, step * 45, 48 + DRAW_X, 76 + DRAW_Y)
+        turned.anchors = turn_anchors(tuck.anchors, step * 45, 48 + DRAW_X, 76 + DRAW_Y)
+        add("flip", turned)
 
     # landing: a squash on touching down
     add("land", draw(old(mallet=carry(), body_dy=6, head_dy=3, near_leg=6, far_leg=-6,
@@ -825,7 +858,9 @@ def player_frames():
     for name, kw in BASE:
         add("empty_" + name, draw(old(**kw)))
 
-    floored = laid_down(draw(old(**HIT_POSE)), 48 + DRAW_X, 80 + DRAW_Y, BASELINE)
+    lying = draw(old(**HIT_POSE))
+    floored = laid_down(lying, 48 + DRAW_X, 80 + DRAW_Y, BASELINE)
+    floored.anchors = laid_anchors(lying, 48 + DRAW_X, 80 + DRAW_Y, BASELINE)
     add("down", floored)
     add("empty_down", floored)
     return frames
@@ -1009,10 +1044,20 @@ def spin_name(weapon):
 def render_weapon(weapon):
     global WEAPON
     WEAPON = weapon
+    global BARE
     frames = player_frames()
     write_sheet(sheet_name("pip", weapon), frames, MATS)
     for name, mats in SQUAD.items():
         write_sheet(sheet_name(name, weapon), frames, mats)
+    # the same clowns bare-headed and barefoot, for wearing gear in play
+    BARE = True
+    try:
+        bare = player_frames()
+    finally:
+        BARE = False
+    write_sheet(sheet_name("pip", weapon).replace("_hd", "_bare_hd"), bare, MATS)
+    for name, mats in SQUAD.items():
+        write_sheet(sheet_name(name, weapon).replace("_hd", "_bare_hd"), bare, mats)
     spin, ms = mallet_frames()
     out = os.path.join("assets", "sprites", spin_name(weapon) + ".png")
     write_png(out, ms * len(spin), ms, to_rows([p for p, _ in spin], ms, ms))

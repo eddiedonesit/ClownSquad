@@ -308,6 +308,40 @@ public partial class GameRoot : Node3D
         if (Has("skillshot")) StartSkillShot();
         if (Has("stageshot")) StartStageShot();
         if (Has("demo")) StartDemo();
+        // "-- gearup" (tests): dress every clown in random gear, every slot; "-- invshot": a picture of the equipment screen.
+        if (Has("gearup") && Session.IsTest)
+        {
+            var rng = new RandomNumberGenerator { Seed = (ulong)Time.GetTicksMsec() };
+            foreach (PlayerFighter gp in _players)
+            {
+                if (gp.Record is not CharacterRecord gr) continue;
+                foreach (ItemSlot slot in new[] { ItemSlot.Mallet, ItemSlot.Hat, ItemSlot.Ruff, ItemSlot.Shoes })
+                {
+                    ItemData item;
+                    do item = Loot.Roll(rng, 10, rng.Randf() * 3f); while (item.Slot != slot);
+                    gr.Stash.Add(item);
+                    gr.Equip(slot, item);
+                    ItemData spare;
+                    do spare = Loot.Roll(rng, 10, 1f); while (spare.Slot != slot);
+                    gr.Stash.Add(spare);
+                }
+                gp.ApplyProgression(gr);
+            }
+        }
+        if (Has("invshot"))
+            GetTree().CreateTimer(2.0).Timeout += () =>
+            {
+                // every clown, whoever drives them (the test bot is no local player)
+                var seats = new List<Seat>();
+                foreach (PlayerFighter sp in _players)
+                    if (sp.Record is CharacterRecord sr) seats.Add(new Seat(sr, ClownSquad.Input.LocalDeviceInput.Keyboard, () => sp.ApplyProgression(sr)));
+                AddChild(new InventoryMenu(seats));
+                GetTree().CreateTimer(0.6, true, false, true).Timeout += () =>
+                {
+                    GetViewport().GetTexture().GetImage().SavePng($"{ClownSquad.Debug.DebugShots.Dir}inventory.png");
+                    GetTree().Quit();
+                };
+            };
         // "-- spawn balloondog 3" (debug): bring on some of one act, to watch them.
         int spawnAt = Array.IndexOf(args, "spawn");
         if (spawnAt >= 0 && spawnAt + 1 < args.Length)
