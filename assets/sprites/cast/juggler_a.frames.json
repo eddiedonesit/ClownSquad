@@ -1,0 +1,51 @@
+{
+  "frame_width": 220,
+  "frame_height": 300,
+  "baseline": 260,
+  "count": 24,
+  "clips": {
+    "idle": [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5
+    ],
+    "walk": [
+      6,
+      7,
+      8,
+      9,
+      10,
+      11,
+      12,
+      13
+    ],
+    "attack": [
+      14,
+      15,
+      16,
+      17
+    ],
+    "hit": [
+      18
+    ],
+    "air": [
+      19,
+      20
+    ],
+    "special": [
+      21,
+      22
+    ],
+    "down": [
+      23
+    ]
+  },
+  "fps": {
+    "idle": 7,
+    "walk": 13
+  },
+  "source": "aseprite"
+}

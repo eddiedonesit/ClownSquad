@@ -44,7 +44,10 @@ public partial class CastFighter : PlayerFighter
     /// <summary>Drawn this much larger than the squad's pixel density. Bosses loom.</summary>
     protected virtual float DrawScale => 1f;
 
-    protected override string SheetPath => Folder + Cast + ".png";
+    protected override string SheetPath => Folder + (SheetSwaps.TryGetValue(Cast, out string? swap) ? swap : Cast) + ".png";
+
+    /// <summary>Test art: "-- castart juggler=juggler_b" plays a cast member with another sheet (debug builds).</summary>
+    public static readonly System.Collections.Generic.Dictionary<string, string> SheetSwaps = new();
     /// <summary>This fighter's sheet, for the HUD portrait.</summary>
     public string SheetFile => SheetPath;
     protected override float SpritePixelSize => Pixel * DrawScale;

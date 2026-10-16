@@ -139,6 +139,10 @@ public partial class GameRoot : Node3D
         ClownSquad.Services.PlatformPump.Ensure(GetTree());
         ClownSquad.Services.Platform.SetPresence(_rush ? "Taking on the boss rush" : _practice ? "Warming up in the practice ring"
             : _stage is StageDef here ? (here.Kind == StageKind.Boss ? $"Facing the boss of world {here.World}" : $"Fighting through stage {here.Id}") : "In the ring");
+        // "-- castart juggler=juggler_b": try new art for a cast member.
+        int artAt = Array.IndexOf(args, "castart");
+        if (artAt >= 0 && artAt + 1 < args.Length && args[artAt + 1].Split('=') is { Length: 2 } swap)
+            ClownSquad.Actors.CastFighter.SheetSwaps[swap[0]] = swap[1];
         GameClock.Reset();
         AttackTokens.Reset();
         ClownSquad.Net.NetRegistry.Reset();

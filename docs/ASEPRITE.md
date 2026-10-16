@@ -63,3 +63,26 @@ so a hand-drawn sprite must either:
 - **draw at half density (`--scale 2`).** Chunkier and more classic, four times less to draw. Only right if the whole game moves that way over time.
 
 The test sprite will show both, so the choice can be made by eye.
+
+## Test sprite: the Juggler, both ways (2026-10-15)
+
+Aseprite 1.3.18 at `C:\Program Files (x86)\Steam\steamapps\common\Aseprite`;
+the plugin's config is written (`~/.config/pixel-mcp/config.json`) and connects
+from the next session. The test drives Aseprite directly with Lua in batch mode,
+which is what the plugin does underneath:
+
+| Step | Tool |
+|---|---|
+| Game sheet to `.aseprite` (frames + tags) | `tools/aseprite/sheet_to_aseprite.lua` |
+| **A**: HD finishing pass (curated hue-shifted ramps, selective outline, rim light, lone-pixel cleanup); 68 colours down to 34 | `tools/aseprite/finish_hd.lua` |
+| **B**: half density: majority-colour halving, small palette, fresh silhouette outline, inner lines kept, then the hand-drawn head (`art/aseprite/juggler_head.txt`, a "hit" face variant, arm-in-front frames) | `tools/aseprite/classic_b.lua` |
+| Back into the game | `tools/aseprite_import.py` (B with `--scale 2`) |
+
+Sources: `art/aseprite/juggler_original.aseprite`, `juggler_A_finished.aseprite`
+(layers: original, finished), `juggler_B_classic.aseprite` (layers: base, hand).
+In game: `-- castshot castart juggler=juggler_a` (or `juggler_b`); comparison in
+`debug/juggler_test_ingame.png`.
+
+**Findings:**
+- **A** is a safe polish: cleaner colours, coloured outlines and a warmer face; it sits with everything else.
+- **B** has more character (a readable eye and expression, a cartoon face), but its chunkier pixels stand out among HD actors. It is only right if the whole cast moves to it.
