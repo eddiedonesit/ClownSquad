@@ -20,11 +20,14 @@ local EDGE = { 255, 220, 140 }
 -- A crescent from angle a0 to a1 (degrees, y up, facing right), the way the
 -- weapon travels: clockwise for the overhead slam, counter-clockwise for the
 -- swipe and the uppercut. Radius R from the pivot.
-local function arcFrameAt(img, a0, a1, clockwise, R, sweepEnd, thickness, fade)
+-- squash < 1 flattens the circle into an ellipse: a swing level with the
+-- ground, seen from the side.
+local function arcFrameAt(img, a0, a1, clockwise, R, sweepEnd, thickness, fade, squash)
+  squash = squash or 1
   local span = clockwise and ((a0 - a1) % 360) or ((a1 - a0) % 360)
   for y = 0, S - 1 do
     for x = 0, S - 1 do
-      local dx, dy = x + 0.5 - C, C - (y + 0.5)
+      local dx, dy = x + 0.5 - C, (C - (y + 0.5)) / squash
       local r = math.sqrt(dx * dx + dy * dy)
       local ang = math.deg(math.atan(dy, dx))
       local d = clockwise and ((a0 - ang) % 360) or ((ang - a0) % 360)
@@ -82,7 +85,12 @@ local function swipeFrame(img, thickness, fade) arcFrameAt(img, 200, 345, false,
 -- hit 2, the uppercut: from low in front, up to overhead
 local function riseFrame(img, thickness, fade) arcFrameAt(img, -60, 95, false, 66, 1.0, thickness, fade) end
 
-for i = 6, 11 do spr:newEmptyFrame() end
+-- the sideways swipe: from behind, round the near side (the lower half of a flat circle) to the front
+local function sweepFrame(img, thickness, fade) arcFrameAt(img, 172, 8, false, 74, 1.0, thickness, fade, 0.42) end
+-- the backhand: back the other way, round the far side (the upper half)
+local function backFrame(img, thickness, fade) arcFrameAt(img, 188, -8, true, 70, 1.0, thickness, fade, 0.42) end
+
+for i = 6, 17 do spr:newEmptyFrame() end
 frameImage(1, function(img) arcFrame(img, 1.0, 0.42, 1.0) end)
 frameImage(2, function(img) arcFrame(img, 1.0, 0.30, 0.75) end)
 frameImage(3, function(img) arcFrame(img, 1.0, 0.14, 0.5) end)
@@ -94,16 +102,24 @@ frameImage(8, function(img) swipeFrame(img, 0.13, 0.5) end)
 frameImage(9, function(img) riseFrame(img, 0.40, 1.0) end)
 frameImage(10, function(img) riseFrame(img, 0.28, 0.75) end)
 frameImage(11, function(img) riseFrame(img, 0.13, 0.5) end)
-for i = 1, 11 do spr.frames[i].duration = 0.04 end
+frameImage(12, function(img) sweepFrame(img, 0.40, 1.0) end)
+frameImage(13, function(img) sweepFrame(img, 0.28, 0.75) end)
+frameImage(14, function(img) sweepFrame(img, 0.13, 0.5) end)
+frameImage(15, function(img) backFrame(img, 0.40, 1.0) end)
+frameImage(16, function(img) backFrame(img, 0.28, 0.75) end)
+frameImage(17, function(img) backFrame(img, 0.13, 0.5) end)
+for i = 1, 17 do spr.frames[i].duration = 0.04 end
 
 local arc = spr:newTag(1, 3); arc.name = "arc"
 local thrust = spr:newTag(4, 5); thrust.name = "thrust"
 local swipe = spr:newTag(6, 8); swipe.name = "swipe"
 local rise = spr:newTag(9, 11); rise.name = "rise"
+local sweep = spr:newTag(12, 14); sweep.name = "sweep"
+local backsweep = spr:newTag(15, 17); backsweep.name = "backsweep"
 spr:saveAs(p.out)
 app.command.ExportSpriteSheet{
   ui = false, askOverwrite = false, type = SpriteSheetType.HORIZONTAL,
   textureFilename = p.sheet, dataFilename = p.data, dataFormat = SpriteSheetDataFormat.JSON_ARRAY,
   listTags = true, trim = false,
 }
-print("swing trail: 11 frames -> " .. p.out)
+print("swing trail: 17 frames -> " .. p.out)

@@ -297,13 +297,17 @@ public partial class PlayerFighter : Fighter
 
     private bool IsPowerHit => _comboIndex == System.Math.Min(PowerHit, Combo.Length - 1);
 
-    /// <summary>The swing for this hit of the combo; sheets drawn before the per-hit swings use "attack" for all.</summary>
+    /// <summary>
+    /// The swing for this hit of the combo. Melee weapons: a sideways swipe,
+    /// a backhand swipe back the other way, then the first swipe again, hard
+    /// (the power hit, "attack3"); follow-ups alternate the first two. Sheets
+    /// without the per-hit swings use "attack" for all.
+    /// </summary>
     private string SwingClip
     {
         get
         {
-            if (IsPowerHit) return "attack";
-            string clip = _comboIndex % 2 == 0 ? "attack1" : "attack2";
+            string clip = IsPowerHit ? "attack3" : _comboIndex % 2 == 0 ? "attack1" : "attack2";
             return Has(clip) ? clip : "attack";
         }
     }
@@ -602,8 +606,9 @@ public partial class PlayerFighter : Fighter
         if (!_trailDone && _phaseTime >= activeStart && !Hostile && HasMalletMoves && !_weapon.Ranged)
         {
             _trailDone = true;
-            string trail = SwingClip switch { "attack1" => "swipe", "attack2" => "rise", _ => "arc" };
-            SwingTrail.Spawn(this, trail, 1.15f * step.Range / 1.9f * (IsPowerHit ? 1.15f : 1f), trail == "swipe" ? 0.8f : 0.62f);
+            string trail = SwingClip switch { "attack1" or "attack3" => "sweep", "attack2" => "backsweep", _ => "arc" };
+            float size = 1.15f * step.Range / 1.9f * (IsPowerHit ? 1.3f : 1f);
+            SwingTrail.Spawn(this, trail, size, trail == "arc" ? 0.62f : 0.72f);
         }
 
         if (_weapon.Ranged && HasMalletMoves)
@@ -976,7 +981,7 @@ public partial class PlayerFighter : Fighter
 
     // One more pin joins the juggle every 2 real seconds (in game time, which runs at
     // GameClock.Speed), on a steady beat that throwing does not interrupt.
-    private const float PinRegenEach = 2.0f * (float)ClownSquad.World.GameClock.Speed;
+    private const float PinRegenEach = 1.5f * (float)ClownSquad.World.GameClock.Speed;
     private int _pinStock = 5;
     private float _pinRegen;
     private int _pinStreak;

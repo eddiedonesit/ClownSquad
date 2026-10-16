@@ -2,7 +2,7 @@
   "frame_width": 160,
   "frame_height": 160,
   "baseline": 141,
-  "count": 11,
+  "count": 17,
   "clips": {
     "arc": [
       0,
@@ -22,13 +22,25 @@
       8,
       9,
       10
+    ],
+    "sweep": [
+      11,
+      12,
+      13
+    ],
+    "backsweep": [
+      14,
+      15,
+      16
     ]
   },
   "fps": {
     "arc": 25.0,
     "thrust": 25.0,
     "swipe": 25.0,
-    "rise": 25.0
+    "rise": 25.0,
+    "sweep": 25.0,
+    "backsweep": 25.0
   },
   "source": "aseprite"
 }

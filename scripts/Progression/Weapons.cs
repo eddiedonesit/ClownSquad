@@ -197,7 +197,7 @@ public static class Weapons
 
     // Juggling pins: quick clubs, and a held charge throws a fan of pins down the lane.
     private static readonly WeaponDef PinsDef = new(
-        WeaponKind.Pins, "JUGGLING PINS", "Juggles up to five pins overhead. Each press throws one as fast as you can tap; one comes back every 2 seconds. Held charge throws them all at once. Out of pins, it clubs.",
+        WeaponKind.Pins, "JUGGLING PINS", "Juggles up to five pins overhead. Each press throws one as fast as you can tap; one comes back every 1.5 seconds. Held charge throws them all at once. Out of pins, it clubs.",
         new AttackStep[]
         {
             new(0.07f, 0.05f, 0.14f, 9f, 2.0f, 0.050f, 2.0f, 0f),

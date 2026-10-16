@@ -647,9 +647,8 @@ def player_frames():
         add("attack", draw(old(lean=4, body_dy=1, near_arm=8, far_arm=4, arm_lift=3, mallet=(22, 30))))
         add("attack", draw(old(lean=5, body_dy=3, near_arm=10, far_arm=5, arm_lift=-3, mallet=(-14, 27), near_leg=3, far_leg=-2)))
 
-    # The combo's first two hits get swings of their own; the third, the power
-    # hit, is the overhead "attack" above. Hit 1 is a low swipe swung underhand
-    # from behind; hit 2 a rising uppercut in front.
+    # The combo's hits get swings of their own (the overhead "attack" above is
+    # kept for the moves that borrow it: the ground pound, the slam).
     if WEAPON == "popgun":
         # from the hip, then from the shoulder
         add("attack1", draw(old(lean=0, body_dy=1, near_arm=8, far_arm=6, arm_lift=3, mallet=(-4, 26))))
@@ -671,14 +670,26 @@ def player_frames():
         add("attack2", draw(old(lean=2, body_dy=-1, near_arm=7, far_arm=4, arm_lift=15, mallet=(5, 14))))
         add("attack2", draw(old(lean=4, near_arm=10, far_arm=5, arm_lift=13, mallet=(-5, 14))))
     else:
-        add("attack1", draw(old(lean=-2, body_dy=2, near_arm=-7, far_arm=-3, arm_lift=1, near_leg=-2, far_leg=2, mallet=(205, 26))))
-        add("attack1", draw(old(lean=1, body_dy=3, near_arm=0, far_arm=1, arm_lift=-3, mallet=(-95, 27))))
-        add("attack1", draw(old(lean=4, body_dy=2, near_arm=9, far_arm=4, arm_lift=-2, near_leg=4, far_leg=-3, mallet=(-35, 29))))
-        add("attack1", draw(old(lean=5, body_dy=1, near_arm=12, far_arm=5, arm_lift=1, near_leg=5, far_leg=-3, mallet=(-8, 28))))
-        add("attack2", draw(old(lean=3, body_dy=3, near_arm=7, far_arm=3, arm_lift=-4, near_leg=3, far_leg=-2, mallet=(-40, 26))))
-        add("attack2", draw(old(lean=2, body_dy=1, near_arm=10, far_arm=4, arm_lift=2, mallet=(10, 28))))
-        add("attack2", draw(old(lean=-1, body_dy=-2, near_arm=9, far_arm=3, arm_lift=13, mallet=(84, 30))))
-        add("attack2", draw(old(lean=-3, body_dy=-3, near_arm=8, far_arm=2, arm_lift=15, mallet=(96, 30))))
+        # Melee: swipe across, backhand swipe back, then swipe across again, hard.
+        # Seen side-on a flat swing runs through depth: the weapon is drawn
+        # back at shoulder height, comes round toward the camera (foreshortened,
+        # short), lands out in front and carries on past.
+        # hit 1, the swipe: from behind the shoulder, round the front
+        add("attack1", draw(old(lean=-3, body_dy=1, near_arm=-8, far_arm=-3, arm_lift=6, near_leg=-2, far_leg=2, mallet=(176, 26))))
+        add("attack1", draw(old(lean=0, body_dy=1, near_arm=-1, far_arm=0, arm_lift=8, mallet=(78, 13))))
+        add("attack1", draw(old(lean=4, body_dy=1, near_arm=10, far_arm=3, arm_lift=7, near_leg=3, far_leg=-2, mallet=(4, 29))))
+        add("attack1", draw(old(lean=5, body_dy=1, near_arm=12, far_arm=4, arm_lift=5, near_leg=4, far_leg=-2, mallet=(-14, 22))))
+        # hit 2, the backhand: wound across the body to the far side, back the other way
+        add("attack2", draw(old(lean=3, body_dy=2, near_arm=-11, far_arm=6, arm_lift=2, near_leg=3, far_leg=-2, mallet=(198, 18))))
+        add("attack2", draw(old(lean=1, body_dy=1, near_arm=-2, far_arm=2, arm_lift=6, mallet=(92, 12))))
+        add("attack2", draw(old(lean=3, body_dy=0, near_arm=9, far_arm=-6, arm_lift=10, near_leg=2, far_leg=-3, mallet=(16, 28))))
+        add("attack2", draw(old(lean=1, body_dy=-1, near_arm=10, far_arm=-8, arm_lift=13, mallet=(42, 24))))
+    # hit 3, the power hit: the swipe again, wound right back and put everything into it
+    if WEAPON not in ("popgun", "pie"):
+        add("attack3", draw(old(lean=-5, body_dy=3, near_arm=-10, far_arm=-4, arm_lift=7, near_leg=-3, far_leg=4, mallet=(182, 28))))
+        add("attack3", draw(old(lean=0, body_dy=2, near_arm=-1, far_arm=0, arm_lift=8, near_leg=1, far_leg=1, mallet=(76, 14))))
+        add("attack3", draw(old(lean=6, body_dy=2, near_arm=12, far_arm=3, arm_lift=7, near_leg=6, far_leg=-4, mallet=(2, 31))))
+        add("attack3", draw(old(lean=7, body_dy=3, near_arm=13, far_arm=4, arm_lift=5, near_leg=6, far_leg=-4, mallet=(-18, 24))))
 
     # charge: coiled low with the mallet drawn right back, two frames to shudder
     add("charge", draw(old(body_dy=5, lean=-4, head_dy=1, near_leg=5, far_leg=-5,
