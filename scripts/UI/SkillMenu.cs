@@ -129,7 +129,7 @@ public partial class SkillMenu : CanvasLayer
                 r.Weapon = (WeaponKind)(((int)r.Weapon + 1) % Weapons.All.Length);
                 c.Seat.Changed?.Invoke();
                 c.Message = $"NOW HOLDING {Weapons.Get(r.Weapon).Name}";
-                Sfx.Play(r.Weapon == WeaponKind.Chicken ? "squawk" : "clack", 1f);
+                Sfx.Play(r.Weapon == WeaponKind.Seltzer ? "fizz" : "clack", 1f);
                 break;
             case MenuPad.Press.Done:
                 c.Done = true;

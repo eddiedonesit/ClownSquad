@@ -325,7 +325,7 @@ public partial class PlayerFighter : Fighter
         Fx.Sound("kaboom", 1.7f, -9f);
         string word = Weapon switch
         {
-            WeaponKind.Hammer => "WHAM!", WeaponKind.Chicken => "BAWK!", WeaponKind.Pie => "SPLAT!",
+            WeaponKind.Hammer => "WHAM!", WeaponKind.Seltzer => "SPLOOSH!", WeaponKind.Pie => "SPLAT!",
             WeaponKind.Pins => "CLONK!", WeaponKind.Slapstick => "SLAP!", WeaponKind.PopGun => "POP!",
             WeaponKind.BalloonSword => "SQUEAK!", _ => "BONK!",
         };
@@ -603,6 +603,14 @@ public partial class PlayerFighter : Fighter
         }
 
         // The smear: as the hit window opens, a crescent behind the weapon (squad only, melee only).
+        if (!_trailDone && _phaseTime >= activeStart && HasMalletMoves && _weapon.Sprays)
+        {
+            // The seltzer sprays instead: a squirt, a squirt from up high, a burst.
+            _trailDone = true;
+            bool high = !IsPowerHit && _comboIndex % 2 == 1;
+            SeltzerSpray.Spawn(this, IsPowerHit ? "burst" : "squirt", step.Range * 1.05f, high ? 1.25f : 1.0f);
+            Fx.Sound("fizz", IsPowerHit ? 0.85f : 1.15f + 0.05f * _comboIndex, IsPowerHit ? 0f : -4f);
+        }
         if (!_trailDone && _phaseTime >= activeStart && !Hostile && HasMalletMoves && !_weapon.Ranged)
         {
             _trailDone = true;
@@ -711,8 +719,9 @@ public partial class PlayerFighter : Fighter
         Fx.Sound("zip");
         if (_perks.SquawkDodge)
         {
-            // SQUAWK: the slide goes off like a startled hen; anyone close is frozen to the spot.
-            Fx.Sound("squawk", 1.1f);
+            // SPRITZ: the slide goes off in a spray of soda; anyone close is frozen to the spot.
+            Fx.Sound("fizz", 1.2f);
+            SeltzerSpray.Spawn(this, "burst", 1.9f, 0.6f);
             foreach (Fighter other in Opponents())
             {
                 Vector3 to = other.GlobalPosition - GlobalPosition;
@@ -787,7 +796,8 @@ public partial class PlayerFighter : Fighter
             switch (_weapon.Charge)
             {
                 case ChargeMove.Quake:
-                case ChargeMove.Clap: StartQuake(); break;
+                case ChargeMove.Clap:
+                case ChargeMove.Soak: StartQuake(); break;
                 case ChargeMove.Lunge: StartLunge(); break;
                 default: StartThrow(); break;
             }
@@ -889,7 +899,7 @@ public partial class PlayerFighter : Fighter
                 MalletProjectile.Spawn(this, Facing, new MalletProjectile.Throw(
                     _weapon.SpinSheet,
                     _perks.ThrowDamage,
-                    _perks.ThrowRange * (Weapon == WeaponKind.Chicken ? 1.5f : 1f),
+                    _perks.ThrowRange,
                     _perks.ThrowExplodes, _perks.ThrowLaunches));
                 Fx.Sound(_weapon.ThrowSound);
                 Fx.Shake(this, 0.04f, 0.12f);
@@ -1279,6 +1289,7 @@ public partial class PlayerFighter : Fighter
         PinClipFrame("attack", _quakeTime < QuakeImpact * 0.6f ? 1 : _quakeTime < QuakeImpact ? 2 : 3);
 
         if (_weapon.Charge == ChargeMove.Clap) { TickClap(); return; }
+        if (_weapon.Charge == ChargeMove.Soak) { TickSoak(); return; }
 
         int due = _quakeTime >= QuakeImpact ? 1 : 0;
         if (_perks.Aftershock && _quakeTime >= AftershockAt) due = 2;
@@ -1324,6 +1335,34 @@ public partial class PlayerFighter : Fighter
             DamageInRadius(radius * 1.35f, Scaled(damage * 0.6f, false), 4f * _perks.Knockback, 0.06f, 3f * _perks.Launch, 1.1f);
             if (!Hostile) ClownSquad.Services.Achievements.Award("ring_bell");
         };
+    }
+
+    /// <summary>
+    /// The seltzer bottle's charge, SOAK: one long hard blast down the lane.
+    /// Everyone in it is shoved back, and the soda left on the floor (three
+    /// puddles along the lane) trips up anyone who walks into it.
+    /// </summary>
+    private void TickSoak()
+    {
+        if (_quakeHits == 0 && _quakeTime >= QuakeImpact)
+        {
+            _quakeHits = 1;
+            float reach = 6.5f * _perks.ThrowRange;
+            SeltzerSpray.Spawn(this, "blast", reach, 1.0f);
+            Fx.Sound("fizz", 0.75f, 3f);
+            Fx.Sound("splash", 0.9f);
+            Fx.Shake(this, 0.08f, 0.25f);
+            foreach (Fighter other in Opponents())
+            {
+                Vector3 to = other.GlobalPosition - GlobalPosition;
+                float forward = to.X * Facing.X;
+                if (forward <= -0.2f || forward > reach || Mathf.Abs(to.Z) > 1.1f || Mathf.Abs(to.Y) > 2f) continue;
+                Strike(other, 18f * _perks.ThrowDamage, Facing, 10f * _perks.Knockback, 0.06f, 1.5f * _perks.Launch, 0.5f);
+            }
+            for (int i = 1; i <= 3; i++)
+                CreamPuddle.Spawn(GetParent(), this, GlobalPosition + Facing * (reach * i / 3.6f), 1.0f * _perks.SplatRadius, 5f, CreamPuddle.Soda);
+        }
+        if (_quakeTime >= 0.6f) EndMalletMove();
     }
 
     /// <summary>The slapstick's charge: one enormous clap that stuns everything in front.</summary>

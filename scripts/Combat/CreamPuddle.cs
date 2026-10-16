@@ -24,9 +24,14 @@ public partial class CreamPuddle : Node3D
     // Numbered for the network (NetRegistry) while in the scene.
     public override void _Notification(int what) => NetRegistry.Notify(this, what);
 
-    public static void Spawn(Node parent, PlayerFighter owner, Vector3 at, float radius, float seconds)
+    public static readonly Color Cream = new(1f, 0.97f, 0.88f);
+    /// <summary>The seltzer bottle's puddles: soda water, just as slippery.</summary>
+    public static readonly Color Soda = new(0.62f, 0.86f, 1f);
+    private Color _color = Cream;
+
+    public static void Spawn(Node parent, PlayerFighter owner, Vector3 at, float radius, float seconds, Color? color = null)
     {
-        var p = new CreamPuddle { _owner = owner, _radius = radius, _left = seconds, _life = seconds };
+        var p = new CreamPuddle { _owner = owner, _radius = radius, _left = seconds, _life = seconds, _color = color ?? Cream };
         parent.AddChild(p);
         p.GlobalPosition = new Vector3(at.X, 0.02f, at.Z);
     }
@@ -35,8 +40,8 @@ public partial class CreamPuddle : Node3D
     {
         _paint = new StandardMaterial3D
         {
-            AlbedoColor = new Color(1f, 0.97f, 0.88f), Roughness = 0.25f, Metallic = 0f,
-            EmissionEnabled = true, Emission = new Color(0.3f, 0.28f, 0.22f),
+            AlbedoColor = _color, Roughness = _color == Cream ? 0.25f : 0.05f, Metallic = 0f,
+            EmissionEnabled = true, Emission = _color * 0.3f,
             Transparency = BaseMaterial3D.TransparencyEnum.Alpha,
         };
         // A flat, slightly lumpy splat: one wide disc and a few blobs.
@@ -53,7 +58,7 @@ public partial class CreamPuddle : Node3D
                 Position = new Vector3(Mathf.Cos(a) * d, 0.04f, Mathf.Sin(a) * d * 0.6f),
             });
         }
-        Fx.Sound("splat", 0.8f);
+        Fx.Sound(_color == Cream ? "splat" : "splash", 0.8f);
     }
 
     public override void _PhysicsProcess(double delta)
@@ -61,7 +66,7 @@ public partial class CreamPuddle : Node3D
         _left -= (float)delta;
         if (_left <= 0f || !IsInstanceValid(_owner)) { QueueFree(); return; }
         // Dries up over the last second.
-        _paint.AlbedoColor = new Color(1f, 0.97f, 0.88f, Mathf.Clamp(_left, 0f, 1f));
+        _paint.AlbedoColor = new Color(_color.R, _color.G, _color.B, Mathf.Clamp(_left, 0f, 1f) * (_color == Cream ? 1f : 0.8f));
 
         foreach (Fighter f in Fighter.Live)
         {

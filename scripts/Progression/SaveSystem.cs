@@ -61,7 +61,7 @@ public static class SaveSystem
         MigrateLegacy();
         string file = ProjectSettings.GlobalizePath(SlotPath(slot));
         if (!File.Exists(file)) return null;
-        try { return JsonSerializer.Deserialize<SaveData>(File.ReadAllText(file), Json); }
+        try { return JsonSerializer.Deserialize<SaveData>(Migrate(File.ReadAllText(file)), Json); }
         catch (Exception e) when (e is JsonException or IOException) { return null; }
     }
 
@@ -86,13 +86,33 @@ public static class SaveSystem
         Converters = { new System.Text.Json.Serialization.JsonStringEnumConverter() },
     };
 
+    /// <summary>
+    /// Saves from before the seltzer bottle: the rubber chicken it replaced
+    /// becomes the bottle, and each learned chicken skill the bottle's skill in
+    /// the same place in the tree, so no point spent is lost.
+    /// </summary>
+    private static readonly (string from, string to)[] Renames =
+    {
+        ("\"Chicken\"", "\"Seltzer\""),
+        ("\"feather_duster\"", "\"fizz_up\""), ("\"pecking_order\"", "\"double_squirt\""), ("\"frenzy\"", "\"quick_trigger\""),
+        ("\"fowl_ball\"", "\"high_pressure\""), ("\"eggsplosive\"", "\"long_spray\""), ("\"rubber_bounce\"", "\"flood\""),
+        ("\"squawk\"", "\"spritz\""), ("\"lucky_feather\"", "\"lucky_bubbles\""),
+    };
+
+    private static string Migrate(string json)
+    {
+        if (!json.Contains("\"Chicken\"")) return json;
+        foreach ((string from, string to) in Renames) json = json.Replace(from, to);
+        return json;
+    }
+
     /// <summary>A character as JSON, the save file's format: what a guest sends to join an online game.</summary>
     public static string CharacterToJson(CharacterRecord r) => JsonSerializer.Serialize(r, Json);
 
     /// <summary>A character from JSON, or null if it does not parse.</summary>
     public static CharacterRecord? CharacterFromJson(string json)
     {
-        try { return JsonSerializer.Deserialize<CharacterRecord>(json, Json); }
+        try { return JsonSerializer.Deserialize<CharacterRecord>(Migrate(json), Json); }
         catch (JsonException) { return null; }
     }
 
@@ -115,7 +135,7 @@ public static class SaveSystem
 
         try
         {
-            SaveData? loaded = JsonSerializer.Deserialize<SaveData>(File.ReadAllText(file), Json);
+            SaveData? loaded = JsonSerializer.Deserialize<SaveData>(Migrate(File.ReadAllText(file)), Json);
             if (loaded is null) throw new InvalidDataException("empty save");
             if (loaded.Version > CurrentVersion)
                 throw new InvalidDataException($"save version {loaded.Version} is newer than this build ({CurrentVersion})");
@@ -161,7 +181,7 @@ public static class SaveSystem
         SaveData data = new();
         try
         {
-            if (File.Exists(file) && JsonSerializer.Deserialize<SaveData>(File.ReadAllText(file), Json) is SaveData on) data = on;
+            if (File.Exists(file) && JsonSerializer.Deserialize<SaveData>(Migrate(File.ReadAllText(file)), Json) is SaveData on) data = on;
         }
         catch (Exception e) when (e is JsonException or IOException) { return false; }
         while (data.Characters.Count <= index) data.Characters.Add(new CharacterRecord());

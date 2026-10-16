@@ -30,7 +30,7 @@ sprite is built, and reads everything else from the definition.
 
 | Charge | Weapons | What it does |
 |---|---|---|
-| Throw | mallet, chicken | Thrown, and it comes back (`MalletProjectile`) |
+| Throw | mallet | Thrown, and it comes back (`MalletProjectile`) |
 | Quake | hammer | Ground pound all round |
 | Clap | slapstick | Stuns everything in front |
 | Lob | pie | Lobbed pie that splats and blinds a group |

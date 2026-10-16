@@ -57,7 +57,7 @@ adds a `SteamPlatform` class and nothing else changes.
 | together | SEND IN THE CLOWNS | Play an online game with a friend |
 | boss_1 ... boss_9 | WORLD n TAMED | Beat each world's boss |
 | boss_10 | THE GREATEST SHOW (hidden) | Beat the Ringmaster |
-| win_mallet, win_hammer, win_chicken, win_pie, win_pins, win_slapstick, win_popgun, win_balloonsword | (weapon) CHAMP | Beat a boss holding that weapon |
+| win_mallet, win_hammer, win_seltzer, win_pie, win_pins, win_slapstick, win_popgun, win_balloonsword | (weapon) CHAMP | Beat a boss holding that weapon |
 
 ## 3. Cloud saves need no code
 

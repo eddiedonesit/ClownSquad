@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://c1l0k18fy5it3"
-path="res://.godot/imported/pip_chicken_hd.png-32cc36eb378394ab19197f77746e688b.ctex"
+uid="uid://dhv63gp5es15j"
+path="res://.godot/imported/bingo_seltzer_hd.png-93192fbdee526b5cc6a5100beded79f9.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://assets/sprites/pip_chicken_hd.png"
-dest_files=["res://.godot/imported/pip_chicken_hd.png-32cc36eb378394ab19197f77746e688b.ctex"]
+source_file="res://assets/sprites/bingo_seltzer_hd.png"
+dest_files=["res://.godot/imported/bingo_seltzer_hd.png-93192fbdee526b5cc6a5100beded79f9.ctex"]
 
 [params]
 

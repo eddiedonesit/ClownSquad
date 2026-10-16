@@ -121,7 +121,7 @@ public partial class GameRoot
     private void SwapWeapon(PlayerFighter p, CharacterRecord rec, int dir)
     {
         rec.Weapon = (WeaponKind)Mathf.PosMod((int)rec.Weapon + dir, Weapons.All.Length);
-        ClownSquad.Audio.Sfx.Play(rec.Weapon == WeaponKind.Chicken ? "squawk" : "clack", 1.1f);
+        ClownSquad.Audio.Sfx.Play(rec.Weapon == WeaponKind.Seltzer ? "fizz" : "clack", 1.1f);
         ReplacePlayer(p);
     }
 

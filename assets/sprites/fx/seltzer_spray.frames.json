@@ -1,0 +1,30 @@
+{
+  "frame_width": 224,
+  "frame_height": 96,
+  "baseline": 82,
+  "count": 10,
+  "clips": {
+    "squirt": [
+      0,
+      1,
+      2
+    ],
+    "burst": [
+      3,
+      4,
+      5
+    ],
+    "blast": [
+      6,
+      7,
+      8,
+      9
+    ]
+  },
+  "fps": {
+    "squirt": 20.0,
+    "burst": 20.0,
+    "blast": 20.0
+  },
+  "source": "aseprite"
+}

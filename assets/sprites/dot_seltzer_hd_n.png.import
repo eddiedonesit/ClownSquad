@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://chd3qnhy51niy"
-path="res://.godot/imported/poppy_chicken_hd.png-986db74be5092c89e5852a4d0e528f05.ctex"
+uid="uid://q078yrpasvgv"
+path="res://.godot/imported/dot_seltzer_hd_n.png-2238ac9c570eb64ada08b335aafb08a6.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://assets/sprites/poppy_chicken_hd.png"
-dest_files=["res://.godot/imported/poppy_chicken_hd.png-986db74be5092c89e5852a4d0e528f05.ctex"]
+source_file="res://assets/sprites/dot_seltzer_hd_n.png"
+dest_files=["res://.godot/imported/dot_seltzer_hd_n.png-2238ac9c570eb64ada08b335aafb08a6.ctex"]
 
 [params]
 

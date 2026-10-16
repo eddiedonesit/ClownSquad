@@ -5,12 +5,12 @@ using System.Collections.Generic;
 using ClownSquad.Combat;
 
 /// <summary>The three things a clown can hit people with.</summary>
-public enum WeaponKind { Mallet, Hammer, Chicken, Pie, Pins, Slapstick, PopGun, BalloonSword }
+public enum WeaponKind { Mallet, Hammer, Seltzer, Pie, Pins, Slapstick, PopGun, BalloonSword }
 
 /// <summary>What a fully held charge does while standing still.</summary>
 public enum ChargeMove
 {
-    /// <summary>Thrown, and it comes back (mallet, chicken).</summary>
+    /// <summary>Thrown, and it comes back (mallet).</summary>
     Throw,
     /// <summary>A ground pound all round (hammer).</summary>
     Quake,
@@ -24,6 +24,8 @@ public enum ChargeMove
     BigShot,
     /// <summary>A fencer's dash forward, hitting all in the way.</summary>
     Lunge,
+    /// <summary>A long blast of soda down the lane, leaving puddles (the seltzer bottle).</summary>
+    Soak,
 }
 
 /// <summary>
@@ -57,6 +59,8 @@ public sealed record WeaponDef(
     public bool Juggles { get; init; }
     /// <summary>Hold attack and a direction for this instead of the spin (the balloon sword's thrust).</summary>
     public bool Thrusts { get; init; }
+    /// <summary>Each combo hit is a spray from a spout rather than a swing (the seltzer bottle).</summary>
+    public bool Sprays { get; init; }
 }
 
 /// <summary>
@@ -143,31 +147,33 @@ public static class Weapons
         })
     { HitPitch = 0.7f, Heft = 1.45f };
 
-    // The rubber chicken: light, long and fast. Quick slaps; thrown, it flies far, squawking.
-    private static readonly WeaponDef ChickenDef = new(
-        WeaponKind.Chicken, "RUBBER CHICKEN", "Light and long. Quick slaps, and thrown it flies the length of the ring.",
+    // The seltzer bottle: the clown's soda siphon. Quick squirts that shove
+    // them back, a big burst on the third; held, a long blast down the lane
+    // that knocks everyone in it back and leaves puddles they slip in.
+    private static readonly WeaponDef SeltzerDef = new(
+        WeaponKind.Seltzer, "SELTZER BOTTLE", "Squirts that shove them back, and a big burst every third. Hold to SOAK the whole lane: everyone in it is knocked back, and the puddles left behind trip them up.",
         new AttackStep[]
         {
-            new(0.06f, 0.05f, 0.12f, 8f, 1.6f, 0.040f, 2.2f, 0f),
-            new(0.06f, 0.05f, 0.13f, 9f, 1.8f, 0.045f, 2.2f, 0f),
-            new(0.10f, 0.07f, 0.26f, 17f, 7.0f, 0.090f, 2.5f, 6f),
+            new(0.06f, 0.05f, 0.12f, 7f, 3.2f, 0.030f, 2.6f, 0f),
+            new(0.06f, 0.05f, 0.13f, 8f, 3.4f, 0.035f, 2.6f, 0f),
+            new(0.10f, 0.07f, 0.24f, 15f, 9.0f, 0.080f, 3.0f, 4f),
         },
-        new(0.06f, 0.05f, 0.12f, 7f, 1.6f, 0.040f, 2.2f, 0f),
-        ChargeMove.Throw, "chicken_spin_hd", "squawk",
-        new[] { "PECK", "FLIGHT", "LUCK" },
+        new(0.06f, 0.05f, 0.12f, 7f, 3.2f, 0.030f, 2.6f, 0f),
+        ChargeMove.Soak, "seltzer_spin_hd", "fizz",
+        new[] { "SQUIRT", "SOAK", "FIZZ" },
         new Skill[]
         {
-            new("feather_duster", "FEATHER DUSTER", "+15% combo damage.", 0, 1),
-            new("pecking_order", "PECKING ORDER", "After the big third hit, one more slap to juggle them.", 0, 2),
-            new("frenzy", "FRENZY", "Slaps are 20% faster.", 0, 3),
-            new("fowl_ball", "FOWL BALL", "The thrown chicken hits 50% harder.", 1, 1),
-            new("eggsplosive", "EGGSPLOSIVE", "The thrown chicken explodes where it turns.", 1, 2),
-            new("rubber_bounce", "RUBBER BOUNCE", "The thrown chicken launches what it hits.", 1, 3),
+            new("fizz_up", "FIZZ UP", "+15% combo damage.", 0, 1),
+            new("double_squirt", "DOUBLE SQUIRT", "After the big third hit, one more squirt to juggle them.", 0, 2),
+            new("quick_trigger", "QUICK TRIGGER", "Squirts are 20% faster.", 0, 3),
+            new("high_pressure", "HIGH PRESSURE", "The SOAK hits 50% harder.", 1, 1),
+            new("long_spray", "LONG SPRAY", "The SOAK reaches 40% farther.", 1, 2),
+            new("flood", "FLOOD", "The SOAK's puddles are half as big again.", 1, 3),
             new("slippery", "SLIPPERY", "Dodges stay untouchable 50% longer.", 2, 1),
-            new("squawk", "SQUAWK", "Dodging squawks, stunning anyone you slide past.", 2, 2),
-            new("lucky_feather", "LUCKY FEATHER", "+6% crit chance and better loot.", 2, 3),
+            new("spritz", "SPRITZ", "Dodging sprays everyone you slide past, freezing them.", 2, 2),
+            new("lucky_bubbles", "LUCKY BUBBLES", "+6% crit chance and better loot.", 2, 3),
         })
-    { HitSound = "squeak", HitPitch = 1.3f, Heft = 0.6f };
+    { HitSound = "splash", HitPitch = 1.1f, Heft = 0f, Sprays = true };
 
     // Cream pies: a short smush, a finisher that leaves them blinded, and a lobbed pie that splats a crowd.
     private static readonly WeaponDef PieDef = new(
@@ -300,12 +306,12 @@ public static class Weapons
         })
     { HitSound = "squeak", HitPitch = 1.4f, Heft = 0f, Thrusts = true };
 
-    public static readonly WeaponDef[] All = { MalletDef, HammerDef, ChickenDef, PieDef, PinsDef, SlapstickDef, PopGunDef, BalloonDef };
+    public static readonly WeaponDef[] All = { MalletDef, HammerDef, SeltzerDef, PieDef, PinsDef, SlapstickDef, PopGunDef, BalloonDef };
 
     public static WeaponDef Get(WeaponKind kind) => kind switch
     {
         WeaponKind.Hammer => HammerDef,
-        WeaponKind.Chicken => ChickenDef,
+        WeaponKind.Seltzer => SeltzerDef,
         WeaponKind.Pie => PieDef,
         WeaponKind.Pins => PinsDef,
         WeaponKind.Slapstick => SlapstickDef,
@@ -383,11 +389,11 @@ public static class Weapons
         {
             switch (id)
             {
-                case "heavy_head": case "iron_head": case "feather_duster": p.Damage *= 1.15f; break;
+                case "heavy_head": case "iron_head": case "fizz_up": p.Damage *= 1.15f; break;
                 case "big_finish": p.Finisher *= 1.4f; p.Launch *= 1.2f; break;
                 case "boomerang": p.ThrowDamage *= 1.5f; p.ThrowRange *= 1.4f; break;
                 case "quick_wrists": p.SwingSpeed *= 1.15f; break;
-                case "fourth_swing": case "pecking_order": p.ExtraSteps++; break;
+                case "fourth_swing": case "double_squirt": p.ExtraSteps++; break;
                 case "spin_doctor": p.SpinTime *= 1.5f; p.SpinDamage *= 1.5f; break;
                 case "crowd_pleaser": p.Crit += 0.05f; break;
                 case "encore": p.HealOnKill += 0.04f; break;
@@ -400,13 +406,13 @@ public static class Weapons
                 case "hefty_grip": p.MaxHealth *= 1.15f; break;
                 case "second_wind": p.SecondWind = true; break;
                 case "last_stand": p.LastStand = true; break;
-                case "frenzy": p.SwingSpeed *= 1.2f; break;
-                case "fowl_ball": p.ThrowDamage *= 1.5f; break;
-                case "eggsplosive": p.ThrowExplodes = true; break;
-                case "rubber_bounce": p.ThrowLaunches = true; break;
+                case "quick_trigger": p.SwingSpeed *= 1.2f; break;
+                case "high_pressure": p.ThrowDamage *= 1.5f; break;
+                case "long_spray": p.ThrowRange *= 1.4f; break;
+                case "flood": p.SplatRadius *= 1.5f; break;
                 case "slippery": p.DodgeFrames *= 1.5f; break;
-                case "squawk": p.SquawkDodge = true; break;
-                case "lucky_feather": case "lucky_cork": p.Crit += 0.06f; p.Loot += 0.3f; break;
+                case "spritz": p.SquawkDodge = true; break;
+                case "lucky_bubbles": case "lucky_cork": p.Crit += 0.06f; p.Loot += 0.3f; break;
                 // pie
                 case "banana_cream": p.SplatRadius *= 1.4f; break;
                 case "seconds": p.ExtraShots++; break;

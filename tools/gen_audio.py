@@ -599,6 +599,30 @@ def splat(sec=0.45):
 
 write("splat", splat())
 
+
+# The seltzer bottle: a hiss of soda through the spout, fizzing as it goes.
+def fizz(sec=0.42):
+    hiss = shape(filt(noise(sec), "bp", lambda t: 5200 - 1800 * min(1.0, t / sec), 1.4),
+                 lambda t: min(1.0, t / 0.012) * math.exp(-t / 0.16))
+    rng = random.Random(11)
+    pops = silence(sec)
+    for _ in range(14):                      # bubbles bursting in the spray
+        at = rng.uniform(0.02, sec * 0.85)
+        place(pops, shape(osc(lambda t, f=rng.uniform(2400, 4200): f, 0.012), lambda t: math.exp(-t / 0.003)), at, 0.35)
+    return add((hiss, 1.0), (pops, 0.6))
+
+
+# A face full of soda: a bright wet slap with a spatter.
+def splash(sec=0.36):
+    slap = shape(filt(noise(sec), "bp", 1800, 1.2), lambda t: math.exp(-t / 0.045))
+    spatter = shape(filt(noise(sec), "hp", 3500), lambda t: min(1.0, t / 0.01) * math.exp(-t / 0.11))
+    plip = shape(osc(lambda t: 900 + 700 * min(1.0, t / 0.08), sec), lambda t: math.exp(-t / 0.05))
+    return add((slap, 1.0), (spatter, 0.55), (plip, 0.25))
+
+
+write("fizz", fizz())
+write("splash", splash())
+
 # The Ringmaster: a full calliope fanfare over a drum roll.
 rm = silence(3.2)
 place(rm, drumroll(1.2), 0, 0.7)

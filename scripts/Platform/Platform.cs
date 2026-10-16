@@ -54,6 +54,9 @@ public sealed class OfflinePlatform : IPlatform
     {
         FilePath = file;
         if (!fresh) _cfg.Load(FilePath);
+        // Beaten a boss with the rubber chicken, before the seltzer bottle replaced it: that counts.
+        if (_cfg.HasSectionKey("achievements", "win_chicken") && !_cfg.HasSectionKey("achievements", "win_seltzer"))
+            _cfg.SetValue("achievements", "win_seltzer", _cfg.GetValue("achievements", "win_chicken"));
     }
 
     /// <summary>Everything earned, for test reports.</summary>

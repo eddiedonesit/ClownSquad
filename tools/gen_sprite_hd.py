@@ -29,7 +29,7 @@ BASELINE = TOP_PAD + BODY_H
 
 SUIT, DIAMOND, RED, YELLOW, WHITE, SKIN, HAIR, NOSE = 1, 2, 3, 4, 5, 6, 7, 8
 INK, EYE, LIP, BLUSH, MAKEUP, SOLE, WOOD, METAL, BELT, GOLD = 9, 10, 11, 12, 13, 14, 15, 16, 17, 18
-IRON, CHICK, BEAK, COMB, DARKWOOD = 19, 20, 21, 22, 23
+IRON, GLASS, SODA, LABEL, DARKWOOD = 19, 20, 21, 22, 23
 CRUST, BALLOON, CORK, CREAM = 24, 25, 26, 27
 
 MATS = {
@@ -52,9 +52,9 @@ MATS = {
     BELT: Material((84, 44, 104)),
     GOLD: Material((252, 204, 72), gloss=True),
     IRON: Material((70, 66, 84), gloss=True),
-    CHICK: Material((250, 214, 70), soft=True),
-    BEAK: Material((240, 140, 40)),
-    COMB: Material((220, 40, 50)),
+    GLASS: Material((176, 228, 236), gloss=True),      # the seltzer bottle's glass
+    SODA: Material((112, 196, 222), gloss=True),       # the soda water inside
+    LABEL: Material((214, 48, 64)),
     DARKWOOD: Material((110, 64, 40)),
     CRUST: Material((222, 164, 92)),
     BALLOON: Material((236, 70, 170), gloss=True),
@@ -207,43 +207,56 @@ def hammer_handle(c, hx, hy, angle, length):
                                else m))
 
 
-def chicken_body(c, hx, hy, angle, length):
-    """The RUBBER CHICKEN, held by the feet: a long floppy yellow body, a head with
-    a red comb and an orange beak, little wings."""
+def seltzer_bottle(c, hx, hy, angle, length):
+    """The SELTZER BOTTLE, the clown's soda siphon: a tall glass bottle of fizzy
+    water (a red label with a white star), a chrome siphon head on top with its
+    lever, and a spout pointing forward. `angle` is the way the bottle's top
+    points; the spout points a quarter turn on, so with the bottle upright it
+    aims straight ahead."""
     r = math.radians(angle)
-    ux, uy = math.cos(r), -math.sin(r)
-    # a plump body, a thin rubbery neck, a big head
-    bx, by = hx + ux * length * 0.55, hy + uy * length * 0.55
+    ux, uy = math.cos(r), -math.sin(r)            # base to top
+    nx, ny = -uy, ux                              # the spout's way (ahead when upright)
+    if ny > 0.2 and nx < 0:                       # never aim back over the shoulder
+        nx, ny = -nx, -ny
+    K = 1.7                                       # bottle-sized next to the clown
+    G = -7                                        # held high, under the siphon head, thumb on the lever, the bottle hanging below
+    at = lambda a, b=0.0: (hx + ux * (a + G) * K + nx * b * K, hy + uy * (a + G) * K + ny * b * K)
+    # the glass, the water in it, the label
     c.part()
-    c.ellipse_rot(bx, by, length * 0.36, 12, math.atan2(uy, ux), CHICK)
-    px, py = -uy, ux                      # across the body, toward the top of the screen
-    if py > 0:
-        px, py = -px, -py
-    c.part()
-    c.ellipse_rot(bx + px * 6, by + py * 6, 9, 5, math.atan2(uy, ux), CHICK)          # a wing on top
-    nx0, ny0 = bx + ux * length * 0.3, by + uy * length * 0.3
-    hcx, hcy = hx + ux * (length + 8), hy + uy * (length + 8)
-    c.part()
-    c.capsule(nx0, ny0, hcx - ux * 6, hcy - uy * 6, 4.5, 3.5, CHICK)
-    c.part()
-    c.ellipse(hcx, hcy, 9, 9, CHICK)
-    # comb on top of the head, beak sticking out ahead
-    c.part()
-    for k in (-4, 0, 4):
-        c.ellipse(hcx + px * 9 + ux * k, hcy + py * 9 + uy * k, 3.6, 3.6, COMB)
-    c.part()
-    c.poly([(hcx + ux * 6 - px * 3, hcy + uy * 6 - py * 3), (hcx + ux * 16, hcy + uy * 16),
-            (hcx + ux * 6 + px * 3, hcy + uy * 6 + py * 3)], BEAK)
+    c.capsule(*at(-11), *at(6), 7.4 * K, 7.0 * K, GLASS)
+    c.capsule(*at(6), *at(11), 6.0 * K, 4.0 * K, GLASS)                     # the shoulder
+    def fill(x, y, m):
+        a = ((x - hx) * ux + (y - hy) * uy) / K - G
+        b = ((x - hx) * nx + (y - hy) * ny) / K
+        if m != GLASS:
+            return m
+        if -4 < a < 3:
+            if (b + 0.5) ** 2 + (a + 0.5) ** 2 < 7.5 and abs(b) < 3.5:
+                return WHITE                       # the star on the label
+            return LABEL
+        if a < 4 and abs(b + 3.2) > 1.4:
+            return SODA                            # the water, below the shoulder
+        return m
+    c.recolor(fill)
+    # bubbles rising in the water, and the glass's shine
+    for k, (a, b) in enumerate(((-9, 2), (-6.5, -2.5), (4.5, 1.5))):
+        c.part(line=False)
+        c.ellipse(*at(a, b), 1.0 * K, 1.0 * K, WHITE)
     c.part(line=False)
-    c.ellipse(hcx + ux * 2 + px * 3, hcy + uy * 2 + py * 3, 1.8, 1.8, INK)
+    c.capsule(*at(-9, -5), *at(5, -5), 0.9 * K, 0.9 * K, WHITE)
+    # the chrome siphon head, its lever and the spout
+    c.part()
+    c.capsule(*at(10.5), *at(17.5), 4.4 * K, 4.0 * K, METAL)
+    c.part()
+    c.capsule(*at(15, 1), *at(15, 12), 2.2 * K, 1.6 * K, METAL)              # the spout
+    c.part()
+    c.capsule(*at(18.5, -1), *at(21, -9), 1.6 * K, 1.4 * K, METAL)           # the lever, under the thumb
+    c.part(line=False)
+    c.ellipse(*at(15, 12.5), 1.1 * K, 1.1 * K, INK)                         # the spout's mouth
 
 
-def chicken_legs(c, hx, hy, angle, length):
-    r = math.radians(angle)
-    ux, uy = math.cos(r), -math.sin(r)
-    for side in (-1.5, 1.5):
-        c.part()
-        c.capsule(hx - uy * side, hy + ux * side, hx + ux * length * 0.3 - uy * side, hy + uy * length * 0.3 + ux * side, 1.4, 1.4, BEAK)
+def seltzer_grip(c, hx, hy, angle, length):
+    """Nothing behind the hand: the bottle is held round its middle."""
 
 
 def axis(angle):
@@ -424,9 +437,9 @@ def balloon_handle(c, hx, hy, angle, length):
     c.ellipse(hx - ux * 10, hy - uy * 10, 3.6, 3.6, YELLOW)
 
 
-HEADS = {"hammer": hammer_head, "chicken": chicken_body, "pie": pie_head, "pins": pin_head,
+HEADS = {"hammer": hammer_head, "seltzer": seltzer_bottle, "pie": pie_head, "pins": pin_head,
          "slapstick": slapstick_head, "popgun": popgun_head, "balloon": balloon_head}
-HANDLES = {"hammer": hammer_handle, "chicken": chicken_legs, "pie": pie_handle, "pins": pin_handle,
+HANDLES = {"hammer": hammer_handle, "seltzer": seltzer_grip, "pie": pie_handle, "pins": pin_handle,
            "slapstick": slapstick_handle, "popgun": popgun_handle, "balloon": balloon_handle}
 
 
@@ -445,8 +458,8 @@ DODGE_CARRY = (112, 24)    # steeper and closer, so the deep slide stays on canv
 
 # Some weapons are not carried on the shoulder: the pop gun is held at the
 # ready, the pie on the palm, the balloon sword out in front.
-CARRY_FOR = {"popgun": (12, 24), "pie": (20, 14), "balloon": (28, 26)}
-DODGE_CARRY_FOR = {"popgun": (6, 22), "pie": (25, 14), "balloon": (15, 24)}
+CARRY_FOR = {"popgun": (12, 24), "pie": (20, 14), "balloon": (28, 26), "seltzer": (88, 26)}
+DODGE_CARRY_FOR = {"popgun": (6, 22), "pie": (25, 14), "balloon": (15, 24), "seltzer": (80, 22)}
 
 
 def carry():
@@ -483,6 +496,9 @@ def old(mallet=None, body_dy=0, lean=0, head_dy=0, near_leg=0, far_leg=0,
 
 def draw(p):
     """Profile facing right, in the 96 x 128 authoring space."""
+    if WEAPON == "seltzer" and p["mallet"] is not None:
+        # the bottle hangs from the hand: carried at chest height, never trailing on the floor
+        p = dict(p, lift=max(p["lift"], 14), na=max(p["na"], 4))
     c = HDCanvas(W, H, DRAW_X, DRAW_Y)
     by, ln, hd = p["by"], p["ln"], p["hd"]
     nl, fl = p["nl"], p["fl"]
@@ -654,7 +670,25 @@ def player_frames():
     for name, kw in BASE:
         add(name, draw(old(mallet=dodge_carry() if name == "dodge" else carry(), **kw)))
 
-    if WEAPON == "popgun":
+    if WEAPON == "seltzer":
+        # every hit is a spray: the bottle held out, spout ahead, and squeezed.
+        # attack (borrowed by the held SOAK) and attack3: two hands, big recoil.
+        for clip in ("attack", "attack3"):
+            add(clip, draw(old(lean=1, body_dy=1, near_arm=3, far_arm=6, arm_lift=5, mallet=(86, 26))))
+            add(clip, draw(old(lean=0, near_arm=8, far_arm=8, arm_lift=7, mallet=(90, 26))))
+            add(clip, draw(old(lean=-4, body_dy=1, near_arm=9, far_arm=9, arm_lift=7, near_leg=-3, far_leg=4, mallet=(92, 26))))
+            add(clip, draw(old(lean=-3, body_dy=1, near_arm=9, far_arm=8, arm_lift=6, near_leg=-2, far_leg=3, mallet=(90, 26))))
+        # hit 1: a squirt from the chest
+        add("attack1", draw(old(lean=0, near_arm=4, far_arm=3, arm_lift=4, mallet=(85, 26))))
+        add("attack1", draw(old(lean=1, near_arm=9, far_arm=4, arm_lift=6, mallet=(90, 26))))
+        add("attack1", draw(old(lean=2, near_arm=11, far_arm=4, arm_lift=6, mallet=(92, 26))))
+        add("attack1", draw(old(lean=1, near_arm=10, far_arm=4, arm_lift=6, mallet=(90, 26))))
+        # hit 2: a squirt from up high, in their face
+        add("attack2", draw(old(lean=0, near_arm=6, far_arm=2, arm_lift=8, mallet=(88, 26))))
+        add("attack2", draw(old(lean=0, near_arm=9, far_arm=2, arm_lift=11, mallet=(94, 26))))
+        add("attack2", draw(old(lean=-1, near_arm=11, far_arm=1, arm_lift=13, mallet=(97, 26))))
+        add("attack2", draw(old(lean=-1, near_arm=10, far_arm=1, arm_lift=12, mallet=(94, 26))))
+    elif WEAPON == "popgun":
         # attack: shouldered and aimed down the lane, a kick of recoil on the shot
         add("attack", draw(old(lean=-1, near_arm=6, far_arm=7, arm_lift=8, mallet=(6, 26))))
         add("attack", draw(old(lean=0, near_arm=8, far_arm=8, arm_lift=8, mallet=(2, 26))))
@@ -675,7 +709,9 @@ def player_frames():
 
     # The combo's hits get swings of their own (the overhead "attack" above is
     # kept for the moves that borrow it: the ground pound, the slam).
-    if WEAPON == "popgun":
+    if WEAPON == "seltzer":
+        pass                                      # its sprays are above
+    elif WEAPON == "popgun":
         # from the hip, then from the shoulder
         add("attack1", draw(old(lean=0, body_dy=1, near_arm=8, far_arm=6, arm_lift=3, mallet=(-4, 26))))
         add("attack1", draw(old(lean=1, body_dy=1, near_arm=9, far_arm=7, arm_lift=3, mallet=(-6, 26))))
@@ -711,7 +747,7 @@ def player_frames():
         add("attack2", draw(old(lean=3, body_dy=0, near_arm=9, far_arm=-6, arm_lift=10, near_leg=2, far_leg=-3, mallet=(16, 28))))
         add("attack2", draw(old(lean=1, body_dy=-1, near_arm=10, far_arm=-8, arm_lift=13, mallet=(42, 24))))
     # hit 3, the power hit: the swipe again, wound right back and put everything into it
-    if WEAPON not in ("popgun", "pie"):
+    if WEAPON not in ("popgun", "pie", "seltzer"):
         add("attack3", draw(old(lean=-5, body_dy=3, near_arm=-10, far_arm=-4, arm_lift=7, near_leg=-3, far_leg=4, mallet=(182, 28))))
         add("attack3", draw(old(lean=0, body_dy=2, near_arm=-1, far_arm=0, arm_lift=8, near_leg=1, far_leg=1, mallet=(76, 14))))
         add("attack3", draw(old(lean=6, body_dy=2, near_arm=12, far_arm=3, arm_lift=7, near_leg=6, far_leg=-4, mallet=(2, 31))))
@@ -725,9 +761,9 @@ def player_frames():
 
     # spin: mallet straight out; the engine mirrors these rapidly into a whirl
     add("spin", draw(old(body_dy=2, lean=2, near_leg=4, far_leg=-4,
-                         near_arm=10, far_arm=-8, arm_lift=10, mallet=(6, 22 if WEAPON == "chicken" else 28))))
+                         near_arm=10, far_arm=-8, arm_lift=10, mallet=(6, 28))))
     add("spin", draw(old(body_dy=3, lean=3, near_leg=-3, far_leg=4,
-                         near_arm=10, far_arm=-8, arm_lift=9, mallet=(-6, 22 if WEAPON == "chicken" else 28))))
+                         near_arm=10, far_arm=-8, arm_lift=9, mallet=(-6, 28))))
 
     # throw: wind up, then released with the arm thrown forward and the hand empty
     add("throw", draw(old(lean=-5, body_dy=2, near_leg=-4, far_leg=5,
@@ -928,8 +964,8 @@ SQUAD = {
 
 
 # Each clown with each weapon. The mallet sheets keep their original names;
-# the others carry the weapon: pip_hammer_hd.png, pip_chicken_hd.png.
-WEAPONS = ("mallet", "hammer", "chicken", "pie", "pins", "slapstick", "popgun", "balloon")
+# the others carry the weapon: pip_hammer_hd.png, pip_seltzer_hd.png.
+WEAPONS = ("mallet", "hammer", "seltzer", "pie", "pins", "slapstick", "popgun", "balloon")
 
 
 def sheet_name(clown, weapon):
