@@ -95,6 +95,21 @@ public partial class WorldMap3D : Node3D
         GD.Print($"World map (3D): world {_world}, standing on {_at.Id}; {_state.Cleared.Count} node(s) cleared.");
 
         string[] args = OS.GetCmdlineUserArgs();
+        // The story: this world's card the first time here, or the ending once the Ringmaster has fallen.
+        if (System.Array.IndexOf(args, "mapshot") < 0 && System.Array.IndexOf(args, "storyshot") < 0)
+            CallDeferred(MethodName.TellStory, _state.Cleared.Contains($"{Campaign.Worlds}-B") ? ClownSquad.UI.StoryCard.Ending : _world);
+        // "-- storyshot 3": a picture of a story card, then quit (needs a window).
+        int storyAt = System.Array.IndexOf(args, "storyshot");
+        if (storyAt >= 0 && storyAt + 1 < args.Length && int.TryParse(args[storyAt + 1], out int card))
+        {
+            GetTree().CreateTimer(1.0).Timeout += () => TellStory(card, keep: false);
+            GetTree().CreateTimer(2.2).Timeout += () =>
+            {
+                if (!DisplayServer.GetName().Contains("headless"))
+                    GetViewport().GetTexture().GetImage().SavePng($"{ClownSquad.Debug.DebugShots.Dir}story_{card}.png");
+                GetTree().Quit();
+            };
+        }
         if (System.Array.IndexOf(args, "mapstats") >= 0)
             GetTree().CreateTimer(1.5).Timeout += () => _tent.Open();
         if (System.Array.IndexOf(args, "mapshot") >= 0)
@@ -714,7 +729,7 @@ public partial class WorldMap3D : Node3D
         _focus = _focus.Lerp(_avatar.Position, 1f - Mathf.Exp(-4f * dt));
         PlaceCamera(1f - Mathf.Exp(-3f * dt));
 
-        if (_shop is not null || _pause is not null || _inventory is not null || _skills is not null || _settings is not null || _tent.IsOpen || _walkingTo is not null) return;
+        if (_story is not null || _shop is not null || _pause is not null || _inventory is not null || _skills is not null || _settings is not null || _tent.IsOpen || _walkingTo is not null) return;
         PollPause();
         if (_pause is not null) return;
         PollJoins();
@@ -758,6 +773,34 @@ public partial class WorldMap3D : Node3D
         _mapPos = _at.MapPos;
         _state.At = _at.Id;
         RefreshInfo();
+        TellStory(world);
+    }
+
+    private ClownSquad.UI.StoryCard? _story;
+
+    /// <summary>Show a story card, once per save.</summary>
+    private void TellStory(int card) => TellStory(card, keep: true);
+
+    /// <param name="keep">Mark it seen in the save (screenshot runs do not).</param>
+    private void TellStory(int card, bool keep)
+    {
+        if (_story is not null || (keep && _state.StorySeen.Contains(card)) || !ClownSquad.UI.StoryCard.Has(card)) return;
+        if (keep && card == ClownSquad.UI.StoryCard.Ending) TellStory(Campaign.Worlds);   // (the last world's first, if it was missed)
+        if (_story is not null) return;
+        if (keep)
+        {
+            _state.StorySeen.Add(card);
+            SaveSystem.Save();
+        }
+        _story = new ClownSquad.UI.StoryCard(card, Campaign.SquadDevices);
+        _story.Closed += () =>
+        {
+            _story = null;
+            foreach (MapPad p in _pads) p.Swallow();
+            // The ending waits behind the last world's card, if both are due.
+            if (keep && _state.Cleared.Contains($"{Campaign.Worlds}-B")) TellStory(ClownSquad.UI.StoryCard.Ending);
+        };
+        AddChild(_story);
     }
 
     private void TryWalk(Vector2 dir)

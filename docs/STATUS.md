@@ -161,7 +161,7 @@ run-based or level-based structure, and max player count.
   reaches boss 7 of 10 in the boss rush; the eight weapons are tuned by probe only.
 - Daily Circus (built 2026-10-16): Title > DAILY CIRCUS.
   - One stage a day, picked from the UTC date: a normal fight of up to four waves from anywhere in the campaign, the same waves for everyone.
-  - One of six acts: ALL-STAR NIGHT, PIE NIGHT, MOON BOUNCE, GLASS CANNONS, THE BIG TOP, STAMPEDE.
+  - One of ten acts: ALL-STAR NIGHT, PIE NIGHT, MOON BOUNCE, GLASS CANNONS, THE BIG TOP, STAMPEDE, DOUBLE TIME, ONE-HIT WONDERS, BOUNCY CASTLE, LIGHTS OUT.
   - Fresh copies of your clowns at level 20 against level-15 acts, on a save of its own.
   - Score: knockouts, best combo, time against par, and a bonus if nobody falls.
   - The day's best is kept locally and on a per-day Steam leaderboard.
@@ -172,3 +172,10 @@ run-based or level-based structure, and max player count.
   Google Drive syncing the repo.
 - The soundtrack is synthesised. A composer or licensed recordings would be
   the step up for release; the song structure and loop points carry over.
+
+## Story (built 2026-10-16)
+
+- The Ringmaster has stolen the circus's laughter into his top hat and hypnotised every act to perform forever.
+- A comic-style story card the first time the squad reaches each world names what's wrong there and who is headlining.
+- A last card, THE LAST LAUGH, plays after the Ringmaster falls.
+- Each card shows once per save (`CampaignState.StorySeen`); `-- storyshot N` takes a picture of card N without touching the save.

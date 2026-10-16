@@ -19,7 +19,7 @@ public static class DailyCircus
     /// <summary>The acts' level, a little under the squad's: a fair fight on any day, wherever the stage is.</summary>
     public const int EnemyLevel = 15;
 
-    public enum Act { AllStars, PieNight, MoonBounce, GlassCannons, BigTop, Stampede }
+    public enum Act { AllStars, PieNight, MoonBounce, GlassCannons, BigTop, Stampede, DoubleTime, OneHitWonders, BouncyCastle, LightsOut }
 
     public sealed record ActInfo(Act Act, string Name, string Blurb);
 
@@ -31,6 +31,10 @@ public static class DailyCircus
         new(Act.GlassCannons, "GLASS CANNONS", "You hit twice as hard, with a little over half the health."),
         new(Act.BigTop, "THE BIG TOP", "The biggest ring of all, and the crowd fills it."),
         new(Act.Stampede, "STAMPEDE", "They just keep coming, half again as fast."),
+        new(Act.DoubleTime, "DOUBLE TIME", "The band plays fast and so does everyone. Keep up!"),
+        new(Act.OneHitWonders, "ONE-HIT WONDERS", "Every act goes down in a hit or two. So do you."),
+        new(Act.BouncyCastle, "BOUNCY CASTLE", "Everything that gets hit goes flying. Everything."),
+        new(Act.LightsOut, "LIGHTS OUT", "The power's out. Each clown brings their own spotlight."),
     };
 
     /// <summary>Today, by the calendar in UTC so the whole world shares a day: 2026-10-16.</summary>

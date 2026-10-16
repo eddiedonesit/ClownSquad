@@ -67,7 +67,7 @@ public partial class TitleScreen : Node3D
         }
         foreach (string f in new[] { "daily", "wavetest", "losetest", "movetest", "animtest", "aitest", "sandbox", "fight", "stage", "tentshot", "stageshot", "castshot", "weapontest", "weaponmoves", "bindtest", "skillshot", "practice", "practicetest", "demo", "bossrush" })
             if (Array.IndexOf(args, f) >= 0) { CallDeferred(MethodName.Go, Campaign.FightScene); return; }
-        if (Array.IndexOf(args, "mapshot") >= 0) { CallDeferred(MethodName.Go, Campaign.MapScene); return; }
+        if (Array.IndexOf(args, "mapshot") >= 0 || Array.IndexOf(args, "storyshot") >= 0) { CallDeferred(MethodName.Go, Campaign.MapScene); return; }
 
         Engine.TimeScale = 1.0;
         GetTree().Paused = false;

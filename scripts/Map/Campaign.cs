@@ -160,6 +160,8 @@ public sealed class CampaignState
     public Dictionary<string, int> ShopRestocks { get; set; } = new();
     /// <summary>Kinds of enemy met so far (EnemyCatalog.KindOf): the act cards and the bestiary.</summary>
     public List<string> Seen { get; set; } = new();
+    /// <summary>Story cards already shown (worlds 1-10, and 11 for the ending).</summary>
+    public List<int> StorySeen { get; set; } = new();
     /// <summary>Best boss rush time in seconds (0 = never finished).</summary>
     public double BossRushBest { get; set; }
 }

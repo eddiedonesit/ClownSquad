@@ -106,6 +106,10 @@ public partial class Fighter : CharacterBody3D
     [Export] public float Gravity { get; set; } = 26f;
     /// <summary>Everyone's gravity at once: the Daily Circus's MOON BOUNCE turns it down. Reset by each fight.</summary>
     public static float GravityScale { get; set; } = 1f;
+    /// <summary>Every knockback and launch at once (BOUNCY CASTLE). Reset by each fight.</summary>
+    public static float KnockScale { get; set; } = 1f;
+    /// <summary>The enemies' health as they arrive (ONE-HIT WONDERS). Reset by each fight.</summary>
+    public static float HostileHealthScale { get; set; } = 1f;
 
     private const float DownTime = 0.6f;
     private const float GetupInvulnerability = 0.55f;
@@ -170,6 +174,7 @@ public partial class Fighter : CharacterBody3D
 
     public override void _Ready()
     {
+        if (Hostile && HostileHealthScale != 1f) MaxHealth = Mathf.Max(1f, MaxHealth * HostileHealthScale);
         Health = MaxHealth;
         AddToGroup(Group);
         JoinFight();
@@ -483,9 +488,9 @@ public partial class Fighter : CharacterBody3D
 
         if (!HasPoise || IsDead)
         {
-            _knockback = info.KnockbackDirection.Normalized() * info.KnockbackForce;
+            _knockback = info.KnockbackDirection.Normalized() * info.KnockbackForce * KnockScale;
 
-            float launch = info.Launch * LaunchScale;
+            float launch = info.Launch * LaunchScale * Mathf.Sqrt(KnockScale);
             // Any hit on a body already in the air keeps it up a little longer.
             if (Launched && !Grounded && LaunchScale > 0f) launch = Mathf.Max(launch, 3.4f);
             // A killing blow always lifts the body, so a knockout reads as one.

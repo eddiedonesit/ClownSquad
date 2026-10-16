@@ -178,6 +178,8 @@ public partial class GameRoot : Node3D
         if (fieldAt >= 0 && fieldAt + 1 < args.Length && Enum.TryParse(args[fieldAt + 1], true, out FieldSize fs)) GameSettings.Field = fs;
         if (Has("god")) GameSettings.GodMode = true;           // "-- god": try god mode in a test run
         Fighter.GravityScale = _act?.Act == DailyCircus.Act.MoonBounce ? 0.45f : 1f;
+        Fighter.KnockScale = _act?.Act == DailyCircus.Act.BouncyCastle ? 2.2f : 1f;
+        Fighter.HostileHealthScale = _act?.Act == DailyCircus.Act.OneHitWonders ? 0.2f : 1f;
         if (_act?.Act == DailyCircus.Act.BigTop) GameSettings.Field = FieldSize.Huge;
         if (GetNodeOrNull<Camera3D>("Camera3D") is Camera3D cam)
         {
@@ -381,6 +383,8 @@ public partial class GameRoot : Node3D
         if (_netHost is not null) ClownSquad.Net.NetSession.Instance?.EndStage();
         if (Session.Mode == PlayMode.OnlineGuest || _act?.Act == DailyCircus.Act.BigTop) GameSettings.Load();   // a field size only for that stage
         Fighter.GravityScale = 1f;
+        Fighter.KnockScale = 1f;
+        Fighter.HostileHealthScale = 1f;
         Fighter.HitLanded -= OnHitLanded;
         Fighter.HitLanded -= OnPracticeHit;
         Arena.Current = null;
