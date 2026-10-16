@@ -39,8 +39,8 @@ public partial class PlayerFighter : Fighter
 
     // The balloon sword's charge: a short coil, then a dash that runs everyone through.
     private const float LungeWind = 0.14f;
-    private const float LungeDash = 0.26f;
-    private const float LungeSpeed = 15f;
+    private const float LungeDash = 0.18f;
+    private const float LungeSpeed = 7f;            // a step into the thrust (about a body length), not a dash across the ring
     private float _lungeTime;
 
     // A ranged weapon fires once per combo step.
@@ -1082,7 +1082,7 @@ public partial class PlayerFighter : Fighter
         _flipTime += dt;
         bool striking = _flipTime >= 0.12f && _flipTime < 0.28f;
         if (striking && _flipTime - dt < 0.12f) SwingTrail.Spawn(this, "thrust", 1.6f, 0.55f);
-        ApplyGroundMovement(striking ? Facing * 7f : Vector3.Zero, dt);       // drives forward as it strikes
+        ApplyGroundMovement(striking ? Facing * 4f : Vector3.Zero, dt);       // a short step in as it strikes
         PinClipFrame("attack", _flipTime < 0.12f ? 1 : 3);
         if (striking)
         {
@@ -1123,7 +1123,7 @@ public partial class PlayerFighter : Fighter
         Fx.Shake(this, 0.02f, 0.08f);
     }
 
-    /// <summary>The balloon sword's charge: coil, then dash forward running everyone through.</summary>
+    /// <summary>The balloon sword's charge: coil, then a short step in with a long thrust, running through whoever is in front.</summary>
     private void StartLunge()
     {
         Visual.Tint = BaseTint;
@@ -1155,7 +1155,7 @@ public partial class PlayerFighter : Fighter
                 if (_hitThisSwing.Contains(other)) continue;
                 Vector3 to = other.GlobalPosition - GlobalPosition;
                 float forward = to.X * Facing.X;
-                if (forward < -0.4f || forward > 2.6f || Mathf.Abs(to.Z) > 0.9f || Mathf.Abs(to.Y) > 1.9f) continue;
+                if (forward < -0.4f || forward > 3.0f || Mathf.Abs(to.Z) > 0.9f || Mathf.Abs(to.Y) > 1.9f) continue;
                 _hitThisSwing.Add(other);
                 Strike(other, 20f * _perks.Lunge, Facing, 5f, 0.06f, 4f, 0.4f);
             }

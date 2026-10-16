@@ -320,26 +320,52 @@ def slapstick_handle(c, hx, hy, angle, length):
 
 
 def popgun_head(c, hx, hy, angle, length):
-    """A toy POP GUN: a red barrel with yellow bands and a cork in the muzzle,
-    tied on with a string that loops back to the stock."""
+    """A toy POP GUN, the classic kind: a slim tin barrel striped like a
+    candy cane, a flared muzzle with a fat cork plugged in it, tied on by a
+    string that droops back to the barrel, and a wooden forestock under the
+    barrel where the front hand goes."""
     ux, uy, px, py = axis(angle)
     L = length * 0.95
+    at = lambda a, b=0.0: (hx + ux * a + px * b, hy + uy * a + py * b)
+    # the wooden forestock along the underside
     c.part()
-    c.capsule(hx + ux * 2, hy + uy * 2, hx + ux * L, hy + uy * L, 4.6, 4.2, RED)
-    c.recolor(lambda x, y, m: YELLOW if abs((x - hx) * ux + (y - hy) * uy - L * 0.45) < 2 or
-              abs((x - hx) * ux + (y - hy) * uy - L * 0.8) < 2 else m)
+    c.capsule(*at(1, -2.2), *at(L * 0.42, -2.2), 3.2, 3.0, DARKWOOD)
+    # the barrel: thin tin, red and white stripes running round it
     c.part()
-    c.ellipse_rot(hx + ux * (L + 4), hy + uy * (L + 4), 4, 4.4, math.atan2(uy, ux), CORK)
+    c.capsule(*at(0, 1.2), *at(L - 4, 1.2), 2.6, 2.6, METAL)
+    c.recolor(lambda x, y, m: RED if m == METAL and math.floor(((x - hx) * ux + (y - hy) * uy + ((x - hx) * px + (y - hy) * py) * 0.8) / 3.0) % 2 == 0 else m)
+    # the muzzle: a red flare
+    c.part()
+    c.capsule(*at(L - 7, 1.2), *at(L, 1.2), 3.4, 6.2, RED)
+    c.recolor(lambda x, y, m: YELLOW if abs((x - hx) * ux + (y - hy) * uy - (L - 4.5)) < 1.0 else m)
+    # the cork, half out of the muzzle, ready to pop
+    c.part()
+    cx, cy = at(L + 5, 1.2)
+    c.ellipse_rot(cx, cy, 6.0, 7.0, math.atan2(uy, ux), CORK)
     c.part(line=False)
-    c.stroke(bezier((hx + ux * (L + 4), hy + uy * (L + 4)), (hx + ux * L * 0.6 - px * 9, hy + uy * L * 0.6 - py * 9),
-                    (hx + ux * 4, hy + uy * 4)), 0.8, INK)
+    c.ellipse_rot(cx + ux * 2.4, cy + uy * 2.4, 2.6, 4.6, math.atan2(uy, ux), CREAM)       # the cork's lighter face
+    # the string, from the cork back to the barrel, sagging below it
+    c.part(line=False)
+    c.stroke(bezier((cx, cy), at(L * 0.75, -11), at(L * 0.45, -1)), 0.9, INK)
 
 
 def popgun_handle(c, hx, hy, angle, length):
+    """The rifle half: a trigger and guard under the hand, and a painted
+    wooden stock that drops down behind it to a broad butt."""
     ux, uy, px, py = axis(angle)
+    at = lambda a, b=0.0: (hx + ux * a + px * b, hy + uy * a + py * b)
+    # trigger guard and trigger
+    c.part(line=False)
+    c.stroke([at(2, -1), at(1, -6), at(-4, -6), at(-5, -2)], 0.8, INK)
+    c.part(line=False)
+    c.stroke([at(-1, -1.5), at(-2, -4.5)], 0.8, INK)
+    # the stock: wrist behind the hand, widening and dropping to the butt
     c.part()
-    # the stock, behind the hand, angled down like a rifle's
-    c.capsule(hx - ux * 2, hy - uy * 2, hx - ux * 16 - px * 4, hy - uy * 16 - py * 4, 4.8, 6.2, DARKWOOD)
+    c.poly([at(-3, 3.4), at(-22, 2.6), at(-24, -9.5), at(-20, -10), at(-6, -4), at(-3, -2.5)], DARKWOOD)
+    c.recolor(lambda x, y, m: YELLOW if m == DARKWOOD and abs((x - hx) * ux + (y - hy) * uy + 16) < 1.1 else m)   # a painted band
+    # the butt plate
+    c.part()
+    c.poly([at(-21.5, 2.8), at(-24.5, 2.2), at(-26.5, -9.8), at(-23.5, -10.2)], RED)
 
 
 def balloon_head(c, hx, hy, angle, length):
@@ -419,8 +445,8 @@ DODGE_CARRY = (112, 24)    # steeper and closer, so the deep slide stays on canv
 
 # Some weapons are not carried on the shoulder: the pop gun is held at the
 # ready, the pie on the palm, the balloon sword out in front.
-CARRY_FOR = {"popgun": (-12, 26), "pie": (20, 14), "balloon": (28, 26)}
-DODGE_CARRY_FOR = {"popgun": (-8, 22), "pie": (25, 14), "balloon": (15, 24)}
+CARRY_FOR = {"popgun": (12, 24), "pie": (20, 14), "balloon": (28, 26)}
+DODGE_CARRY_FOR = {"popgun": (6, 22), "pie": (25, 14), "balloon": (15, 24)}
 
 
 def carry():
