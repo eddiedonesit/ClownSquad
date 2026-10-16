@@ -60,6 +60,14 @@ public partial class PlayerFighter : Fighter
     private float _somersault;          // time left on the double jump's tumble, for the pose
     private Vector3 _airDashDir;
     private bool _slamLanded;
+    private float _landTime;            // a squash pose just after touching down
+    private bool _celebrating;          // the stage is won: cheer when standing still
+
+    /// <summary>The stage is won: stand and cheer (the victory pose) whenever not moving.</summary>
+    public void Celebrate() => _celebrating = true;
+
+    /// <summary>A pose if this sheet has it; sheets drawn before it (the classic art, enemies) fall back.</summary>
+    private bool Has(string clip) => Visual is not null && Visual.HasClip(clip);
 
     /// <summary>Double jump, air dash and slam belong to the squad; enemies keep their simpler air game.</summary>
     protected virtual bool HasAirMoves => !Hostile && HasMalletMoves;
@@ -363,8 +371,13 @@ public partial class PlayerFighter : Fighter
         }
 
         TickJuggle(dt);
-        // Touching down gives the air moves back.
-        if (Grounded) { _usedAirJump = false; _usedAirDash = false; _airTime = 0f; }
+        // Touching down gives the air moves back, after a real jump with a squash.
+        if (Grounded)
+        {
+            if (_airTime > 0.25f) _landTime = 0.1f;
+            _usedAirJump = false; _usedAirDash = false; _airTime = 0f;
+        }
+        if (_landTime > 0f) _landTime -= dt;
         else _airTime += dt;
         if (_somersault > 0f) _somersault -= dt;
 
@@ -482,7 +495,9 @@ public partial class PlayerFighter : Fighter
             else
             {
                 float speed = new Vector3(Velocity.X, 0f, Velocity.Z).Length();
-                PlayClip(speed > 0.6f ? "walk" : "idle");
+                if (_landTime > 0f && Has("land")) PinClipFrame("land", 0);
+                else if (speed <= 0.6f && _celebrating && Has("victory")) PlayClip("victory");
+                else PlayClip(speed > 0.6f ? "walk" : "idle");
             }
         }
     }
@@ -1152,7 +1167,7 @@ public partial class PlayerFighter : Fighter
         float t = _dodgeTime / AirDashTime;
         // Fast out, easing off; gravity is held off (it is added after this tick).
         Velocity = new Vector3(_airDashDir.X * AirDashSpeed * (1f - 0.5f * t), Gravity * dt, Velocity.Z * 0.5f);
-        PinClipFrame("dodge", 1);
+        if (Has("dash")) PinClipFrame("dash", 0); else PinClipFrame("dodge", 1);
         if (_dodgeTime >= AirDashTime || Grounded)
         {
             Velocity = new Vector3(Velocity.X * 0.4f, 0f, Velocity.Z);
@@ -1180,11 +1195,11 @@ public partial class PlayerFighter : Fighter
             if (_flipTime < 0.1f)
             {
                 Velocity = new Vector3(0f, Gravity * dt + 1.5f, 0f);
-                PinClipFrame("attack", 1);
+                if (Has("slam")) PinClipFrame("slam", 0); else PinClipFrame("attack", 1);
                 return;
             }
             Velocity = new Vector3(0f, -SlamDiveSpeed, 0f);
-            PinClipFrame("attack", 3);
+            if (Has("slam")) PinClipFrame("slam", 0); else PinClipFrame("attack", 3);
             // Anyone under the dive is struck on the way down.
             foreach (Fighter other in Opponents())
             {
@@ -1211,7 +1226,7 @@ public partial class PlayerFighter : Fighter
         }
         // A brief recovery on the ground: the price of the slam.
         ApplyGroundMovement(Vector3.Zero, dt);
-        PinClipFrame("attack", 3);
+        if (Has("slam")) PinClipFrame("slam", 1); else PinClipFrame("attack", 3);
         if (_flipTime >= SlamRecover) EndMalletMove();
     }
 

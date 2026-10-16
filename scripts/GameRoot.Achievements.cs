@@ -14,6 +14,7 @@ public partial class GameRoot
 
     private void OnWonForAchievements()
     {
+        foreach (PlayerFighter p in _players) p.Celebrate();      // the victory pose
         if (_rush)
         {
             double secs = _rushTime;      // set just before, when the rush was won

@@ -451,10 +451,14 @@ def draw(p):
     if behind:
         weapon_head(c, gx, gy, m[0], m[1])
 
-    # hair, behind everything above the shoulders
-    for x, y, r in ((36, hy - 10, 6), (31, hy - 3, 7.5), (27, hy + 5, 7), (30, hy + 13, 6.5)):
-        c.part()                                  # each curl its own part, so they separate
-        c.ellipse(x + ln, y, r, r * 0.9, HAIR)
+    # clown hair: a big round puff of curls bursting out from under the hat at
+    # the back of the head, wider than the head itself, each curl its own part
+    # so it shades as a bumpy cloud rather than one blob
+    for x, y, r in ((38, hy - 12, 6.5), (30, hy - 12, 7.5), (22, hy - 7, 8.5), (16, hy + 2, 9),
+                    (18, hy + 12, 8.5), (25, hy + 18, 8), (33, hy + 17, 6.5), (27, hy + 4, 8.5),
+                    (33, hy - 4, 7.5), (12, hy - 5, 6), (11, hy + 9, 6)):
+        c.part()
+        c.ellipse(x + ln, y, r, r * 0.92, HAIR)
 
     # far leg, shoe and arm, a tone darker
     c.part(far=True)
@@ -501,7 +505,9 @@ def draw(p):
     c.ellipse(37 + ln, hy + 4, 3.6, 5, SKIN)                     # ear, half under the hair
     c.recolor(lambda x, y, mm: BLUSH if ((x - 37.6 - ln) / 1.6) ** 2 + ((y - hy - 4) / 2.8) ** 2 <= 1 else mm)
     c.part()
-    c.ellipse(33 + ln, hy + 1, 4.5, 7, HAIR)                     # a curl over its back edge
+    c.ellipse(33 + ln, hy - 3, 5, 5, HAIR)                       # tufts sprouting over the ear
+    c.part()
+    c.ellipse(31 + ln, hy + 4, 5.2, 5.2, HAIR)
 
     # face
     c.part(line=False)
@@ -554,7 +560,7 @@ def draw(p):
 # ------------------------------------------------------------------ clips
 # Mirrors tools/gen_sprite.py clip for clip, so either sheet drives the same code.
 
-def idle_cycle(n=4):
+def idle_cycle(n=8):
     """A slow breath: settle down and back up, in n in-betweens."""
     out = []
     for i in range(n):
@@ -578,10 +584,11 @@ def walk_cycle(n=8):
 
 
 # Hand-keyed brawlers live on in-betweens; these two loops play all the time.
-FPS = {"idle": 6, "walk": 22, "empty_idle": 6, "empty_walk": 22}
+FPS = {"idle": 10, "walk": 22, "empty_idle": 10, "empty_walk": 22, "hit": 8, "empty_hit": 8, "victory": 4}
 
 BASE = idle_cycle() + walk_cycle() + [
     ("hit", dict(lean=-4, head_dy=-2, body_dy=2, near_arm=-7, far_arm=-5, arm_lift=-2)),
+    ("hit", dict(lean=-2, head_dy=-1, body_dy=1, near_arm=-4, far_arm=-3, arm_lift=-1)),   # catching himself
     ("dodge", dict(body_dy=8, lean=6, head_dy=3, near_leg=12, far_leg=-6,
                    near_arm=-10, far_arm=-7, arm_lift=-6)),
     ("dodge", dict(body_dy=15, lean=10, head_dy=6, near_leg=20, far_leg=-10,
@@ -643,6 +650,26 @@ def player_frames():
                     near_arm=6, far_arm=4, arm_lift=12, mallet=(70, 24)))
     for step in range(8):
         add("flip", rotated(tuck, step * 45, 48 + DRAW_X, 76 + DRAW_Y))
+
+    # landing: a squash on touching down
+    add("land", draw(old(mallet=carry(), body_dy=6, head_dy=3, near_leg=6, far_leg=-6,
+                         near_arm=-4, far_arm=-3, arm_lift=-3)))
+
+    # air dash: stretched out, leaning into it, legs trailing
+    add("dash", draw(old(mallet=(5, 26), lean=9, body_dy=3, head_dy=1, near_leg=-12, far_leg=-16,
+                         near_arm=9, far_arm=-9, arm_lift=6)))
+
+    # slam: weapon raised high for the dive, then smashed into the floor
+    add("slam", draw(old(mallet=(78, 28), lean=1, body_dy=-2, head_dy=-1, near_leg=4, far_leg=-3,
+                         near_arm=12, far_arm=2, arm_lift=15)))
+    add("slam", draw(old(mallet=(-25, 26), lean=5, body_dy=7, head_dy=3, near_leg=9, far_leg=-7,
+                         near_arm=10, far_arm=6, arm_lift=-4)))
+
+    # victory: weapon thrown up in the air, bouncing on the spot
+    add("victory", draw(old(mallet=(80, 29), lean=-2, body_dy=-1, head_dy=-2, near_leg=2, far_leg=-2,
+                            near_arm=12, far_arm=-6, arm_lift=15)))
+    add("victory", draw(old(mallet=(86, 29), lean=-1, body_dy=1, head_dy=0, near_leg=-2, far_leg=2,
+                            near_arm=11, far_arm=-5, arm_lift=13)))
 
     # the same body with empty hands, for while the mallet is in flight
     for name, kw in BASE:
