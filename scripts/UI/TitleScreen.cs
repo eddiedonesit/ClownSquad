@@ -59,7 +59,7 @@ public partial class TitleScreen : Node3D
         // Tests and debug runs go straight where they are going.
         string[] args = OS.IsDebugBuild() ? OS.GetCmdlineUserArgs() : Array.Empty<string>();
         if (Array.IndexOf(args, "nettest") >= 0) { SetProcess(false); AddChild(new ClownSquad.Debug.NetProbe()); return; }
-        foreach (string f in new[] { "wavetest", "losetest", "movetest", "animtest", "aitest", "sandbox", "fight", "stage", "tentshot", "stageshot", "castshot", "weapontest", "bindtest", "skillshot", "practice", "practicetest", "demo", "bossrush" })
+        foreach (string f in new[] { "wavetest", "losetest", "movetest", "animtest", "aitest", "sandbox", "fight", "stage", "tentshot", "stageshot", "castshot", "weapontest", "weaponmoves", "bindtest", "skillshot", "practice", "practicetest", "demo", "bossrush" })
             if (Array.IndexOf(args, f) >= 0) { CallDeferred(MethodName.Go, Campaign.FightScene); return; }
         if (Array.IndexOf(args, "mapshot") >= 0) { CallDeferred(MethodName.Go, Campaign.MapScene); return; }
 

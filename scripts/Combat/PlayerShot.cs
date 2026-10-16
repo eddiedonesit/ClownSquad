@@ -37,6 +37,8 @@ public partial class PlayerShot : Node3D
     /// <summary>Bursts in confetti at the end of its flight, hitting everyone near.</summary>
     public bool Burst;
     public float SpinSpeed = 14f;
+    /// <summary>Left on the floor where it lands (the big pie's cream).</summary>
+    public System.Action<Vector3>? LeavesBehind;
     /// <summary>How far off its lane a shot still hits: the same band as a swing (PlayerFighter.DepthBand), so lining up works the same for both.</summary>
     public float LaneBand = 0.85f;
 
@@ -103,6 +105,7 @@ public partial class PlayerShot : Node3D
     /// <summary>The end of a straight flight: just gone, or a burst of confetti.</summary>
     private void End()
     {
+        if (Splat > 0f) { Land(); return; }               // a pie that reaches the end of its flight splats on the floor
         if (Burst) Splash(1.8f, Damage * 0.8f, "kaboom", 1.4f, new Color(1f, 0.6f, 0.9f));
         QueueFree();
     }
@@ -110,6 +113,7 @@ public partial class PlayerShot : Node3D
     private void Land()
     {
         Splash(Splat > 0f ? Splat : 0.8f, Damage, "splat", 1f, new Color(1f, 0.97f, 0.9f));
+        LeavesBehind?.Invoke(new Vector3(GlobalPosition.X, 0f, GlobalPosition.Z));
         QueueFree();
     }
 

@@ -155,37 +155,33 @@ WEAPON = "mallet"
 
 
 def hammer_head(c, hx, hy, angle, length):
-    """BIG BERTHA: a dark iron barrel, bigger than the mallet's, banded in brass."""
+    """BIG BERTHA: a sledgehammer. A long rectangular iron block across the end
+    of the handle, square faces at both ends, brass bands, a bevelled edge:
+    nothing like the round squeaky mallet."""
     r = math.radians(angle)
-    mx, my = hx + math.cos(r) * (length - 2), hy - math.sin(r) * (length - 2)
-    ax, ay = math.cos(r + math.pi / 2), -math.sin(r + math.pi / 2)
-    nx, ny = math.cos(r), -math.sin(r)
-    head_len, head_rad = 50, 19
-    half = head_len / 2
-    if my + ay * half > my - ay * half:
-        ax, ay = -ax, -ay
-    e0 = (mx - ax * half, my - ay * half)
-    e1 = (mx + ax * half, my + ay * half)
-    axis = math.atan2(ay, ax)
-    cap = head_rad * 0.42
+    ux, uy = math.cos(r), -math.sin(r)               # along the handle
+    ax, ay = -uy, ux                                 # along the head (across the handle)
+    L = length - 2
+    mx, my = hx + ux * L, hy + uy * L                # the head's middle, at the handle's end
+    half, thick = 24, 13                             # the block: 48 long, 26 deep
+    corners = [(mx + ax * half + ux * thick, my + ay * half + uy * thick),
+               (mx - ax * half + ux * thick, my - ay * half + uy * thick),
+               (mx - ax * half - ux * thick, my - ay * half - uy * thick),
+               (mx + ax * half - ux * thick, my + ay * half - uy * thick)]
     c.part()
-    c.poly([(e0[0] + nx * head_rad, e0[1] + ny * head_rad), (e1[0] + nx * head_rad, e1[1] + ny * head_rad),
-            (e1[0] - nx * head_rad, e1[1] - ny * head_rad), (e0[0] - nx * head_rad, e0[1] - ny * head_rad)], IRON)
-    c.ellipse_rot(e0[0], e0[1], cap, head_rad, axis, IRON)
+    c.poly(corners, IRON)
 
-    def bands(x, y, m):
-        u = (x - e0[0]) * ax + (y - e0[1]) * ay
-        v = (x - e0[0]) * nx + (y - e0[1]) * ny
-        bulge = cap * math.sqrt(max(0.0, 1.0 - (v / head_rad) ** 2))
-        for at in (head_len * 0.12, head_len * 0.5, head_len * 0.88):
-            if abs(u - (at + bulge)) < 3.0:
-                return GOLD
+    def detail(x, y, m):
+        a = (x - mx) * ax + (y - my) * ay            # along the head
+        b = (x - mx) * ux + (y - my) * uy            # across it
+        if abs(abs(a) - half * 0.55) < 2.6:
+            return GOLD                               # brass bands near each end
+        if abs(a) > half - 4:
+            return METAL                              # polished striking faces
+        if b > thick - 3:
+            return DARKWOOD if False else m           # (keep the top plain)
         return m
-    c.recolor(bands)
-    c.part()
-    c.ellipse_rot(e1[0], e1[1], cap, head_rad, axis, METAL)
-    c.recolor(lambda x, y, m: IRON if ((x - e1[0]) * ax + (y - e1[1]) * ay) ** 2 / (cap * 0.5) ** 2
-              + ((x - e1[0]) * nx + (y - e1[1]) * ny) ** 2 / (head_rad * 0.45) ** 2 <= 1.0 else m)
+    c.recolor(detail)
 
 
 def hammer_handle(c, hx, hy, angle, length):
@@ -331,25 +327,59 @@ def popgun_handle(c, hx, hy, angle, length):
 
 
 def balloon_head(c, hx, hy, angle, length):
-    """A BALLOON SWORD: a long twisted balloon blade of glossy bulbs, a balloon crossguard."""
-    ux, uy, px, py = axis(angle)
-    L = length * 1.1
-    n = 5
-    seg = (L - 8) / n
-    for i in range(n):
-        u = 8 + seg * (i + 0.5)
+    """A BALLOON SWORD, shaped like a sword: a long straight blade of twisted
+    balloon tapering to a point, a crossguard of two round balloons, a short
+    grip and a pommel bulb. Longer than any other weapon."""
+    r = math.radians(angle)
+    ux, uy = math.cos(r), -math.sin(r)
+    px, py = -uy, ux
+    # the blade's tip, from the grip: a touch shorter swung right back or held straight out, to stay in frame
+    L = length * (1.5 if 15 < angle < 100 else 1.32)
+    g = 7                                             # where the blade starts (above the guard)
+    # the blade: overlapping capsules, each a twist, narrowing toward the point
+    n = 6
+    seg = (L - g) / n
+    for k in range(n):
+        a0, a1 = g + seg * k, g + seg * (k + 1)
+        w0 = 6.4 - 2.8 * k / n
+        w1 = 6.4 - 2.8 * (k + 1) / n
         c.part()
-        c.ellipse_rot(hx + ux * u, hy + uy * u, seg * 0.62, 5.2, math.atan2(uy, ux), BALLOON)
+        c.capsule(hx + ux * a0, hy + uy * a0, hx + ux * a1, hy + uy * a1, w0, w1, BALLOON)
+    # the point
     c.part()
-    c.ellipse(hx + ux * (L + 2), hy + uy * (L + 2), 2.2, 2.2, BALLOON)      # the knot at the tip
+    tip = L + 7
+    c.poly([(hx + ux * L + px * 3.4, hy + uy * L + py * 3.4), (hx + ux * tip, hy + uy * tip),
+            (hx + ux * L - px * 3.4, hy + uy * L - py * 3.4)], BALLOON)
+    # the twists between segments, and a shine along the blade's lit edge
+    def twist(x, y, m):
+        a = (x - hx) * ux + (y - hy) * uy
+        b = (x - hx) * px + (y - hy) * py
+        if m != BALLOON or a < g:
+            return m
+        if abs(((a - g) % seg) - seg) < 1.2 or ((a - g) % seg) < 0.8:
+            return RED                                # the knot where each twist pinches
+        if 0.8 < b < 2.0 and a < L:
+            return WHITE                              # the shine
+        return m
+    c.recolor(twist)
 
 
 def balloon_handle(c, hx, hy, angle, length):
-    ux, uy, px, py = axis(angle)
+    r = math.radians(angle)
+    ux, uy = math.cos(r), -math.sin(r)
+    px, py = -uy, ux
+    # crossguard: a balloon bar across the blade, round at both ends
     c.part()
-    c.ellipse_rot(hx + ux * 6, hy + uy * 6, 3.2, 10, math.atan2(uy, ux), YELLOW)     # crossguard, across the blade
+    c.capsule(hx + ux * 6 + px * 13, hy + uy * 6 + py * 13, hx + ux * 6 - px * 13, hy + uy * 6 - py * 13, 4.4, 4.4, YELLOW)
     c.part()
-    c.ellipse_rot(hx - ux * 5, hy - uy * 5, 5, 4, math.atan2(uy, ux), YELLOW)       # pommel
+    c.ellipse(hx + ux * 6 + px * 14, hy + uy * 6 + py * 14, 5.4, 5.4, YELLOW)
+    c.part()
+    c.ellipse(hx + ux * 6 - px * 14, hy + uy * 6 - py * 14, 5.4, 5.4, YELLOW)
+    # grip and pommel behind the hand
+    c.part()
+    c.capsule(hx - ux * 2, hy - uy * 2, hx - ux * 8, hy - uy * 8, 2.6, 2.6, BALLOON)
+    c.part()
+    c.ellipse(hx - ux * 10, hy - uy * 10, 3.6, 3.6, YELLOW)
 
 
 HEADS = {"hammer": hammer_head, "chicken": chicken_body, "pie": pie_head, "pins": pin_head,
@@ -370,6 +400,19 @@ def weapon_handle(c, hx, hy, angle, length):
 
 CARRY = (143, 29)          # resting back over the shoulder (original units)
 DODGE_CARRY = (112, 24)    # steeper and closer, so the deep slide stays on canvas
+
+# Some weapons are not carried on the shoulder: the pop gun is held at the
+# ready, the pie on the palm, the balloon sword out in front.
+CARRY_FOR = {"popgun": (-12, 26), "pie": (20, 14), "balloon": (28, 26)}
+DODGE_CARRY_FOR = {"popgun": (-8, 22), "pie": (25, 14), "balloon": (15, 24)}
+
+
+def carry():
+    return CARRY_FOR.get(WEAPON, CARRY)
+
+
+def dodge_carry():
+    return DODGE_CARRY_FOR.get(WEAPON, DODGE_CARRY)
 
 POSE = dict(by=0, ln=0, hd=0, nl=0, fl=0, nfoot=0, ffoot=0, na=0, fa=0, lift=0, mallet=None)
 
@@ -556,7 +599,7 @@ def player_frames():
     frames = []
     add = lambda name, cv: frames.append((name, cv))
     for name, kw in BASE:
-        add(name, draw(old(mallet=DODGE_CARRY if name == "dodge" else CARRY, **kw)))
+        add(name, draw(old(mallet=dodge_carry() if name == "dodge" else carry(), **kw)))
 
     if WEAPON == "popgun":
         # attack: shouldered and aimed down the lane, a kick of recoil on the shot

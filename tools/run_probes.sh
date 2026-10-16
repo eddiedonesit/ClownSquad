@@ -18,6 +18,7 @@ MUST=(
   "weapontest"
   "weapontest skills all"
   "bindtest"
+  "weaponmoves"
   "practicetest"
   "nettest host"    # these two talk to each other over localhost
   "nettest join"

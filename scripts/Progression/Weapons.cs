@@ -53,6 +53,10 @@ public sealed record WeaponDef(
     public float StunScale { get; init; } = 1f;
     /// <summary>Seconds the finisher leaves its target reeling (a pie in the face).</summary>
     public float FinisherStagger { get; init; }
+    /// <summary>Juggles a stock of these above the head; each attack press throws one (the pins).</summary>
+    public bool Juggles { get; init; }
+    /// <summary>Hold attack and a direction for this instead of the spin (the balloon sword's thrust).</summary>
+    public bool Thrusts { get; init; }
 }
 
 /// <summary>
@@ -166,14 +170,14 @@ public static class Weapons
 
     // Cream pies: a short smush, a finisher that leaves them blinded, and a lobbed pie that splats a crowd.
     private static readonly WeaponDef PieDef = new(
-        WeaponKind.Pie, "CREAM PIE", "Short reach, messy finish. Held charge lobs a pie that blinds everyone it splats.",
+        WeaponKind.Pie, "CREAM PIE", "Every press throws a pie in someone's face; every third is a big one. Held charge lobs a giant pie that leaves a slick of cream: enemies slip and fall.",
         new AttackStep[]
         {
-            new(0.09f, 0.06f, 0.18f, 9f, 2.0f, 0.050f, 1.6f, 0f),
-            new(0.09f, 0.06f, 0.20f, 11f, 2.5f, 0.060f, 1.6f, 0f),
-            new(0.12f, 0.08f, 0.30f, 18f, 6.0f, 0.100f, 1.8f, 5f),
+            new(0.08f, 0.05f, 0.20f, 9f, 2.0f, 0.050f, 8f, 0f),
+            new(0.08f, 0.05f, 0.20f, 10f, 2.2f, 0.050f, 8f, 0f),
+            new(0.12f, 0.06f, 0.32f, 18f, 6.0f, 0.090f, 9f, 4.5f),
         },
-        new(0.09f, 0.06f, 0.18f, 10f, 2.2f, 0.055f, 1.6f, 0f),
+        new(0.08f, 0.05f, 0.20f, 10f, 2.2f, 0.055f, 8f, 0f),
         ChargeMove.Lob, "mallet_spin_hd", "fwee",
         new[] { "CREAM", "BAKERY", "SWEETS" },
         new Skill[]
@@ -188,11 +192,11 @@ public static class Weapons
             new("sweet_tooth", "SWEET TOOTH", "Each knockout heals 4% of max health.", 2, 2),
             new("custard_coat", "CUSTARD COAT", "Take 15% less damage.", 2, 3),
         })
-    { HitSound = "splat", HitPitch = 1.1f, Heft = 0f, FinisherStagger = 0.9f };
+    { Ranged = true, HitSound = "splat", HitPitch = 1.1f, Heft = 0f, FinisherStagger = 0.9f };
 
     // Juggling pins: quick clubs, and a held charge throws a fan of pins down the lane.
     private static readonly WeaponDef PinsDef = new(
-        WeaponKind.Pins, "JUGGLING PINS", "Quick clubbing, and a held charge throws a fan of pins down the lane.",
+        WeaponKind.Pins, "JUGGLING PINS", "Juggles up to five pins overhead. Each press throws one as fast as you can tap; they come back while you juggle. Held charge throws them all at once. Out of pins, it clubs.",
         new AttackStep[]
         {
             new(0.07f, 0.05f, 0.14f, 9f, 2.0f, 0.050f, 2.0f, 0f),
@@ -205,7 +209,7 @@ public static class Weapons
         new Skill[]
         {
             new("fourth_pin", "FOURTH PIN", "After the big third hit, one more swing to juggle them.", 0, 1),
-            new("five_pin", "FIVE PIN", "The fan throws five pins.", 0, 2),
+            new("five_pin", "SEVEN PIN", "Juggle seven pins instead of five.", 0, 2),
             new("strike", "STRIKE!", "Thrown pins fly through everyone in the lane.", 0, 3),
             new("heavy_pins", "HEAVY PINS", "+15% combo damage.", 1, 1),
             new("spare", "SPARE", "Thrown pins hit 50% harder.", 1, 2),
@@ -214,7 +218,7 @@ public static class Weapons
             new("quick_hands", "QUICK HANDS", "Swings are 15% faster.", 2, 2),
             new("jugglers_luck", "JUGGLER'S LUCK", "+30% crit damage and better loot.", 2, 3),
         })
-    { HitSound = "clack", HitPitch = 1.1f, Heft = 0.6f };
+    { HitSound = "clack", HitPitch = 1.1f, Heft = 0.6f, Juggles = true };
 
     // The slapstick: little damage, huge noise. Every hit stuns; a held charge claps the whole lane silly.
     private static readonly WeaponDef SlapstickDef = new(
@@ -270,7 +274,7 @@ public static class Weapons
 
     // The balloon sword: the longest reach in the squad, quick and squeaky; a held charge lunges.
     private static readonly WeaponDef BalloonDef = new(
-        WeaponKind.BalloonSword, "BALLOON SWORD", "The longest reach in the circus. Quick squeaky slashes; a held charge lunges like a fencer.",
+        WeaponKind.BalloonSword, "BALLOON SWORD", "The longest reach in the circus. Quick squeaky slashes; hold attack and a direction to thrust them into the wall; a held charge lunges like a fencer.",
         new AttackStep[]
         {
             new(0.07f, 0.05f, 0.14f, 8f, 2.0f, 0.040f, 2.7f, 0f),
@@ -287,12 +291,12 @@ public static class Weapons
             new("fleche", "FLECHE", "The lunge goes 50% farther and hits 50% harder.", 0, 3),
             new("squeaky", "SQUEAKY", "Slashes are 15% faster.", 1, 1),
             new("pop_goes", "POP GOES THE...", "The finisher bursts the balloon in a bang that hits all around.", 1, 2),
-            new("spin_doctor", "TWISTER", "Spins last 50% longer and hit 50% harder.", 1, 3),
+            new("spin_doctor", "TWISTER", "The wall thrust hits 50% harder and shoves further.", 1, 3),
             new("helium", "HELIUM", "Dodges stay untouchable 50% longer.", 2, 1),
             new("crowd_pleaser", "CROWD PLEASER", "+5% crit chance.", 2, 2),
             new("last_stand", "LAST STAND", "+30% damage while below 30% health.", 2, 3),
         })
-    { HitSound = "squeak", HitPitch = 1.4f, Heft = 0f };
+    { HitSound = "squeak", HitPitch = 1.4f, Heft = 0f, Thrusts = true };
 
     public static readonly WeaponDef[] All = { MalletDef, HammerDef, ChickenDef, PieDef, PinsDef, SlapstickDef, PopGunDef, BalloonDef };
 

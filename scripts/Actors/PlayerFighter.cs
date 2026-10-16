@@ -16,7 +16,7 @@ using ClownSquad.Net;
 /// </summary>
 public partial class PlayerFighter : Fighter
 {
-    private enum State { Free, Attacking, Dodging, Special, Charging, Spinning, Throwing, Flipping, Quaking, Lunging, AirDashing, Slamming }
+    private enum State { Free, Attacking, Dodging, Special, Charging, Spinning, Throwing, Flipping, Quaking, Lunging, AirDashing, Slamming, Thrusting, PinToss }
 
     // The combo comes from the weapon in hand (Weapons.cs): an escalating chain
     // where only the finisher launches, so a full string is what opens a juggle.
@@ -78,7 +78,9 @@ public partial class PlayerFighter : Fighter
 
     // Charge moves. Time is measured from the moment attack is pressed.
     private const float ChargeStart = 0.35f;     // held past a tap: the charge pose begins
-    private const float SpinMinCharge = 0.6f;    // earliest a held direction turns it into a spin
+    // Hold attack with a direction for 0.5 real seconds (in game time, which runs at GameClock.Speed)
+    // and the forward charge move starts: the spin, or the balloon sword's thrust. Same for every weapon.
+    private const float SpinMinCharge = 0.5f * (float)ClownSquad.World.GameClock.Speed;
     // Standing still this long throws the mallet: one real second, expressed in
     // game time, which runs at GameClock.Speed.
     private const float FullCharge = 1.0f * (float)ClownSquad.World.GameClock.Speed;
@@ -173,6 +175,8 @@ public partial class PlayerFighter : Fighter
         State.Quaking => _weapon.Charge == ChargeMove.Clap ? "CLAP" : "QUAKE",
         State.Lunging => "LUNGE",
         State.AirDashing => "AIRDASH",
+        State.Thrusting => "THRUST",
+        State.PinToss => "PINTOSS",
         State.Slamming => "SLAM",
         _ => Armed ? "free" : "free (unarmed)",
     };
@@ -358,6 +362,7 @@ public partial class PlayerFighter : Fighter
             _chargeLock = false;
         }
 
+        TickJuggle(dt);
         // Touching down gives the air moves back.
         if (Grounded) { _usedAirJump = false; _usedAirDash = false; _airTime = 0f; }
         else _airTime += dt;
@@ -376,6 +381,8 @@ public partial class PlayerFighter : Fighter
             case State.Quaking: TickQuake(dt); break;
             case State.Lunging: TickLunge(dt); break;
             case State.AirDashing: TickAirDash(dt); break;
+            case State.Thrusting: TickThrust(dt); break;
+            case State.PinToss: TickPinToss(dt); break;
             case State.Slamming: TickSlam(dt); break;
         }
     }
@@ -427,6 +434,11 @@ public partial class PlayerFighter : Fighter
             if (_bufferedAttack)
             {
                 _bufferedAttack = false;
+                if (Armed && _weapon.Juggles && HasMalletMoves && _pinStock > 0)
+                {
+                    ThrowPin();
+                    return;
+                }
                 if (Armed)
                 {
                     StartAttack();
@@ -557,7 +569,11 @@ public partial class PlayerFighter : Fighter
 
         if (_weapon.Ranged && HasMalletMoves)
         {
-            if (!_fired && _phaseTime >= activeStart) { _fired = true; FireCork(step); }
+            if (!_fired && _phaseTime >= activeStart)
+            {
+                _fired = true;
+                if (Weapon == WeaponKind.Pie) ThrowPie(step); else FireCork(step);
+            }
         }
         else if (_phaseTime > activeStart && prev < activeEnd)
             ResolveSwing(step);
@@ -715,7 +731,11 @@ public partial class PlayerFighter : Fighter
         if (Mathf.Abs(cmd.Move.X) > 0.35f)
         {
             Facing = new Vector3(Mathf.Sign(cmd.Move.X), 0f, 0f);
-            if (_heldTime >= SpinMinCharge) { StartSpin(); return; }
+            if (_heldTime >= SpinMinCharge)
+            {
+                if (_weapon.Thrusts) StartThrust(); else StartSpin();
+                return;
+            }
         }
 
         if (_heldTime >= FullCharge)
@@ -860,10 +880,15 @@ public partial class PlayerFighter : Fighter
                     pie.Blind = 1.4f * _perks.Blind;
                     pie.Knockback = 3f;
                     pie.SpinSpeed = 4f;
+                    float slick = 1.6f * _perks.SplatRadius;
+                    pie.LeavesBehind = at => CreamPuddle.Spawn(GetParent(), this, at, slick, 6.5f);
                 }
                 break;
             case ChargeMove.Fan:
-                int n = 3 + extra;
+                // Everything in the juggle goes at once (at least one, pulled from a pocket).
+                int n = Mathf.Max(1, _pinStock);
+                _pinStock = 0;
+                _pinRegen = -PinRegenDelay;
                 for (int i = 0; i < n; i++)
                 {
                     float z = (i - (n - 1) * 0.5f) * 0.16f;
@@ -887,6 +912,149 @@ public partial class PlayerFighter : Fighter
                 Visual.Squash(0.3f);
                 break;
         }
+    }
+
+    /// <summary>A pie flung in an arc at face height; it splats on the first face it meets. The power hit's pie is bigger.</summary>
+    private void ThrowPie(in AttackStep step)
+    {
+        bool big = IsPowerHit;
+        Vector3 from = GlobalPosition + new Vector3(Facing.X * 0.3f, 1.2f, 0f);
+        var pie = PlayerShot.Fire(this, PlayerShot.Pie(big ? 1.6f : 1.05f), from, Facing, 13f);
+        pie.Velocity += new Vector3(0f, 2.4f, 0f);
+        pie.Gravity = 6f;
+        pie.Damage = step.Damage;
+        pie.Range = step.Range * _perks.ThrowRange;
+        pie.Knockback = step.Knockback;
+        pie.Launch = step.Launch * _launchMultiplier;
+        pie.Splat = big ? 1.3f * _perks.SplatRadius : 0.6f;
+        pie.Blind = (big ? 1.0f : 0.45f) * _perks.Blind;
+        pie.SpinSpeed = 3f;
+        Fx.Sound("fwee", big ? 0.9f : 1.2f);
+        if (big) Fx.Pop(GetParent(), GlobalPosition + new Vector3(Facing.X * 0.8f, BodyHeight + 0.4f, 0f), "PIE TIME!", new Color(1f, 0.95f, 0.8f), 0.9f, 0.6f);
+    }
+
+    // ------------------------------------------------------- the pin juggle
+
+    private const float PinRegenDelay = 0.35f;     // juggling resumes this long after a throw
+    private const float PinRegenEach = 0.4f;       // then one more pin joins every this long
+    private int _pinStock = 5;
+    private float _pinRegen;
+    private int _pinStreak;
+    private double _lastPinAt = -9;
+    private Node3D? _juggle;
+    private readonly List<Node3D> _jugglePins = new();
+    private float _juggleClock;
+
+    private int MaxPins => 5 + _perks.ExtraShots;
+
+    /// <summary>Pins in the juggle right now (the pins weapon), for the HUD and tests.</summary>
+    public int PinStock => _weapon.Juggles ? _pinStock : 0;
+
+    /// <summary>One pin from the juggle, straight down the lane; every third in a quick run is a power pin.</summary>
+    private void ThrowPin()
+    {
+        _pinStock--;
+        _pinRegen = -PinRegenDelay;
+        _pinStreak = ClownSquad.World.GameClock.Seconds - _lastPinAt < 0.7 ? _pinStreak + 1 : 1;
+        _lastPinAt = ClownSquad.World.GameClock.Seconds;
+        bool power = _pinStreak % 3 == 0;
+        var pin = PlayerShot.Fire(this, EnemyShot.Pin(power ? 1.9f : 1.3f), GlobalPosition + new Vector3(Facing.X * 0.4f, 1.3f, 0f), Facing, 17f);
+        pin.Damage = (power ? 18f : 8f) * _perks.Damage * _perks.ThrowDamage;
+        pin.Range = 9f * _perks.ThrowRange;
+        pin.Pierce = _perks.Pierce;
+        pin.Knockback = power ? 7f : 3f;
+        pin.Launch = power || _perks.ThrowLaunches ? 5f : 0f;
+        Fx.Sound("whoosh", power ? 1.0f : 1.5f, -4f);
+        if (power) Fx.Pop(GetParent(), GlobalPosition + new Vector3(Facing.X * 0.8f, BodyHeight + 0.4f, 0f), "CLONK!", new Color(1f, 0.9f, 0.35f), 1f, 0.6f);
+        _flipTime = 0f;
+        _state = State.PinToss;
+    }
+
+    private void TickPinToss(float dt)
+    {
+        _flipTime += dt;
+        ApplyGroundMovement(ToWorld(_cmd.Move) * MoveSpeed * 0.5f, dt);
+        PinClipFrame("attack", _flipTime < 0.05f ? 2 : 3);
+        // Short enough to throw as fast as you can tap; a press during it is kept.
+        if (_flipTime >= 0.1f) _state = State.Free;
+    }
+
+    /// <summary>The juggle: the stock refills while you juggle, and you can see it, pins wheeling over the head.</summary>
+    private void TickJuggle(float dt)
+    {
+        if (!_weapon.Juggles || Hostile || !HasMalletMoves)
+        {
+            if (_juggle is not null) _juggle.Visible = false;
+            return;
+        }
+        if (_pinStock < MaxPins)
+        {
+            _pinRegen += dt;
+            if (_pinRegen >= PinRegenEach) { _pinStock++; _pinRegen = 0f; Fx.Sound("clack", 1.6f, -14f); }
+        }
+        if (_juggle is null)
+        {
+            _juggle = new Node3D { Name = "Juggle" };
+            AddChild(_juggle);
+            for (int i = 0; i < 7; i++)
+            {
+                Node3D pin = EnemyShot.Pin(0.85f);
+                _juggle.AddChild(pin);
+                _jugglePins.Add(pin);
+            }
+        }
+        _juggle.Visible = !IsDead;
+        _juggleClock += dt;
+        int n = _pinStock;
+        for (int i = 0; i < _jugglePins.Count; i++)
+        {
+            Node3D pin = _jugglePins[i];
+            pin.Visible = i < n;
+            if (i >= n) continue;
+            // A cascade: each pin on the same figure-of-eight loop, spaced evenly in time.
+            float ph = _juggleClock * 3.4f + Mathf.Tau * i / Mathf.Max(1, n);
+            pin.Position = new Vector3(Mathf.Sin(ph) * 0.42f + Facing.X * 0.15f, BodyHeight + 0.55f + Mathf.Abs(Mathf.Cos(ph)) * 0.55f, 0.12f);
+            pin.Rotation = new Vector3(0f, 0f, ph * 2f);
+        }
+    }
+
+    // ------------------------------------------------------ the wall thrust
+
+    /// <summary>The balloon sword, held charge plus a direction: a straight thrust that shoves them into the wall.</summary>
+    private void StartThrust()
+    {
+        Visual.Tint = BaseTint;
+        Sfx.Stop(_chargeVoice);
+        _chargeVoice = null;
+        _flipTime = 0f;
+        _hitThisSwing.Clear();
+        _state = State.Thrusting;
+        Fx.Sound("whoosh", 1.1f);
+    }
+
+    private void TickThrust(float dt)
+    {
+        _flipTime += dt;
+        bool striking = _flipTime >= 0.12f && _flipTime < 0.28f;
+        ApplyGroundMovement(striking ? Facing * 7f : Vector3.Zero, dt);       // drives forward as it strikes
+        PinClipFrame("attack", _flipTime < 0.12f ? 1 : 3);
+        if (striking)
+        {
+            float power = _perks.SpinDamage;      // TWISTER
+            foreach (Fighter other in Opponents())
+            {
+                if (_hitThisSwing.Contains(other)) continue;
+                Vector3 to = other.GlobalPosition - GlobalPosition;
+                float forward = to.X * Facing.X;
+                if (forward <= 0f || forward > 3.3f || Mathf.Abs(to.Z) > 1.0f || Mathf.Abs(to.Y) > 1.9f) continue;
+                _hitThisSwing.Add(other);
+                // A small lift and a huge shove: they sail flat across the ring and bounce off the wall.
+                Strike(other, 14f * power, Facing, 24f * power * _perks.Knockback, 0.1f, 2.2f, 0.7f);
+                Fx.Pop(GetParent(), other.GlobalPosition + new Vector3(0f, other.BodyHeight + 0.3f, 0f), "BOING!", new Color(1f, 0.6f, 0.85f), 1f, 0.6f);
+                Fx.Shake(this, 0.08f, 0.18f);
+            }
+        }
+        if (_flipTime >= 0.5f) EndMalletMove();
     }
 
     /// <summary>A pop-gun shot: one cork (two with DOUBLE BARREL) straight down the lane.</summary>
