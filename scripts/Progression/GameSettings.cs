@@ -4,6 +4,9 @@ using Godot;
 
 public enum Difficulty { Easy, Normal, Hard }
 
+/// <summary>How much of the stage the camera takes in: more room to fight in, smaller clowns.</summary>
+public enum FieldSize { Normal, Large, Huge }
+
 /// <summary>
 /// The player's settings, kept apart from the save slots (they belong to the
 /// machine, not to a squad): music and sound volume on their own audio buses,
@@ -28,8 +31,29 @@ public static class GameSettings
     /// <summary>The best boss rush time in seconds on this machine (0 = never finished).</summary>
     public static double BossRushBest { get; set; }
 
+    public static FieldSize Field { get; set; } = FieldSize.Normal;
+
+    /// <summary>
+    /// For now, a cheat for trying things out: the squad cannot be hurt and every
+    /// hit is a knockout. Achievements are not earned while it is on.
+    /// </summary>
+    public static bool GodMode { get; set; }
+
     /// <summary>Set by the test runs: difficulty reads as Normal whatever is saved.</summary>
     public static bool ForceNormal { get; set; }
+
+    /// <summary>God mode in force (never in tests).</summary>
+    public static bool God => GodMode;
+
+    /// <summary>How far back the camera sits and how deep the walkway is, relative to normal.</summary>
+    public static float FieldScale => Field switch { FieldSize.Large => 1.25f, FieldSize.Huge => 1.5f, _ => 1f };
+
+    public static string Describe(FieldSize f) => f switch
+    {
+        FieldSize.Large => "A quarter more room to fight in; the clowns look a little smaller.",
+        FieldSize.Huge => "Half as much room again; the clowns look smaller still.",
+        _ => "The stage as framed.",
+    };
 
     private static bool _loaded;
 
@@ -63,6 +87,8 @@ public static class GameSettings
             Fullscreen = (bool)cfg.GetValue("video", "fullscreen", Fullscreen);
             Difficulty = (Difficulty)(int)cfg.GetValue("game", "difficulty", (int)Difficulty);
             BossRushBest = (double)cfg.GetValue("records", "boss_rush", BossRushBest);
+            Field = (FieldSize)(int)cfg.GetValue("game", "field", (int)Field);
+            GodMode = (bool)cfg.GetValue("game", "god_mode", GodMode);
         }
         Apply();
     }
@@ -76,6 +102,8 @@ public static class GameSettings
         cfg.SetValue("video", "fullscreen", Fullscreen);
         cfg.SetValue("game", "difficulty", (int)Difficulty);
         cfg.SetValue("records", "boss_rush", BossRushBest);
+        cfg.SetValue("game", "field", (int)Field);
+        cfg.SetValue("game", "god_mode", GodMode);
         cfg.Save(FilePath);
     }
 

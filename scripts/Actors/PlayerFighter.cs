@@ -251,23 +251,56 @@ public partial class PlayerFighter : Fighter
         if (IsInsideTree() && !IsDead && MaxHealth > oldMax) Heal(MaxHealth - oldMax);
     }
 
-    /// <summary>The weapon's combo with the skill tree applied: extra swings go in before the finisher.</summary>
+    /// <summary>
+    /// Every combo's third hit is the power hit: harder, launching, with the
+    /// big impact (see <see cref="PowerHitFx"/>). Swings a skill adds come
+    /// after it, as follow-ups that keep the launched enemy in the air.
+    /// </summary>
+    private const int PowerHit = 2;
+
+    /// <summary>The weapon's combo with the skill tree applied.</summary>
     private static AttackStep[] BuildCombo(WeaponDef w, WeaponPerks k)
     {
         var steps = new List<AttackStep>(w.Combo);
-        for (int i = 0; i < k.ExtraSteps; i++) steps.Insert(steps.Count - 1, w.Extra);
+        int power = System.Math.Min(PowerHit, steps.Count - 1);
+        // Follow-ups: as fast as an opener, a little harder, with a lift to juggle.
+        for (int i = 0; i < k.ExtraSteps; i++)
+            steps.Add(w.Extra with { Damage = w.Extra.Damage * 1.2f, Launch = 3.4f, Knockback = w.Extra.Knockback * 0.6f });
         for (int i = 0; i < steps.Count; i++)
         {
             AttackStep s = steps[i];
-            bool last = i == steps.Count - 1;
+            bool big = i == power;
             steps[i] = s with
             {
-                Damage = s.Damage * k.Damage * (last ? k.Finisher : 1f),
+                Damage = s.Damage * k.Damage * (big ? k.Finisher : 1f),
                 Knockback = s.Knockback * k.Knockback,
                 Launch = s.Launch * k.Launch,
+                Hitstop = big ? s.Hitstop * 1.35f : s.Hitstop,
             };
         }
         return steps.ToArray();
+    }
+
+    private bool IsPowerHit => _comboIndex == System.Math.Min(PowerHit, Combo.Length - 1);
+    private bool _powerFxDone;
+
+    /// <summary>The third hit lands: it should feel like the big one.</summary>
+    private void PowerHitFx(Fighter target)
+    {
+        if (_powerFxDone || Hostile) return;
+        _powerFxDone = true;
+        Vector3 at = target.GlobalPosition + new Vector3(0f, target.BodyHeight * 0.6f, 0f);
+        Fx.Impact(GetParent(), at, 1.5f);
+        Fx.Punch(this, 0.55f);
+        Fx.Shake(this, 0.11f, 0.22f);
+        Fx.Sound("kaboom", 1.7f, -9f);
+        string word = Weapon switch
+        {
+            WeaponKind.Hammer => "WHAM!", WeaponKind.Chicken => "BAWK!", WeaponKind.Pie => "SPLAT!",
+            WeaponKind.Pins => "CLONK!", WeaponKind.Slapstick => "SLAP!", WeaponKind.PopGun => "POP!",
+            WeaponKind.BalloonSword => "SQUEAK!", _ => "BONK!",
+        };
+        Fx.Pop(GetParent(), at + new Vector3(0f, 0.6f, 0f), word, new Color(1f, 0.9f, 0.35f), 1.1f, 0.8f);
     }
 
     /// <summary>
@@ -451,6 +484,7 @@ public partial class PlayerFighter : Fighter
         _hitThisSwing.Clear();
         _impactSpawned = false;
         _fired = false;
+        _powerFxDone = false;
         _kaboomed = false;
         _sinceCombo = 0f;
         AssistLane();
@@ -576,15 +610,16 @@ public partial class PlayerFighter : Fighter
             // Knock straight along the facing, so hits shove down the lane
             // instead of scattering sideways.
             Strike(other, step.Damage, Facing, step.Knockback, step.Hitstop, step.Launch * _launchMultiplier);
-            // A pie in the face: the finisher leaves them reeling.
-            if (_weapon.FinisherStagger > 0f && _comboIndex == Combo.Length - 1 && !other.IsDead)
+            if (IsPowerHit) PowerHitFx(other);
+            // A pie in the face: the power hit leaves them reeling.
+            if (_weapon.FinisherStagger > 0f && IsPowerHit && !other.IsDead)
                 other.Stagger(_weapon.FinisherStagger * _perks.Blind);
         }
 
         // KABOOM gear, or POP GOES THE... on a balloon sword: the finisher goes
         // off like a firework, once per swing.
         float boom = _kaboom + (_perks.PopFinisher ? 14f : 0f);
-        if (boom > 0f && _comboIndex == Combo.Length - 1 && _hitThisSwing.Count > 0 && !_kaboomed)
+        if (boom > 0f && IsPowerHit && _hitThisSwing.Count > 0 && !_kaboomed)
         {
             _kaboomed = true;
             Vector3 at = GlobalPosition + Facing * (step.Range * ReachScale * 0.7f);
@@ -1163,6 +1198,7 @@ public partial class PlayerFighter : Fighter
     private bool RollCrit() => CritChance > 0f && _critRng.Randf() < CritChance;
 
     private float Scaled(float damage, bool crit) =>
+        !Hostile && GameSettings.God ? 99999f :
         damage * DamageMultiplier * ExtraDamageMultiplier * (crit ? _critMultiplier : 1f)
         * (_perks.LastStand && Health < MaxHealth * 0.3f ? 1.3f : 1f);
 
@@ -1224,6 +1260,7 @@ public partial class PlayerFighter : Fighter
     /// <summary>Invulnerable through the middle of the roll, not its edges.</summary>
     public override bool CanBeHit()
     {
+        if (!Hostile && GameSettings.God) return false;
         if (_state == State.AirDashing && _dodgeTime <= AirDashTime * 0.7f) return false;
         if (_state == State.Dodging && _dodgeTime >= IFrameStart && _dodgeTime <= IFrameEnd * _perks.DodgeFrames)
             return false;

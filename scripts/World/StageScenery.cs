@@ -22,7 +22,9 @@ public partial class StageScenery : Node3D
 {
     private const string Folder = "res://assets/stages/";
     private const float PropPixel = 0.01125f;
-    public const float BandFar = -3.3f, BandNear = 3.2f;
+    /// <summary>The walkway's depth, far and near edge; deeper with a larger field (Settings > FIELD SIZE).</summary>
+    public static float BandFar => -3.3f * ClownSquad.Progression.GameSettings.FieldScale;
+    public static float BandNear => 3.2f * ClownSquad.Progression.GameSettings.FieldScale;
 
     private readonly int _world;
     private readonly float _length;
@@ -426,10 +428,11 @@ public partial class StageScenery : Node3D
             // The HD-2D lens: the walkway pin sharp, the far scenery and
             // anything right at the camera softly out of focus.
             lens.DofBlurFarEnabled = true;
-            lens.DofBlurFarDistance = 24f;
+            float k = ClownSquad.Progression.GameSettings.FieldScale;      // the camera sits further back
+            lens.DofBlurFarDistance = 24f * k;
             lens.DofBlurFarTransition = 30f;
             lens.DofBlurNearEnabled = true;
-            lens.DofBlurNearDistance = 5.2f;
+            lens.DofBlurNearDistance = 5.2f * k;
             lens.DofBlurNearTransition = 2.2f;
             lens.DofBlurAmount = 0.08f;
         }

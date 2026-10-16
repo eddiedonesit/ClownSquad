@@ -15,7 +15,7 @@ using ClownSquad.Progression;
 /// </summary>
 public partial class SettingsMenu : CanvasLayer
 {
-    private enum Row { Music, Sound, Shake, Difficulty, Fullscreen, Controls, Back }
+    private enum Row { Music, Sound, Shake, Difficulty, Field, Fullscreen, God, Controls, Back }
 
     private readonly List<MapPad> _pads = new();
     private readonly List<Label> _labels = new();
@@ -101,7 +101,9 @@ public partial class SettingsMenu : CanvasLayer
             ("SOUND", Bar(GameSettings.Sound)),
             ("SCREEN SHAKE", GameSettings.Shake <= 0f ? "OFF" : GameSettings.Shake < 0.9f ? "LOW" : "FULL"),
             ("DIFFICULTY", GameSettings.Difficulty.ToString().ToUpperInvariant()),
+            ("FIELD SIZE", GameSettings.Field.ToString().ToUpperInvariant()),
             ("FULLSCREEN", GameSettings.Fullscreen ? "ON" : "OFF"),
+            ("GOD MODE", GameSettings.GodMode ? "ON" : "OFF"),
             ("CONTROLS", ""),
             ("BACK", ""),
         };
@@ -119,6 +121,8 @@ public partial class SettingsMenu : CanvasLayer
             Row.Difficulty => GameSettings.Describe(GameSettings.Difficulty) + " Takes effect on the next enemies to arrive.",
             Row.Shake => "How much the camera shakes on big hits.",
             Row.Fullscreen => "Fill the screen, or play in a window.",
+            Row.Field => GameSettings.Describe(GameSettings.Field) + " Takes effect from the next stage.",
+            Row.God => "Can't be hurt, and every hit is a knockout. For trying things out: achievements are off while it is on.",
             Row.Controls => "Rebind every key and gamepad button.",
             _ => "",
         };
@@ -175,6 +179,12 @@ public partial class SettingsMenu : CanvasLayer
                 break;
             case Row.Fullscreen:
                 GameSettings.Fullscreen = !GameSettings.Fullscreen;
+                break;
+            case Row.Field:
+                GameSettings.Field = (FieldSize)Mathf.PosMod((int)GameSettings.Field + dir, 3);
+                break;
+            case Row.God:
+                GameSettings.GodMode = !GameSettings.GodMode;
                 break;
             default:
                 return;

@@ -107,7 +107,7 @@ public static class Platform
     }
 
     /// <summary>Practice and automated tests never earn anything: they would be free achievements.</summary>
-    public static bool Counts => Session.Mode is PlayMode.Campaign or PlayMode.BossRush || CountInTests;
+    public static bool Counts => (Session.Mode is PlayMode.Campaign or PlayMode.BossRush && !ClownSquad.Progression.GameSettings.God) || CountInTests;
 
     /// <summary>A test checking achievements turns them on, against a scratch platform file.</summary>
     public static bool CountInTests { get; set; }

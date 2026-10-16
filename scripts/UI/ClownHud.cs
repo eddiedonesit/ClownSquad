@@ -68,6 +68,7 @@ public partial class ClownHud : CanvasLayer
     private string _bannerShown = "";
 
     private Label _hint = null!;
+    private Label _god = null!;
     private Label _go = null!;
     private double _clock;
     private bool _f1Down;
@@ -323,16 +324,28 @@ public partial class ClownHud : CanvasLayer
         _hint = new Label
         {
             Text = "move WASD/stick   attack J/X   jump Space/A   dodge K/B\n" +
-                   "hold attack: charge   +left/right: spin   air: attack flip, jump again, dodge dash, down+attack slam\n" +
+                   "hold attack: charge   +left/right: spin   3rd hit: power hit\n" +
+                   "air: attack flip, jump again, dodge dash, down+attack slam\n" +
                    "TAB/SELECT stats   F1 controls   F3 debug",
             HorizontalAlignment = HorizontalAlignment.Right,
             LabelSettings = Style(11, new Color(1f, 1f, 1f, 0.95f), 4),
         };
         // Top right: clear of the boss bar, the combo and the player panels.
         _hint.SetAnchorsPreset(Control.LayoutPreset.TopRight);
-        _hint.Position = new Vector2(-602, 10);
-        _hint.Size = new Vector2(590, 60);
+        _hint.Position = new Vector2(-442, 10);
+        _hint.Size = new Vector2(430, 76);
         AddChild(_hint);
+
+        // A reminder that the cheat is on, so it is never left on by accident.
+        _god = new Label
+        {
+            Text = "GOD MODE", HorizontalAlignment = HorizontalAlignment.Center,
+            LabelSettings = Style(16, new Color(1f, 0.85f, 0.3f), 5),
+        };
+        _god.SetAnchorsPreset(Control.LayoutPreset.CenterBottom);
+        _god.Position = new Vector2(-100, -34);
+        _god.Size = new Vector2(200, 24);
+        AddChild(_god);
         // Shown for the first moments of a fight, then out of the way.
         CreateTween().TweenProperty(_hint, "modulate:a", 0f, 1.2f).SetDelay(9.0);
     }
@@ -361,6 +374,7 @@ public partial class ClownHud : CanvasLayer
         if (f1 && !_f1Down) _hint.Modulate = new Color(1, 1, 1, _hint.Modulate.A > 0.5f ? 0f : 1f);
         _f1Down = f1;
 
+        _god.Visible = ClownSquad.Progression.GameSettings.God;
         IReadOnlyList<PlayerFighter> players = _players();
         for (int i = 0; i < _panels.Count; i++)
         {

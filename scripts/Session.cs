@@ -70,7 +70,11 @@ public static class Session
     public static void BeginTest()
     {
         Reset(PlayMode.Test);
+        // Tests compare runs: the standard field and no cheats, whatever is saved.
+        GameSettings.Load();
         GameSettings.ForceNormal = true;
+        GameSettings.Field = FieldSize.Normal;
+        GameSettings.GodMode = false;
         SaveSystem.Path = TestSave;
         SaveSystem.DeleteForTests();
     }

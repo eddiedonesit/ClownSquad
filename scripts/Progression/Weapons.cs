@@ -105,7 +105,7 @@ public static class Weapons
             new("big_finish", "BIG FINISH", "The last swing hits 40% harder and launches higher.", 0, 2),
             new("boomerang", "BOOMERANG II", "The thrown mallet hits 50% harder and flies 40% farther.", 0, 3),
             new("quick_wrists", "QUICK WRISTS", "Swings are 15% faster.", 1, 1),
-            new("fourth_swing", "FOURTH SWING", "The combo gains an extra swing before the finisher.", 1, 2),
+            new("fourth_swing", "FOURTH SWING", "After the big third hit, one more swing to juggle them.", 1, 2),
             new("spin_doctor", "SPIN DOCTOR", "Spins last 50% longer and hit 50% harder.", 1, 3),
             new("crowd_pleaser", "CROWD PLEASER", "+5% crit chance.", 2, 1),
             new("encore", "ENCORE", "Each knockout heals 4% of max health.", 2, 2),
@@ -138,15 +138,14 @@ public static class Weapons
         })
     { HitPitch = 0.7f, Heft = 1.45f };
 
-    // The rubber chicken: light, long and fast. Four pecks; thrown, it flies far, squawking.
+    // The rubber chicken: light, long and fast. Quick slaps; thrown, it flies far, squawking.
     private static readonly WeaponDef ChickenDef = new(
-        WeaponKind.Chicken, "RUBBER CHICKEN", "Light and long. Four quick slaps, and thrown it flies the length of the ring.",
+        WeaponKind.Chicken, "RUBBER CHICKEN", "Light and long. Quick slaps, and thrown it flies the length of the ring.",
         new AttackStep[]
         {
-            new(0.06f, 0.05f, 0.12f, 7f, 1.6f, 0.040f, 2.2f, 0f),
-            new(0.06f, 0.05f, 0.12f, 7f, 1.6f, 0.040f, 2.2f, 0f),
-            new(0.06f, 0.05f, 0.14f, 8f, 1.8f, 0.045f, 2.2f, 0f),
-            new(0.10f, 0.07f, 0.26f, 15f, 7.0f, 0.090f, 2.5f, 6f),
+            new(0.06f, 0.05f, 0.12f, 8f, 1.6f, 0.040f, 2.2f, 0f),
+            new(0.06f, 0.05f, 0.13f, 9f, 1.8f, 0.045f, 2.2f, 0f),
+            new(0.10f, 0.07f, 0.26f, 17f, 7.0f, 0.090f, 2.5f, 6f),
         },
         new(0.06f, 0.05f, 0.12f, 7f, 1.6f, 0.040f, 2.2f, 0f),
         ChargeMove.Throw, "chicken_spin_hd", "squawk",
@@ -154,7 +153,7 @@ public static class Weapons
         new Skill[]
         {
             new("feather_duster", "FEATHER DUSTER", "+15% combo damage.", 0, 1),
-            new("pecking_order", "PECKING ORDER", "The combo gains a fifth slap.", 0, 2),
+            new("pecking_order", "PECKING ORDER", "After the big third hit, one more slap to juggle them.", 0, 2),
             new("frenzy", "FRENZY", "Slaps are 20% faster.", 0, 3),
             new("fowl_ball", "FOWL BALL", "The thrown chicken hits 50% harder.", 1, 1),
             new("eggsplosive", "EGGSPLOSIVE", "The thrown chicken explodes where it turns.", 1, 2),
@@ -184,7 +183,7 @@ public static class Weapons
             new("pie_in_the_sky", "PIE IN THE SKY", "A third pie, and splats hit 30% harder.", 0, 3),
             new("meringue", "MERINGUE", "+15% combo damage.", 1, 1),
             new("faceful", "FACEFUL", "Blinded enemies stay blind 50% longer.", 1, 2),
-            new("bakers_dozen", "BAKER'S DOZEN", "The combo gains an extra smush.", 1, 3),
+            new("bakers_dozen", "BAKER'S DOZEN", "After the big third hit, one more smush to juggle them.", 1, 3),
             new("cherry_on_top", "CHERRY ON TOP", "+5% crit chance.", 2, 1),
             new("sweet_tooth", "SWEET TOOTH", "Each knockout heals 4% of max health.", 2, 2),
             new("custard_coat", "CUSTARD COAT", "Take 15% less damage.", 2, 3),
@@ -205,7 +204,7 @@ public static class Weapons
         new[] { "JUGGLE", "BOWL", "SHOW" },
         new Skill[]
         {
-            new("fourth_pin", "FOURTH PIN", "The combo gains an extra swing.", 0, 1),
+            new("fourth_pin", "FOURTH PIN", "After the big third hit, one more swing to juggle them.", 0, 1),
             new("five_pin", "FIVE PIN", "The fan throws five pins.", 0, 2),
             new("strike", "STRIKE!", "Thrown pins fly through everyone in the lane.", 0, 3),
             new("heavy_pins", "HEAVY PINS", "+15% combo damage.", 1, 1),
@@ -232,7 +231,7 @@ public static class Weapons
         new Skill[]
         {
             new("sting", "STING", "+15% combo damage.", 0, 1),
-            new("double_slap", "DOUBLE SLAP", "The combo gains an extra slap.", 0, 2),
+            new("double_slap", "DOUBLE SLAP", "After the big third hit, one more slap to juggle them.", 0, 2),
             new("slap_happy", "SLAP HAPPY", "Slaps are 20% faster.", 0, 3),
             new("thunderclap", "THUNDERCLAP", "The clap reaches 40% farther and hits 30% harder.", 1, 1),
             new("stunner", "STUNNER", "Every stun lasts 50% longer.", 1, 2),
@@ -284,7 +283,7 @@ public static class Weapons
         new Skill[]
         {
             new("en_garde", "EN GARDE", "+15% combo damage.", 0, 1),
-            new("riposte", "RIPOSTE", "The combo gains an extra slash.", 0, 2),
+            new("riposte", "RIPOSTE", "After the big third hit, one more slash to juggle them.", 0, 2),
             new("fleche", "FLECHE", "The lunge goes 50% farther and hits 50% harder.", 0, 3),
             new("squeaky", "SQUEAKY", "Slashes are 15% faster.", 1, 1),
             new("pop_goes", "POP GOES THE...", "The finisher bursts the balloon in a bang that hits all around.", 1, 2),

@@ -152,9 +152,15 @@ public partial class GameRoot : Node3D
         // The arena is whatever the camera sees, captured before any shake, and
         // rebuilt whenever the window changes shape so the walls stay at the
         // screen edge.
+        GameSettings.Load();
+        // "-- field large" / "huge": try a field size without changing the saved setting.
+        int fieldAt = Array.IndexOf(args, "field");
+        if (fieldAt >= 0 && fieldAt + 1 < args.Length && Enum.TryParse(args[fieldAt + 1], true, out FieldSize fs)) GameSettings.Field = fs;
+        if (Has("god")) GameSettings.GodMode = true;           // "-- god": try god mode in a test run
         if (GetNodeOrNull<Camera3D>("Camera3D") is Camera3D cam)
         {
             if (_scrolling) MountStageCamera(cam);
+            PullBack(cam, GameSettings.FieldScale);
             _arenaCamera = cam;
             _arenaCameraRest = cam.GlobalTransform;
             RebuildArena();
@@ -337,6 +343,20 @@ public partial class GameRoot : Node3D
         Fighter.HitLanded -= OnHitLanded;
         Fighter.HitLanded -= OnPracticeHit;
         Arena.Current = null;
+    }
+
+    /// <summary>
+    /// A larger field: the camera backs away from the middle of the walkway,
+    /// keeping its angle, so it takes in more of the stage. The arena's
+    /// walls come from the camera's view, so the fighting room grows with it.
+    /// </summary>
+    private static void PullBack(Camera3D cam, float scale)
+    {
+        if (scale <= 1.001f) return;
+        // Back along the line to the middle of the walkway (the origin of the
+        // camera's rig, or of the ring): that point stays put on screen while
+        // everything around it comes into view.
+        cam.Position *= scale;
     }
 
     private void RebuildArena()
