@@ -23,6 +23,7 @@ public partial class OnlineMenu : CanvasLayer
 
     private readonly List<MapPad> _pads = new();
     private readonly CharacterRecord _me;
+    private readonly string? _savePath;
     private readonly List<(string label, Action act)> _items = new();
     private Page _page;
     private int _cursor;
@@ -36,10 +37,12 @@ public partial class OnlineMenu : CanvasLayer
     /// <summary>The host pressed START: the title takes them to their world map.</summary>
     public event Func<string?>? HostStarts;
 
-    public OnlineMenu(IEnumerable<int> devices, CharacterRecord me)
+    /// <param name="savePath">The save the character comes from, where what they earn as a guest is kept (null: none).</param>
+    public OnlineMenu(IEnumerable<int> devices, CharacterRecord me, string? savePath = null)
     {
         foreach (int d in devices) _pads.Add(new MapPad(d));
         _me = me;
+        _savePath = savePath;
         Layer = 24;
         ProcessMode = ProcessModeEnum.Always;
     }
@@ -153,7 +156,7 @@ public partial class OnlineMenu : CanvasLayer
         string address = _address?.Text.Trim() ?? "";
         if (address.Length == 0) { Sfx.Play("honk_low", 1.2f, -6f); return; }
         _lastAddress = address;
-        if (_net.Join(address, _me) == Error.Ok) { Sfx.Play("whoosh", 1.2f); Show(Page.Lobby); }
+        if (_net.Join(address, _me, _savePath) == Error.Ok) { Sfx.Play("whoosh", 1.2f); Show(Page.Lobby); }
         else { Sfx.Play("honk_low", 1.2f, -6f); Refresh(); }
     }
 
@@ -201,7 +204,9 @@ public partial class OnlineMenu : CanvasLayer
                     ? $"Friends join with:  {string.Join("   or   ", mine)}\n(port {NetSession.Port}; on the same network, or over a VPN app)"
                     : $"Friends join with this computer's address (port {NetSession.Port}).";
             }
-            else _info.Text = "Connected. Waiting for the host.";
+            else _info.Text = _savePath is null
+                ? "Connected. Waiting for the host. (You have no save yet, so what you earn won't be kept.)"
+                : "Connected. Waiting for the host. Everything you earn in their stages is saved to your game.";
             foreach (NetMember m in _net.Members)
             {
                 var row = new HBoxContainer { Alignment = BoxContainer.AlignmentMode.Center };

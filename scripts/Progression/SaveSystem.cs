@@ -150,6 +150,38 @@ public static class SaveSystem
         }
     }
 
+    /// <summary>
+    /// Put one character into a save file other than the one being played, and
+    /// write it: how a guest keeps what they earned in someone else's online
+    /// game. The rest of that save is left as it was.
+    /// </summary>
+    public static bool StoreCharacter(string path, int index, CharacterRecord record)
+    {
+        string file = ProjectSettings.GlobalizePath(path);
+        SaveData data = new();
+        try
+        {
+            if (File.Exists(file) && JsonSerializer.Deserialize<SaveData>(File.ReadAllText(file), Json) is SaveData on) data = on;
+        }
+        catch (Exception e) when (e is JsonException or IOException) { return false; }
+        while (data.Characters.Count <= index) data.Characters.Add(new CharacterRecord());
+        data.Characters[index] = record;
+        data.Version = CurrentVersion;
+        string temp = file + ".tmp";
+        try
+        {
+            Directory.CreateDirectory(System.IO.Path.GetDirectoryName(file)!);
+            File.WriteAllText(temp, JsonSerializer.Serialize(data, Json));
+            File.Move(temp, file, overwrite: true);
+            return true;
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+        {
+            GD.PushError($"Save: could not write {file}: {e.Message}");
+            return false;
+        }
+    }
+
     /// <summary>The character in a player slot, created on first use.</summary>
     public static CharacterRecord CharacterFor(int slot, string defaultName)
     {

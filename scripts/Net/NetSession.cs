@@ -130,11 +130,21 @@ public partial class NetSession : Node
         return Error.Ok;
     }
 
-    /// <summary>Connect to a host by IP address (or host name).</summary>
-    public Error Join(string address, CharacterRecord me)
+    /// <summary>
+    /// Where a guest keeps what they earn online: the save their character came
+    /// from (P1 of it). Null when they have no save: they can play, but nothing is kept.
+    /// </summary>
+    public string? GuestSavePath { get; private set; }
+
+    /// <summary>A guest's rewards came back from the host and were saved (or not).</summary>
+    public event Action<CharacterRecord, bool>? RewardsReceived;
+
+    /// <summary>Connect to a host by IP address (or host name). savePath: the save the character came from.</summary>
+    public Error Join(string address, CharacterRecord me, string? savePath = null)
     {
         Leave(quiet: true);
         _local = me;
+        GuestSavePath = savePath;
         _peer = new ENetMultiplayerPeer();
         Error err = _peer.CreateClient(address.Trim(), Port);
         if (err != Error.Ok)
@@ -291,12 +301,31 @@ public partial class NetSession : Node
         if (Mode == Role.Host && InStage) Rpc(MethodName.StageBanner, text);
     }
 
-    /// <summary>Host: the stage is over (back to the map); guests return to the lobby.</summary>
+    /// <summary>
+    /// Host: the stage is over (back to the map). Each guest is sent their
+    /// character as it is now (XP and levels, gold and loot banked on a win,
+    /// all earned in this stage) to keep in their own save; then everyone
+    /// returns to the lobby.
+    /// </summary>
     public void EndStage()
     {
         if (Mode != Role.Host || !InStage) return;
         InStage = false;
+        foreach ((long peer, CharacterRecord rec) in _records)
+            RpcId(peer, MethodName.Rewards, SaveSystem.CharacterToJson(rec));
         Rpc(MethodName.StageEnd);
+    }
+
+    [Rpc(MultiplayerApi.RpcMode.Authority, TransferMode = MultiplayerPeer.TransferModeEnum.Reliable)]
+    private void Rewards(string json)
+    {
+        if (Mode != Role.Guest || SaveSystem.CharacterFromJson(json) is not CharacterRecord rec) return;
+        // Only what the guest brought can come back: a host can add to it, but not swap in someone else.
+        if (rec.Name != _local.Name || rec.Look != _local.Look) return;
+        bool kept = GuestSavePath is string path && SaveSystem.StoreCharacter(path, 0, rec);
+        if (kept) _local = rec;
+        GD.Print($"Net: rewards for {rec.Name}: level {rec.Level}, {rec.Gold} gold{(kept ? ", saved" : " (no save to keep them in)")}.");
+        RewardsReceived?.Invoke(rec, kept);
     }
 
     /// <summary>Host: back on the map choosing a stage.</summary>

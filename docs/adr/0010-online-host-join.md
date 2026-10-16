@@ -1,6 +1,6 @@
 # 10. Online co-op: host-authoritative puppets over ENet, direct IP
 
-- **Status:** Accepted; phases 0, 1 and 2 built
+- **Status:** Accepted; phases 0 to 3 built
 - **Date:** 2026-10-15
 - **Extends:** ADR 0003 (co-op architecture)
 
@@ -37,7 +37,7 @@ machines.
 | 0. Prep | `Fx` (every gameplay effect through one class, raising `Fx.Emitted`; `Fx.Replay` on guests); `NetRegistry` (every fighter, shot, telegraph, hazard and drop numbered on entering the scene) | Built |
 | 1. Connect | `NetSession` (host, join, hello with protocol version and character, roster, kick, leave, disconnect handling); Title > ONLINE lobby showing everyone's clown, level and weapon, and the host's addresses | Built; `nettest host` + `nettest join` |
 | 2. Play a stage | `RemoteInput`; input RPC (unreliable ordered); host snapshots at 20–30 Hz and `Fx` event forwarding; guest puppet scene (fighters, shots, telegraphs, hazards, HUD, camera) | Built; `nettest host` + `nettest join` play stage 1-1 together |
-| 3. Campaign | Host drives the map; results, XP, gold and loot sent to each guest to save; shops, inventory and skills local, changed record sent back | Later |
+| 3. Campaign | Host drives the map; results, XP, gold and loot sent to each guest to save; shops, inventory and skills local, changed record sent back | Built: at each stage's end every guest gets their character back and it is written into the save it came from |
 | 4. Polish | Prediction for the guest's own movement, ping display, latency simulation for testing, host-leaves handling mid-stage | Later |
 
 ## Consequences
@@ -83,3 +83,16 @@ machines.
 **Not mirrored yet:**
 - The host's menus: pause, results, shops, the stat tent and the secret curtain.
 - Rewards for guests (phase 3).
+
+## Phase 3 as built (2026-10-16)
+
+**Host:**
+- Plays each guest as the record they brought.
+- XP and levels are earned live; gold and loot are banked on a win, as for a local player.
+- When the stage ends (`EndStage`), each guest is sent their record as it now stands.
+
+**Guest:**
+- Writes the record into P1 of the save the character came from (`SaveSystem.StoreCharacter`), leaving the rest of that save alone.
+- Only a record with the same name and clown is accepted: a host can add to a guest's character but cannot swap in someone else's.
+- A guest with no save can play, but nothing is kept (the lobby says so).
+- Spending skill points and shopping stay local, between sessions.

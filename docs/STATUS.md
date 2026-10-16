@@ -113,14 +113,14 @@ immediately; pads join by pressing a button.
 | Bestiary | Title > BESTIARY: every act met in any save slot, with portrait and tip; bosses show whether they are beaten; unmet ones are silhouettes |
 | Practice ring | Title > PRACTICE RING: your clowns (a copy of the last save; nothing kept) with three dummies; change weapon on the spot, switch the whole tree on and off, call in grunts, damage meter |
 | Controls | Settings > CONTROLS: rebind every action on keyboard and gamepad (user://controls.cfg); taken keys swap; d-pad moves |
-| Online | Title > ONLINE: host (UDP 7777) or join by IP, lobby with everyone's clown, level and weapon; guests bring their own character. The host plays the campaign from their map and guests play every stage with them, mirrored live (ADR 0010 phase 2). Guest rewards are phase 3 |
+| Online | Title > ONLINE: host (UDP 7777) or join by IP, lobby with everyone's clown, level and weapon; guests bring their own character. The host plays the campaign from their map and guests play every stage with them, mirrored live, and keep the XP, gold and loot they earn in their own save (ADR 0010 phases 2-3) |
 | Steam-ready | Platform layer (`IPlatform`, offline today), 34 achievements wired with an in-game list, stats, boss-rush leaderboard, rich presence, overlay pause; Steamworks checklist and the remaining SDK step in [STEAM.md](STEAM.md) |
 | Session | One place for cross-scene mode and save path (Campaign, BossRush, Practice, Test); command-line test flags only in debug builds |
 | Tooling | Procedural sprite/effect/enemy generators, animation probe, AI probe, variant renderer, the smart test bot (reads telegraphs, hazards and shots; dodges and jumps rings), weapon probe, `tools/run_probes.sh` |
 
 ## Not built
 
-From the GDD: online rewards for guests and prediction (ADR 0010 phases 3-4),
+From the GDD: online prediction and Steam networking (ADR 0010 phase 4, STEAM.md),
 monster capture, classes, story. Also not yet: Steam integration (achievements,
 cloud saves), controller rebinding, localisation.
 

@@ -132,7 +132,7 @@ public partial class TitleScreen : Node3D
         CharacterRecord me = recent > 0 && SaveSystem.Peek(recent) is SaveData d && d.Characters.Count > 0
             ? d.Characters[0]
             : new CharacterRecord { Name = "PIP", Look = "pip" };
-        _online = new OnlineMenu(devices, me);
+        _online = new OnlineMenu(devices, me, recent > 0 ? SaveSystem.SlotPath(recent) : null);
         _online.Closed += () => { _online = null; foreach (MapPad p in _pads) p.Swallow(); };
         _online.HostStarts += () =>
         {
