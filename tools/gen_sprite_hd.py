@@ -18,6 +18,7 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from pixelart_hd import HDCanvas, Material, shade, to_rows, bezier, rotated, laid_down, crop, touches_border
 from pixelpng import write_png
+from aseprite_import import read_png
 
 BODY_W, BODY_H = 96, 128
 TOP_PAD, BOTTOM_PAD = 88, 72
@@ -66,6 +67,49 @@ MATS = {
 # as dirt on the faces. These shadows lean warm and rosy instead (darkest first;
 # the darkest is only used for lines, skin being a soft material).
 MATS[SKIN].tones = [(150, 84, 82), (226, 160, 138), (250, 218, 192), (255, 232, 211), (255, 243, 231)]
+
+# --------------------------------------------------------- Aseprite parts
+# Hand-drawn pieces live in Aseprite (art/aseprite/clown_head.aseprite, one
+# layer each), exported to art/aseprite/export/ by tools/aseprite/export_layers.lua
+# (tools/refresh_sprites.sh runs it). Every layer shares one anchor, the head
+# anchor of draw() (x = 50 + lean, y = head centre), at pixel (56, 24).
+#   hair_back, hair_front: shapes only; each colour is one curl, painted with the
+#     clown's own hair and shaded by the generator as a part of its own.
+#   eye_open, eye_hit, mouth_hit, blush, nose_shine: finished colours, painted
+#     over the shaded frame by hand_face().
+
+PARTS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "art", "aseprite", "export")
+HEAD_AX, HEAD_AY = 56, 24
+
+
+def _head_layer(name):
+    """The opaque pixels of one layer: [(x, y, rgba)] relative to the anchor."""
+    w, h, rows = read_png(os.path.join(PARTS_DIR, "clown_head_" + name + ".png"))
+    return [(x - HEAD_AX, y - HEAD_AY, rows[y][x]) for y in range(h) for x in range(w) if rows[y][x][3] > 0]
+
+
+def _groups(pixels):
+    """Pixels grouped by colour, in order of first appearance: one group per curl."""
+    out = {}
+    for x, y, c in pixels:
+        out.setdefault(c, []).append((x, y))
+    return list(out.values())
+
+
+HEAD = {n: _head_layer(n) for n in ("hair_back", "hair_front", "eye_open", "eye_hit", "mouth_hit", "blush", "nose_shine")}
+HAIR_BACK = _groups(HEAD["hair_back"])
+HAIR_FRONT = _groups(HEAD["hair_front"])
+
+
+def stamp_shapes(c, groups, ax, ay, material):
+    """Paint Aseprite shapes into the canvas as parts of one material, at the head anchor (canvas pixels)."""
+    for group in groups:
+        c.part()
+        for x, y in group:
+            X, Y = ax + x, ay + y
+            if 0 <= X < c.w and 0 <= Y < c.h:
+                c._set(X, Y, material)
+
 
 # ------------------------------------------------------------------- parts
 
@@ -451,14 +495,9 @@ def draw(p):
     if behind:
         weapon_head(c, gx, gy, m[0], m[1])
 
-    # clown hair: a big round puff of curls bursting out from under the hat at
-    # the back of the head, wider than the head itself, each curl its own part
-    # so it shades as a bumpy cloud rather than one blob
-    for x, y, r in ((38, hy - 12, 6.5), (30, hy - 12, 7.5), (22, hy - 7, 8.5), (16, hy + 2, 9),
-                    (18, hy + 12, 8.5), (25, hy + 18, 8), (33, hy + 17, 6.5), (27, hy + 4, 8.5),
-                    (33, hy - 4, 7.5), (12, hy - 5, 6), (11, hy + 9, 6)):
-        c.part()
-        c.ellipse(x + ln, y, r, r * 0.92, HAIR)
+    # clown hair, drawn in Aseprite (hair_back): a big puff of curls bursting
+    # out from under the hat, each curl its own part so it shades as a bumpy cloud
+    stamp_shapes(c, HAIR_BACK, c.face[0], c.face[1], HAIR)
 
     # far leg, shoe and arm, a tone darker
     c.part(far=True)
@@ -504,10 +543,7 @@ def draw(p):
     c.part()
     c.ellipse(37 + ln, hy + 4, 3.6, 5, SKIN)                     # ear, half under the hair
     c.recolor(lambda x, y, mm: BLUSH if ((x - 37.6 - ln) / 1.6) ** 2 + ((y - hy - 4) / 2.8) ** 2 <= 1 else mm)
-    c.part()
-    c.ellipse(33 + ln, hy - 3, 5, 5, HAIR)                       # tufts sprouting over the ear
-    c.part()
-    c.ellipse(31 + ln, hy + 4, 5.2, 5.2, HAIR)
+    stamp_shapes(c, HAIR_FRONT, c.face[0], c.face[1], HAIR)        # tufts over the ear (Aseprite: hair_front)
 
     # face
     c.part(line=False)
@@ -736,48 +772,6 @@ MOUTH_D = (90, 9, 35)
 TONGUE = (216, 68, 81)
 LIP_C = (196, 36, 58)
 
-# The open eye: a tall oval, rounded corners, a big pupil looking ahead with a catchlight.
-EYE_OPEN = [
-    "..KKKKK.",
-    ".KWWWWWK",
-    "KWWWWWWK",
-    "KWWWKKKK",
-    "KWWKOKKK",
-    "KWWKKKKK",
-    "KWWKKKKK",
-    "KWWWKKKK",
-    ".KWWWWWK",
-    "..KKKKK.",
-]
-EYE_X, EYE_Y = 6, -10            # top-left of the grid, from the anchor
-
-# Squeezed shut: an ouch.
-EYE_SHUT = [
-    "........",
-    "........",
-    "..K.....",
-    "...KK...",
-    ".....KK.",
-    "...KK...",
-    "..K.....",
-    "........",
-    "........",
-    "........",
-]
-
-# The open mouth for the hit pose: dark inside, a tongue, a lip rim.
-MOUTH_OPEN = [
-    ".LLLL.",
-    "LMMMML",
-    "LMMMML",
-    "LMTTML",
-    ".LLLL.",
-]
-MOUTH_X, MOUTH_Y = 6, 8
-
-KEYS = {"K": INK_C, "W": EYE_W, "O": EYE_W, "M": MOUTH_D, "T": TONGUE, "L": LIP_C}
-
-
 def _is_skin(px):
     return px[3] > 0 and tuple(px[:3]) in SKIN_T
 
@@ -808,41 +802,30 @@ def hand_face(rows, anchor, expression):
             tone = SKIN_T[1]                              # against the hair
         put(x, y, tone)
 
-    # 2. Blush: a soft oval on the cheek with a lighter middle.
-    for (x, y) in ((-3, 5), (-2, 5), (-1, 5), (0, 5), (-4, 6), (-3, 6), (-2, 6), (-1, 6), (0, 6), (1, 6), (-3, 7), (-2, 7), (-1, 7), (0, 7)):
-        if _is_skin(rows[ay + y][ax + x]):
-            put(ax + x, ay + y, BLUSH_C)
-    for (x, y) in ((-2, 6), (-1, 6)):
-        put(ax + x, ay + y, BLUSH_L)
-
-    # 3. The eye.
-    grid = EYE_SHUT if expression == "hit" else EYE_OPEN
+    # 2. The pieces drawn in Aseprite: the blush (on skin only), the nose shine,
+    #    and the eye (open, or squeezed shut and an "ouch" mouth when hit).
+    for x, y, c in HEAD["blush"]:
+        if 0 <= ax + x < w and 0 <= ay + y < h and _is_skin(rows[ay + y][ax + x]):
+            put(ax + x, ay + y, c[:3])
+    for x, y, c in HEAD["nose_shine"]:
+        put(ax + x, ay + y, c[:3])
     if expression == "hit":
         # skin over the whole eye area (the generator's eye too), then the squeezed lines
-        for y in range(ay + EYE_Y, ay + EYE_Y + len(EYE_OPEN) + 2):
-            for x in range(ax + EYE_X - 1, ax + EYE_X + len(EYE_OPEN[0]) + 1):
+        ex0 = min(x for x, _, _ in HEAD["eye_open"]) - 1
+        ex1 = max(x for x, _, _ in HEAD["eye_open"]) + 1
+        ey0 = min(y for _, y, _ in HEAD["eye_open"])
+        ey1 = max(y for _, y, _ in HEAD["eye_open"]) + 2
+        for y in range(ay + ey0, ay + ey1 + 1):
+            for x in range(ax + ex0, ax + ex1 + 1):
                 if 0 <= x < w and 0 <= y < h and rows[y][x][3] > 0:
                     c = tuple(rows[y][x][:3])
                     if c in (EYE_W, INK_C) or c in SKIN_T:
                         put(x, y, SKIN_T[2])
-    for gy, line in enumerate(grid):
-        for gx, k in enumerate(line):
-            if k in KEYS:
-                put(ax + EYE_X + gx, ay + EYE_Y + gy, KEYS[k])
-
-    # 4. The nose: a highlight and a glint up on the lit side.
-    nx, ny = ax + 19, ay + 3
-    for (x, y) in ((-4, -3), (-3, -3), (-2, -3), (-5, -2), (-4, -2), (-3, -2), (-4, -1), (-3, -4), (-2, -4), (-1, -4)):
-        put(nx + x, ny + y, NOSE_HI)
-    for (x, y) in ((-3, -3), (-2, -3), (-3, -2)):
-        put(nx + x, ny + y, NOSE_GLINT)
-
-    # 5. The hit pose: an open "ouch" mouth over the grin.
-    if expression == "hit":
-        for gy, line in enumerate(MOUTH_OPEN):
-            for gx, k in enumerate(line):
-                if k in KEYS:
-                    put(ax + MOUTH_X + gx, ay + MOUTH_Y + gy, KEYS[k])
+        for x, y, c in HEAD["eye_hit"] + HEAD["mouth_hit"]:
+            put(ax + x, ay + y, c[:3])
+    else:
+        for x, y, c in HEAD["eye_open"]:
+            put(ax + x, ay + y, c[:3])
 
 
 def write_sheet(name, frames, mats):

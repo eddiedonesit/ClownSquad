@@ -1,5 +1,19 @@
 # Aseprite workflow
 
+**Rule (2026-10-15): all sprite work goes through Aseprite.** Hand-drawn art
+lives in `.aseprite` sources under `art/aseprite/`; tools read their exports.
+Nothing hand-drawn is kept only as data in Python.
+
+| Source | Layers | Read by |
+|---|---|---|
+| `art/aseprite/clown_head.aseprite` | hair_back, hair_front (shapes: one colour per curl), blush, nose_shine, eye_open, eye_hit, mouth_hit (finished colours); anchor at (56, 24) = the head anchor | `tools/gen_sprite_hd.py` (every clown's hair; PIP's face) |
+| `art/aseprite/juggler_*.aseprite` | the Juggler test (A finished, B classic) | `tools/aseprite_import.py` |
+
+`bash tools/refresh_sprites.sh` exports every source's layers
+(`tools/aseprite/export_layers.lua`) before the generators run. What stays in
+Python is the posable rig (body, limbs, weapons by angle) and shading rules,
+not hand-placed pixels.
+
 How hand-drawn sprites get into the game, alongside the generated ones.
 
 ## Setup (once)
