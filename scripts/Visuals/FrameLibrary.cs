@@ -16,6 +16,7 @@ public static class FrameLibrary
     public readonly record struct SheetInfo(int FrameWidth, int FrameHeight, int Baseline);
 
     private static readonly Dictionary<string, SpriteFrames> Cache = new();
+    private static readonly Dictionary<ulong, string> SheetOfFrames = new();
     private static readonly Dictionary<string, SheetInfo> Infos = new();
     // Packed sheets: where each frame's trimmed box sits on the sheet, and its offset in the full frame.
     private static readonly Dictionary<string, (Rect2 region, Vector2 offset)[]> Packed = new();
@@ -59,6 +60,9 @@ public static class FrameLibrary
         if (clipped.Size.X <= 0 || clipped.Size.Y <= 0) clipped = local;
         return new Rect2(region.Position + (clipped.Position - off), clipped.Size);
     }
+
+    /// <summary>The sheet a set of frames was built from (online play sends sprites by sheet).</summary>
+    public static string? SheetOf(SpriteFrames frames) => SheetOfFrames.TryGetValue(frames.GetInstanceId(), out string? s) ? s : null;
 
     public static SpriteFrames Load(string sheetPath, string framesPath)
     {
@@ -139,6 +143,7 @@ public static class FrameLibrary
             }
         }
         Cache[sheetPath] = frames;
+        SheetOfFrames[frames.GetInstanceId()] = sheetPath;
         return frames;
     }
 }

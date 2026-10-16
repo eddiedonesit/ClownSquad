@@ -58,7 +58,13 @@ public partial class TitleScreen : Node3D
     {
         // Tests and debug runs go straight where they are going.
         string[] args = OS.IsDebugBuild() ? OS.GetCmdlineUserArgs() : Array.Empty<string>();
-        if (Array.IndexOf(args, "nettest") >= 0) { SetProcess(false); AddChild(new ClownSquad.Debug.NetProbe()); return; }
+        // The net probe lives on the scene root: it follows the game from the lobby into a stage.
+        if (Array.IndexOf(args, "nettest") >= 0)
+        {
+            SetProcess(false);
+            if (!ClownSquad.Debug.NetProbe.Running) GetTree().Root.CallDeferred(Node.MethodName.AddChild, new ClownSquad.Debug.NetProbe());
+            return;
+        }
         foreach (string f in new[] { "wavetest", "losetest", "movetest", "animtest", "aitest", "sandbox", "fight", "stage", "tentshot", "stageshot", "castshot", "weapontest", "weaponmoves", "bindtest", "skillshot", "practice", "practicetest", "demo", "bossrush" })
             if (Array.IndexOf(args, f) >= 0) { CallDeferred(MethodName.Go, Campaign.FightScene); return; }
         if (Array.IndexOf(args, "mapshot") >= 0) { CallDeferred(MethodName.Go, Campaign.MapScene); return; }
@@ -74,6 +80,14 @@ public partial class TitleScreen : Node3D
         _pads.Add(new MapPad(LocalDeviceInput.Keyboard));
         foreach (int pad in Godot.Input.GetConnectedJoypads()) _pads.Add(new MapPad(pad));
         ShowMain();
+
+        // Back from a stage played online: no opening, straight into the lobby.
+        if (ClownSquad.Net.NetSession.Instance is { Mode: not ClownSquad.Net.NetSession.Role.Offline })
+        {
+            Sfx.PlayMusic("music_title");
+            CallDeferred(MethodName.OpenOnline);
+            return;
+        }
 
         // The comic-book opening plays over the ring; the menu waits for it.
         _ui.Visible = false;
@@ -120,6 +134,16 @@ public partial class TitleScreen : Node3D
             : new CharacterRecord { Name = "PIP", Look = "pip" };
         _online = new OnlineMenu(devices, me);
         _online.Closed += () => { _online = null; foreach (MapPad p in _pads) p.Swallow(); };
+        _online.HostStarts += () =>
+        {
+            if (recent <= 0) return "Start a game on this computer first (NEW GAME), then host it.";
+            _starting = true;
+            SaveSystem.ActiveSlot = recent;
+            Session.BeginCampaign();
+            Sfx.Play("drumroll");
+            GetTree().ChangeSceneToFile(Campaign.MapScene);
+            return null;
+        };
         AddChild(_online);
     }
 

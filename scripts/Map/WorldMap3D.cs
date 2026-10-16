@@ -59,6 +59,7 @@ public partial class WorldMap3D : Node3D
 
     public override void _Ready()
     {
+        ClownSquad.Net.NetSession.Instance?.HostOnMap();
         Engine.TimeScale = 1.0;
         GetTree().Paused = false;
         if (Sfx.Instance is null) AddChild(new Sfx());

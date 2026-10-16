@@ -34,7 +34,7 @@ public partial class NetSession : Node
     public const int Port = 7777;
     public const int MaxGuests = 3;
     /// <summary>Bumped whenever the messages change; host and guest must match.</summary>
-    public const int Protocol = 1;
+    public const int Protocol = 2;
 
     public enum Role { Offline, Host, Guest }
 
@@ -51,6 +51,22 @@ public partial class NetSession : Node
     public event Action? Changed;
     /// <summary>The session ended (failed to connect, kicked, host left), with why.</summary>
     public event Action<string>? Ended;
+
+    // ---- phase 2: playing a stage (guest side) ----
+    /// <summary>The stage the host is playing, while a guest is in it.</summary>
+    public string? GuestStage { get; private set; }
+    /// <summary>The host's field size, so a guest's scenery matches.</summary>
+    public FieldSize GuestField { get; private set; }
+    public event Action<byte[]>? SnapshotReceived;
+    public event Action<int, int, byte[]>? DescribeReceived;
+    public event Action<FxEvent>? FxReceived;
+    /// <summary>A banner from the host: STAGE CLEAR!, GAME OVER.</summary>
+    public event Action<string>? StageResult;
+
+    // ---- phase 2 (host side) ----
+    private readonly Dictionary<long, RemoteInput> _inputs = new();
+    /// <summary>The host is in a stage that guests are watching and playing.</summary>
+    public bool InStage { get; private set; }
 
     private readonly List<NetMember> _members = new();
     private readonly Dictionary<long, CharacterRecord> _records = new();
@@ -149,6 +165,9 @@ public partial class NetSession : Node
         Mode = Role.Offline;
         _members.Clear();
         _records.Clear();
+        _inputs.Clear();
+        GuestStage = null;
+        InStage = false;
         Status = "";
         if (was && !quiet) Changed?.Invoke();
     }
@@ -230,6 +249,8 @@ public partial class NetSession : Node
         NetMember? gone = _members.Find(m => m.Peer == id);
         _members.RemoveAll(m => m.Peer == id);
         _records.Remove(id);
+        // Their clown stands idle for the rest of the stage.
+        if (_inputs.TryGetValue(id, out RemoteInput? left)) left.Receive(Vector2.Zero, false, 0);
         if (gone is not null) Status = $"{gone.Name} left.";
         SendRoster();
     }
@@ -237,9 +258,118 @@ public partial class NetSession : Node
     private void End(string why)
     {
         GD.Print($"Net: session ended: {why}");
+        bool inStage = GuestStage is not null;
         Leave(quiet: true);
+        // A guest whose host went away mid-stage goes back to the title.
+        if (inStage) GetTree().CallDeferred(SceneTree.MethodName.ChangeSceneToFile, ClownSquad.Map.Campaign.TitleScene);
         Status = why;
         Ended?.Invoke(why);
+        Changed?.Invoke();
+    }
+
+    // ------------------------------------------------- phase 2: play a stage
+
+    /// <summary>A guest's controls, as the host's fighter for them reads them.</summary>
+    public RemoteInput InputFor(long peer)
+    {
+        if (!_inputs.TryGetValue(peer, out RemoteInput? input)) _inputs[peer] = input = new RemoteInput(peer);
+        return input;
+    }
+
+    /// <summary>Host: a stage is starting; every guest loads it to watch and play.</summary>
+    public void BeginStage(string stageId, FieldSize field)
+    {
+        if (Mode != Role.Host) return;
+        InStage = true;
+        Rpc(MethodName.StageBegin, stageId, (int)field);
+        ClownSquad.Services.Platform.SetPresence($"Playing stage {stageId} online");
+    }
+
+    /// <summary>Host: a banner for everyone (empty clears it).</summary>
+    public void ShowResult(string text)
+    {
+        if (Mode == Role.Host && InStage) Rpc(MethodName.StageBanner, text);
+    }
+
+    /// <summary>Host: the stage is over (back to the map); guests return to the lobby.</summary>
+    public void EndStage()
+    {
+        if (Mode != Role.Host || !InStage) return;
+        InStage = false;
+        Rpc(MethodName.StageEnd);
+    }
+
+    /// <summary>Host: back on the map choosing a stage.</summary>
+    public void HostOnMap()
+    {
+        if (Mode != Role.Host) return;
+        Status = "Picking a stage on the map...";
+        Rpc(MethodName.HostStatus, "The host is picking a stage on the map. You'll join them when it starts.");
+    }
+
+    public void SendSnapshot(byte[] data) { if (Mode == Role.Host) Rpc(MethodName.Snapshot, data); }
+    public void SendDescribe(int id, int version, byte[] data) { if (Mode == Role.Host) Rpc(MethodName.Describe, id, version, data); }
+
+    public void SendFx(FxEvent e)
+    {
+        if (Mode != Role.Host || !InStage) return;
+        Rpc(MethodName.FxRelay, (int)e.Kind, e.Text, e.At, e.A, e.B, e.Color, e.Flag);
+    }
+
+    /// <summary>Guest: this frame's controls.</summary>
+    public void SendInput(Vector2 move, bool attackHeld, int counts)
+    {
+        if (Mode == Role.Guest && GuestStage is not null) RpcId(1, MethodName.GuestInput, move, attackHeld, counts);
+    }
+
+    [Rpc(MultiplayerApi.RpcMode.AnyPeer, TransferMode = MultiplayerPeer.TransferModeEnum.UnreliableOrdered, TransferChannel = 1)]
+    private void GuestInput(Vector2 move, bool attackHeld, int counts)
+    {
+        if (Mode != Role.Host) return;
+        long from = _api.GetRemoteSenderId();
+        if (_inputs.TryGetValue(from, out RemoteInput? input)) input.Receive(move, attackHeld, counts);
+    }
+
+    [Rpc(MultiplayerApi.RpcMode.Authority, TransferMode = MultiplayerPeer.TransferModeEnum.UnreliableOrdered, TransferChannel = 2)]
+    private void Snapshot(byte[] data) { if (Mode == Role.Guest) SnapshotReceived?.Invoke(data); }
+
+    [Rpc(MultiplayerApi.RpcMode.Authority, TransferMode = MultiplayerPeer.TransferModeEnum.Reliable, TransferChannel = 3)]
+    private void Describe(int id, int version, byte[] data) { if (Mode == Role.Guest) DescribeReceived?.Invoke(id, version, data); }
+
+    [Rpc(MultiplayerApi.RpcMode.Authority, TransferMode = MultiplayerPeer.TransferModeEnum.Reliable, TransferChannel = 3)]
+    private void FxRelay(int kind, string text, Vector3 at, float a, float b, Color color, bool flag)
+    {
+        if (Mode == Role.Guest) FxReceived?.Invoke(new FxEvent((FxKind)kind, text, at, a, b, color, flag));
+    }
+
+    [Rpc(MultiplayerApi.RpcMode.Authority, TransferMode = MultiplayerPeer.TransferModeEnum.Reliable)]
+    private void StageBegin(string stageId, int field)
+    {
+        if (Mode != Role.Guest) return;
+        GuestStage = stageId;
+        GuestField = (FieldSize)field;
+        Status = $"Playing stage {stageId} with the host.";
+        ClownSquad.Services.Platform.SetPresence($"Playing stage {stageId} online");
+        GetTree().CallDeferred(SceneTree.MethodName.ChangeSceneToFile, ClownSquad.Map.Campaign.FightScene);
+    }
+
+    [Rpc(MultiplayerApi.RpcMode.Authority, TransferMode = MultiplayerPeer.TransferModeEnum.Reliable)]
+    private void StageBanner(string text) { if (Mode == Role.Guest) StageResult?.Invoke(text); }
+
+    [Rpc(MultiplayerApi.RpcMode.Authority, TransferMode = MultiplayerPeer.TransferModeEnum.Reliable)]
+    private void StageEnd()
+    {
+        if (Mode != Role.Guest || GuestStage is null) return;
+        GuestStage = null;
+        Status = "Back in the lobby. The host is picking the next stage.";
+        GetTree().CallDeferred(SceneTree.MethodName.ChangeSceneToFile, ClownSquad.Map.Campaign.TitleScene);
+    }
+
+    [Rpc(MultiplayerApi.RpcMode.Authority, TransferMode = MultiplayerPeer.TransferModeEnum.Reliable)]
+    private void HostStatus(string text)
+    {
+        if (Mode != Role.Guest) return;
+        Status = text;
         Changed?.Invoke();
     }
 

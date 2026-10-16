@@ -14,6 +14,8 @@ public enum PlayMode
     Practice,
     /// <summary>An automated probe or screenshot run, on a throwaway save, always on Normal.</summary>
     Test,
+    /// <summary>A guest in someone else's online game: nothing here is saved (the host plays the stage).</summary>
+    OnlineGuest,
 }
 
 /// <summary>
@@ -77,6 +79,15 @@ public static class Session
         GameSettings.GodMode = false;
         SaveSystem.Path = TestSave;
         SaveSystem.DeleteForTests();
+    }
+
+    public const string GuestSave = "user://online_guest_save.json";
+
+    /// <summary>Watching and playing in a host's stage: saves go to a scratch file, so the guest's own slot is never touched.</summary>
+    public static void BeginOnlineGuest()
+    {
+        Reset(PlayMode.OnlineGuest);
+        SaveSystem.Path = GuestSave;
     }
 
     private static void Reset(PlayMode mode)

@@ -105,11 +105,18 @@ public partial class GameRoot : Node3D
         string[] args = OS.IsDebugBuild() ? OS.GetCmdlineUserArgs() : Array.Empty<string>();
         bool Has(string flag) => Array.IndexOf(args, flag) >= 0;
 
+        // A guest in an online game runs no fight of its own: it shows the host's.
+        if (ClownSquad.Net.NetSession.Instance is { Mode: ClownSquad.Net.NetSession.Role.Guest, GuestStage: string guestStage } guestNet)
+        {
+            SetUpGuest(guestNet, guestStage);
+            return;
+        }
+
         // The HD art is the default; the original sheets are kept and selectable.
         ClownSquad.Visuals.ArtStyle.Classic = Has("classic");
 
         // Tests run against a throwaway save, so they never read or touch a real one.
-        bool probe = Has("animtest") || Has("movetest") || Has("aitest") || Has("wavetest") || Has("losetest") || Has("tentshot") || Has("skillshot") || Has("weapontest") || Has("weaponmoves") || Has("bindtest") || Has("practicetest") || Has("castshot") || Has("demo");
+        bool probe = Has("animtest") || Has("movetest") || Has("aitest") || Has("wavetest") || Has("losetest") || Has("tentshot") || Has("skillshot") || Has("weapontest") || Has("weaponmoves") || Has("bindtest") || Has("practicetest") || Has("castshot") || Has("demo") || Has("nettest");
         // Which kind of play this is, and so which save it uses (Session). The
         // stage chosen on the map is read before a Begin clears it.
         StageDef? picked = Campaign.Pending;
@@ -184,6 +191,10 @@ public partial class GameRoot : Node3D
 
         SpawnPlayers();
         if (_rush) foreach (PlayerFighter rp in _players) ApplyLevel(rp, BossRush.Level);
+        // Hosting online: the guests' clowns join the stage (campaign stages only, not the rush or practice).
+        if (ClownSquad.Net.NetSession.Instance is { Mode: ClownSquad.Net.NetSession.Role.Host } hostNet && hostNet.Members.Count > 1
+            && _stage is not null && !_rush && !_practice)
+            AddOnlinePlayers(hostNet);
         BuildHud();
 
         // "-- snaps 4,8.5,12": screenshots at those seconds into the fight (needs a window).
@@ -194,13 +205,7 @@ public partial class GameRoot : Node3D
                     GetTree().CreateTimer(t, true, false, true).Timeout += () =>
                         GetViewport().GetTexture().GetImage().SavePng($"{ClownSquad.Debug.DebugShots.Dir}snap_{s}.png");
 
-        ClownSquad.Audio.Sfx.PlayMusic(_practice ? "music_bonus" : _stage switch
-        {
-            StageDef { Kind: StageKind.Boss } => "music_boss",
-            StageDef { Kind: StageKind.Bonus } => "music_bonus",
-            StageDef song => $"music_world{song.World}",
-            _ => "music_world1",
-        });
+        ClownSquad.Audio.Sfx.PlayMusic(StageMusic());
 
         if (_practice)
         {
@@ -253,6 +258,12 @@ public partial class GameRoot : Node3D
         }
         AddChild(_director);
         _director.PhaseChanged += OnPhaseChanged;
+        if (_netHost is not null)
+            _director.PhaseChanged += phase =>
+            {
+                if (phase == WaveDirector.Phase.Victory) ClownSquad.Net.NetSession.Instance?.ShowResult("STAGE CLEAR!");
+                else if (phase == WaveDirector.Phase.Defeat) ClownSquad.Net.NetSession.Instance?.ShowResult("GAME OVER");
+            };
         _director.EnemyDefeated += OnEnemyDefeated;
         _director.HostLevel = () => _players.Count > 0 && _players[0].Record is CharacterRecord host ? host.Level : 1;
         _lootRng.Seed = _director.Seed ^ 0x5eed10075UL;
@@ -341,6 +352,8 @@ public partial class GameRoot : Node3D
     {
         // Leaving the scene (quit, or replaying the stage) always saves.
         SaveSystem.Save();
+        if (_netHost is not null) ClownSquad.Net.NetSession.Instance?.EndStage();
+        if (Session.Mode == PlayMode.OnlineGuest) GameSettings.Load();   // the host's field size was only for that stage
         Fighter.HitLanded -= OnHitLanded;
         Fighter.HitLanded -= OnPracticeHit;
         Arena.Current = null;

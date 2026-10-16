@@ -12,8 +12,8 @@ using ClownSquad.Progression;
 /// Title > ONLINE: host a game or join one by IP address (no matchmaking).
 /// The lobby lists everyone with their clown, level and weapon; the host sees
 /// the addresses friends should type. Each player brings P1's character from
-/// their own most recent save. Playing stages together online is phase 2
-/// (ADR 0010), so START explains that for now.
+/// their own most recent save. The host's START opens their world map, and
+/// every stage they enter, the guests play too (ADR 0010, phase 2).
 /// </summary>
 public partial class OnlineMenu : CanvasLayer
 {
@@ -33,6 +33,8 @@ public partial class OnlineMenu : CanvasLayer
     private NetSession _net = null!;
 
     public event Action? Closed;
+    /// <summary>The host pressed START: the title takes them to their world map.</summary>
+    public event Func<string?>? HostStarts;
 
     public OnlineMenu(IEnumerable<int> devices, CharacterRecord me)
     {
@@ -76,7 +78,8 @@ public partial class OnlineMenu : CanvasLayer
         _box.AddChild(_list);
         _status = new Label { HorizontalAlignment = HorizontalAlignment.Center, AutowrapMode = TextServer.AutowrapMode.WordSmart, CustomMinimumSize = new Vector2(580, 0), LabelSettings = Style(15, new Color(1f, 0.75f, 0.45f), 3) };
         _box.AddChild(_status);
-        Show(Page.Choose);
+        // Back on the title after a stage online: straight to the lobby.
+        Show(_net.Mode == NetSession.Role.Offline ? Page.Choose : Page.Lobby);
         Sfx.Play("pop", 0.9f);
     }
 
@@ -156,11 +159,24 @@ public partial class OnlineMenu : CanvasLayer
 
     private void Start()
     {
-        // Phase 1 stops at the lobby: running stages over the network is phase 2.
-        Sfx.Play("honk_low", 1.1f, -6f);
-        _status.Text = _net.Mode == NetSession.Role.Host
-            ? "Everyone is connected! Playing stages together online is the next step being built (phase 2)."
-            : "Only the host can start the game.";
+        if (_net.Mode != NetSession.Role.Host)
+        {
+            Sfx.Play("honk_low", 1.1f, -6f);
+            _status.Text = "Only the host can start. You'll join them as soon as they pick a stage.";
+            return;
+        }
+        if (_net.Members.Count < 2)
+        {
+            Sfx.Play("honk_low", 1.1f, -6f);
+            _status.Text = "Waiting for a friend to join first.";
+            return;
+        }
+        // The host plays from their own world map; guests follow them into each stage.
+        if (HostStarts?.Invoke() is string problem)
+        {
+            Sfx.Play("honk_low", 1.1f, -6f);
+            _status.Text = problem;
+        }
     }
 
     private void OnNetChanged() { if (IsInsideTree()) Refresh(); }

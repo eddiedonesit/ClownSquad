@@ -48,6 +48,13 @@ public static class NetRegistry
     /// <summary>The number of a tracked node, or 0.</summary>
     public static int IdFor(Node node) => IdOf.TryGetValue(node.GetInstanceId(), out int id) ? id : 0;
 
+    /// <summary>Every numbered node, for the host's snapshots.</summary>
+    public static IEnumerable<(int id, Node node)> Entries()
+    {
+        foreach (KeyValuePair<int, Node> kv in ById)
+            if (GodotObject.IsInstanceValid(kv.Value)) yield return (kv.Key, kv.Value);
+    }
+
     public static Node? Find(int id) => ById.TryGetValue(id, out Node? n) && GodotObject.IsInstanceValid(n) ? n : null;
 
     /// <summary>Start numbering again from 1, at the start of a fight.</summary>
