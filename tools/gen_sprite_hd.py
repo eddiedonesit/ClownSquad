@@ -70,7 +70,7 @@ MATS[SKIN].tones = [(150, 84, 82), (226, 160, 138), (250, 218, 192), (255, 232, 
 # --------------------------------------------------------- Aseprite parts
 # The hair and PIP's face pieces are drawn in Aseprite and shared by every
 # generator: see clown_parts.py (art/aseprite/clown_head.aseprite).
-from clown_parts import HEAD, HAIR_BACK, HAIR_FRONT, stamp_hair
+from clown_parts import HEAD, HAIR_BACK, HAIR_FRONT, FACE_EXTRA, stamp_hair
 
 
 # ------------------------------------------------------------------- parts
@@ -849,7 +849,7 @@ def mallet_frames():
 # anchor (draw(): x = 50 + lean, y = head centre). Rotated and floored frames
 # have no anchor and keep the generated face.
 
-FACE_CLOWNS = ("pip",)          # who has the hand-drawn face so far
+FACE_CLOWNS = ("pip", "poppy", "bingo", "dot")    # the whole squad has the hand-drawn face
 
 INK_C = (34, 22, 40)
 EYE_W = (252, 252, 255)
@@ -866,7 +866,7 @@ def _is_skin(px):
     return px[3] > 0 and tuple(px[:3]) in SKIN_T
 
 
-def hand_face(rows, anchor, expression):
+def hand_face(rows, anchor, expression, clown="pip"):
     """Paint the hand-drawn face onto shaded RGBA rows (a list of lists of tuples)."""
     ax, ay = anchor
     h, w = len(rows), len(rows[0])
@@ -916,6 +916,11 @@ def hand_face(rows, anchor, expression):
     else:
         for x, y, c in HEAD["eye_open"]:
             put(ax + x, ay + y, c[:3])
+    # 3. The clown's own touch: Poppy's lashes, Bingo's brow, Dot's freckles.
+    for x, y, c in FACE_EXTRA.get(clown, ()):
+        if expression == "hit" and c[:3] == (255, 255, 255):
+            continue                                      # no glint in a squeezed-shut eye
+        put(ax + x, ay + y, c[:3])
 
 
 def write_sheet(name, frames, mats):
@@ -926,7 +931,7 @@ def write_sheet(name, frames, mats):
     if name.split("_")[0] in FACE_CLOWNS:
         for (clip, cv), (px, _) in zip(frames, both):
             if getattr(cv, "face", None):
-                hand_face(px, cv.face, "hit" if clip.endswith("hit") else "")
+                hand_face(px, cv.face, "hit" if clip.endswith("hit") else "", name.split("_")[0])
     shaded = [p for p, _ in both]
     out = os.path.join("assets", "sprites", name + ".png")
     # Trimmed and packed into rows (pixelart_hd.pack_frames): a one-row strip of

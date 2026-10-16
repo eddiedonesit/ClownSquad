@@ -314,6 +314,9 @@ class Rig:
             c.recolor(lambda x, y, m: (TRIM if (math.floor(x / (3 * k)) * 7 + math.floor(y / (3 * k)) * 13) % 11 == 0
                                        else GOLD if (math.floor(x / (3 * k)) * 5 + math.floor(y / (3 * k)) * 3) % 17 == 0 else m)
                       if m == SUIT else m)
+        if s.get("suspenders"):
+            # a pair of braces down the front (the mime's)
+            c.recolor(lambda x, y, m: TRIM if y > sh_y + 2 * k and (abs(x - cx + 3 * k) < 1.4 * k or abs(x - cx - 6 * k) < 1.4 * k) else m)
         if s.get("sash"):
             c.recolor(lambda x, y, m: ACCENT if abs((x - cx) + (y - (sh_y + hip_y) / 2) * 0.9) < 3.2 * k else m)
         belt = s.get("belt")
@@ -1151,19 +1154,19 @@ def paste(dst, src, dx, dy):
 CAST = {
     # ---- enemies
     "juggler": dict(k=1.0, suit=(150, 70, 190), accent=(250, 210, 90), pattern="stripes", hair=(250, 120, 160),
-                    hat="cone", hat_col=(80, 190, 210), neck="ruff", shoe=(80, 190, 210), juggles="pin"),
+                    hat="cone", hat_col=(80, 190, 210), neck="ruff", shoe=(80, 190, 210), juggles="pin", belt="plain", legwear="stripes", wristbands=True),
     "unicyclist": dict(k=1.0, legs="unicycle", suit=(240, 150, 40), accent=(60, 130, 220), pattern="vstripes",
-                       hair=(90, 60, 40), hat="fez", hat_col=(200, 40, 60), neck="bowtie", shoe=(60, 60, 80), pants=(60, 130, 220)),
+                       hair=(90, 60, 40), hat="fez", hat_col=(200, 40, 60), neck="bowtie", shoe=(60, 60, 80), pants=(60, 130, 220), belt="plain", legwear="stripes"),
     "weightlifter": dict(k=1.12, build="muscle", suit=(210, 50, 60), accent=(250, 240, 240), pattern="leotard", bare_arms=True,
                          gloves=False, hair_style="slick", hair=(40, 30, 30), hat="none", neck="none", mustache=True,
-                         face="plain", nose=False, shoe=(60, 40, 50), shoes="boot", pants=(210, 50, 60), cw=240),
+                         face="plain", nose=False, shoe=(60, 40, 50), shoes="boot", pants=(210, 50, 60), cw=240, strap=True, belt="plain", wristbands=True),
     "balloonist": dict(k=1.0, build="round", suit=(70, 180, 120), accent=(250, 250, 250), pattern="dots", hair=(250, 200, 80),
-                       hat="bowler", hat_col=(60, 50, 70), neck="bowtie", balloon=(240, 80, 120)),
+                       hat="bowler", hat_col=(60, 50, 70), neck="bowtie", balloon=(240, 80, 120), belt="plain", sash=True),
     "stiltwalker": dict(k=1.0, legs="stilts", suit=(60, 60, 120), accent=(250, 220, 90), pattern="plain", tails=True,
-                        hair=(200, 200, 210), hat="top", hat_col=(40, 40, 60), neck="collar", pants=(220, 60, 80), ch=420, cw=330),
+                        hair=(200, 200, 210), hat="top", hat_col=(40, 40, 60), neck="collar", pants=(220, 60, 80), ch=420, cw=330, sequins=True, frogging=True),
     "mime": dict(k=1.0, face="mime", suit=(30, 30, 40), accent=(245, 245, 250), pattern="stripes", hair_style="none",
                  hat="beret", hat_col=(30, 30, 40), neck="scarf", nose=False, shoe=(30, 30, 40), pants=(30, 30, 40),
-                 trim=(230, 60, 70)),
+                 trim=(230, 60, 70), suspenders=True),
     "tot": dict(k=0.62, build="tiny", suit=(240, 90, 90), accent=(250, 230, 120), pattern="dots", hair=(120, 210, 250),
                 hat="cone", hat_col=(120, 210, 250), neck="ruff", cw=260, ch=320),
     # ---- bosses

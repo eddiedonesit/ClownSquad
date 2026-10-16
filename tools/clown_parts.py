@@ -12,6 +12,8 @@ head of radius 18.5 (the squad's), facing right.
   eye_open, eye_hit, mouth_hit, blush, nose_shine
                          finished colours, painted over a shaded frame
                          (gen_sprite_hd.hand_face).
+  lashes_poppy, brow_bingo, freckles_dot
+                         one clown's own touch, painted over the shared face.
 """
 import math
 import os
@@ -38,6 +40,9 @@ def _groups(pixels):
 
 
 HEAD = {n: _layer(n) for n in ("hair_back", "hair_front", "eye_open", "eye_hit", "mouth_hit", "blush", "nose_shine")}
+# Each clown's own touch over the shared face (tools/aseprite/draw_clown_faces.lua).
+FACE_EXTRA = {clown: _layer(layer) for clown, layer in (("poppy", "lashes_poppy"), ("bingo", "brow_bingo"), ("dot", "freckles_dot"))
+              if os.path.exists(os.path.join(PARTS_DIR, "clown_head_" + layer + ".png"))}
 HAIR_BACK = _groups(HEAD["hair_back"])
 HAIR_FRONT = _groups(HEAD["hair_front"])
 
