@@ -107,6 +107,18 @@ public partial class TitleScreen : Node3D
         AddChild(_intro);
 
         if (Array.IndexOf(args, "titleshot") >= 0) TitleShots();
+        // "-- keyart window 1920x1080": the ring and the squad with no menus, for the store's art, then quit.
+        if (Array.IndexOf(args, "keyart") >= 0)
+        {
+            _intro?.QueueFree();
+            _intro = null;
+            _ui.Visible = false;
+            GetTree().CreateTimer(2.5).Timeout += () =>
+            {
+                GetViewport().GetTexture().GetImage().SavePng($"{ClownSquad.Debug.DebugShots.Dir}keyart.png");
+                GetTree().Quit();
+            };
+        }
         if (Array.IndexOf(args, "titlemovie") >= 0) TitleMovie();
     }
 
@@ -315,7 +327,7 @@ public partial class TitleScreen : Node3D
         _menu.AddThemeConstantOverride("separation", 8);
         backing.AddChild(_menu);
 
-        _hint = new Label { HorizontalAlignment = HorizontalAlignment.Center, LabelSettings = Style(15, new Color(0.85f, 0.8f, 0.95f), 4) };
+        _hint = new Label { HorizontalAlignment = HorizontalAlignment.Center, LabelSettings = Style(18, new Color(0.85f, 0.8f, 0.95f), 4) };
         _hint.SetAnchorsPreset(Control.LayoutPreset.CenterBottom);
         _hint.Position = new Vector2(-560, -44);
         _hint.Size = new Vector2(1120, 30);

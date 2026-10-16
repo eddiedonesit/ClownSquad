@@ -9,7 +9,7 @@ adds a `SteamPlatform` class and nothing else changes.
 
 | Feature | State |
 |---|---|
-| Achievements | 34, all triggers wired; in-game list (Title > ACHIEVEMENTS); earned offline into `user://platform.cfg` and unlocked on Steam the first time the Steam build runs |
+| Achievements | 36, all triggers wired; in-game list (Title > ACHIEVEMENTS); earned offline into `user://platform.cfg` and unlocked on Steam the first time the Steam build runs |
 | Stats | `kos`, `stages`, `bosses` (integers, counted up) |
 | Leaderboard | `boss_rush`: best boss-rush time, lower is better |
 | Rich presence | Set on the title, map, every stage, boss, boss rush, practice and online lobby |
@@ -55,6 +55,8 @@ adds a `SteamPlatform` class and nothing else changes.
 | rush_clear | THE FULL SHOW | Beat the boss rush |
 | rush_fast | QUICK CHANGE | Beat the boss rush in under 20 minutes |
 | together | SEND IN THE CLOWNS | Play an online game with a friend |
+| ring_bell | RING THE BELL | Ring the High Striker with Big Bertha |
+| daily_clear | SAME TIME TOMORROW | Clear a Daily Circus |
 | boss_1 ... boss_9 | WORLD n TAMED | Beat each world's boss |
 | boss_10 | THE GREATEST SHOW (hidden) | Beat the Ringmaster |
 | win_mallet, win_hammer, win_seltzer, win_pie, win_pins, win_slapstick, win_popgun, win_balloonsword | (weapon) CHAMP | Beat a boss holding that weapon |
@@ -93,3 +95,24 @@ beside the project; `scripts/Platform/SteamPlatform.cs`.
 - Age rating questionnaire (cartoon violence).
 - Playtest and balance (weapons, late bosses).
 - The soundtrack is synthesised; decide whether to keep it or commission music.
+
+## 6. Store art and release checks (made 2026-10-16)
+
+All in `store/`, made from the game's own art. Regenerate after art changes.
+
+**Capsules:** `capsule_header_920x430`, `capsule_small_462x174`, `capsule_main_1232x706`, `capsule_vertical_748x896`, `library_capsule_600x900`, `library_hero_3840x1240` (no logo; Steam lays it over) and `library_logo_1280x720` (transparent).
+- Made by `python tools/make_store_art.py` from the key art.
+- Render the key art first: `-- keyart window 1920x1080`, which saves to debug/keyart.png.
+
+**Screenshots:** `screenshot_1` to `screenshot_6`, 1920x1080, taken in play (`-- stage N demo window 1920x1080 snaps T`). Swap in your own favourites any time.
+
+**Achievement icons:** `store/achievements/<api name>.png` (256x256), plus `<api name>_locked.png` for the unearned version.
+- Made by `python tools/make_achievement_icons.py`, which reads the list from Achievements.cs.
+
+**Steam Deck (1280x800):**
+- Checked with `-- window 1280x800`.
+- The title menu and the fight HUD fit and read.
+- The title's hint line was enlarged.
+- With two or more clowns, the stage ticket now drops below the player panels (they overlapped at any size).
+- Every menu works on a gamepad.
+- The address box on the JOIN page needs Steam's on-screen keyboard; Steam invites avoid typing altogether.

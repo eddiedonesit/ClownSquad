@@ -113,8 +113,18 @@ public static class GameSettings
         EnsureBuses();
         SetVolume(MusicBus, Music);
         SetVolume(SfxBus, Sound);
-        if (DisplayServer.GetName() != "headless")
-            DisplayServer.WindowSetMode(Fullscreen ? DisplayServer.WindowMode.Fullscreen : DisplayServer.WindowMode.Windowed);
+        if (DisplayServer.GetName() == "headless") return;
+        // "-- window 1280x800" (debug builds): a window that size whatever is saved, to check other screens (the Steam Deck).
+        string[] args = OS.IsDebugBuild() ? OS.GetCmdlineUserArgs() : System.Array.Empty<string>();
+        int at = System.Array.IndexOf(args, "window");
+        if (at >= 0 && at + 1 < args.Length && args[at + 1].Split('x') is { Length: 2 } wh
+            && int.TryParse(wh[0], out int w) && int.TryParse(wh[1], out int h))
+        {
+            DisplayServer.WindowSetMode(DisplayServer.WindowMode.Windowed);
+            DisplayServer.WindowSetSize(new Vector2I(w, h));
+            return;
+        }
+        DisplayServer.WindowSetMode(Fullscreen ? DisplayServer.WindowMode.Fullscreen : DisplayServer.WindowMode.Windowed);
     }
 
     /// <summary>The music and sound buses, made on first use and routed to the master bus.</summary>

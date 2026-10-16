@@ -379,6 +379,10 @@ public partial class ClownHud : CanvasLayer
 
         _god.Visible = ClownSquad.Progression.GameSettings.God;
         IReadOnlyList<PlayerFighter> players = _players();
+        // With a second clown their panel runs under the top centre: the stage ticket drops below the panels.
+        float ticketY = players.Count >= 2 ? 100 : 10;
+        _ticket.OffsetTop = ticketY;                      // (offsets: the ticket is anchored to the top centre)
+        _ticket.OffsetBottom = ticketY + 74;
         for (int i = 0; i < _panels.Count; i++)
         {
             (Control root, CandyBar bar, Label name) = _panels[i];
