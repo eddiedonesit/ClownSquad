@@ -110,11 +110,21 @@ public partial class GameRoot
     }
 
     /// <summary>Terraces, ramps and obstacles for this stage (World.Terrain), built and shown.</summary>
-    private void LayTerrain(float[] stops, float exitX)
+    private void LayTerrain(float[] stops, float exitX, bool host = true)
     {
         if (_scenery is null || _stage is null || ArtStyle.Classic) return;
-        Terrain.Current = Terrain.Lay(_stage.Id, stops, exitX, StageScenery.BandFar, StageScenery.BandNear);
+        Terrain.Current = Terrain.Lay(_stage.Id, _stage.World, stops, exitX, StageScenery.BandFar, StageScenery.BandNear);
+        if (OS.IsDebugBuild() && Array.IndexOf(OS.GetCmdlineUserArgs(), "notraps") >= 0)       // debug: the same ground, without pits or traps (to compare balance)
+        {
+            Terrain.Current.Pits.Clear();
+            Terrain.Current.Features.Clear();
+            Terrain.Current.Obstacles.RemoveAll(o => o.Kind == "cannon");
+        }
         _scenery.PlaceTerrain(Terrain.Current);
+        Terrain tc = Terrain.Current;
+        GD.Print($"[terrain] {_stage.Id}: {tc.Layout}, {tc.Pits.Count} pits, features: {string.Join(" ", tc.Features.ConvertAll(f => $"{f.Kind}@{f.X:0}"))}");
+        // the traps and features move, so they are the host's (a guest sees them mirrored)
+        if (host) StageFeature.Build(this, Terrain.Current, _stage.World);
     }
 
     private void ConfigureEncounters(StageDef st)

@@ -185,7 +185,11 @@ run-based or level-based structure, and max player count.
 
 `World.Terrain.Lay` builds each scrolling stage's ground from the stage id alone, so an online guest gets the same.
 
-- **Terraces:** most encounters have a raised terrace along the back of the walkway (0.75 to 1.05 high) with a ramp at one end.
+- **Layout styles (seeded per stage):** Flat (more obstacles), BackDecks (terraces along the back on some encounters), Islands (raised islands mid-walkway), FrontRidge (a low ridge along the front), Tiers (a low deck and a higher one behind it). Ramps on the left, right or both ends.
+- **Pits:** some stages have open drops with hazard-striped edges. A fall costs 20% of max health (bosses 6%) and puts you back at the last safe edge, blinking. Enemies and bots stop at pit edges but can be knocked in. Spawns are moved clear of pits.
+- **Features and traps (`World.StageFeature`, host-only, mirrored to guests):** trampoline (a mushroom in world 3), circus cannon (lane warning, then a cannonball), giant mallet (circle warning, then a slam), fire jet, slippery patch (soap, syrup, mud, oil or ice by world), poison spill, TNT barrel (smash it: fuse, then a blast that hits everyone and chains other barrels) and poison barrel (bursts into a spill). They hit friend and foe alike.
+- **Difficulty by world:** the pool of trap kinds widens from world 1 to 10. Later worlds use more kinds per stage (1 + (world-1)/3), more of them, and more pits (15% chance in world 1, 78% in world 10). Traps hit harder (severity 0.6 up to 1.5) and come round faster.
+- **Debug:** `-- notraps` lays the same ground without pits or traps, for balance comparisons.
 - **Obstacles:** between encounters, one to three of the world's obstacles stand on the walkway (barrels, pins, candy trees, mushrooms, rocks, crystals, mirrors, pines, cacti, statues, trophies, stars), drawn from the 3D kit.
 - **Movement:**
   - A ledge stops you: jump up, or take the ramp.

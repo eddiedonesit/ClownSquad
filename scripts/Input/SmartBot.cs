@@ -76,7 +76,7 @@ public sealed class SmartBot : IInputSource
         // Safe: pick a fight.
         Fighter? target = PickTarget(tree, me);
         if (target is null)
-            return AdvanceWhenIdle ? new InputCommand(new Vector2(1f, 0f), false, false) : InputCommand.None;
+            return AdvanceWhenIdle ? new InputCommand(AroundPits(tree, me, new Vector2(1f, 0f)), false, false) : InputCommand.None;
 
         Vector3 t = Flat(target.GlobalPosition);
         float side = me.X >= t.X ? 1f : -1f;
@@ -114,7 +114,37 @@ public sealed class SmartBot : IInputSource
         // Never step into a telegraph on the way in.
         Vector3 next = me + new Vector3(move.X, 0f, move.Y) * 0.6f;
         if (Danger(next, out _) > 0f) move = Vector2.Zero;
-        return new InputCommand(move, false, false);
+        return new InputCommand(AroundPits(tree, me, move), false, false);
+    }
+
+    /// <summary>
+    /// The way to go instead, if this way walks into a pit or a lasting patch
+    /// (a slick, a spill): the nearest turn that does not. Standing in one
+    /// already, it just walks on out.
+    /// </summary>
+    private static Vector2 AroundPits(SceneTree tree, Vector3 me, Vector2 move)
+    {
+        if (move == Vector2.Zero) return move;
+        Terrain? t = Terrain.Current;
+        var lasting = new List<StageFeature>();
+        foreach (Node n in tree.GetNodesInGroup(StageFeature.Group))
+            if (n is StageFeature sf && sf.Lasting && !sf.Covers(me)) lasting.Add(sf);
+        bool Open(Vector2 m)
+        {
+            var p = new Vector3(me.X + m.X * 0.9f, 0f, me.Z + m.Y * 0.9f);
+            if (t is not null && t.InPit(p.X, p.Z, 0.35f)) return false;
+            foreach (StageFeature sf in lasting) if (sf.Covers(p)) return false;
+            return true;
+        }
+        if (Open(move)) return move;
+        foreach (float deg in new[] { 45f, -45f, 90f, -90f, 135f, -135f })
+        {
+            // turn toward the walkway's middle first, so it goes round the short way
+            float sign = me.Z > 0f ? -1f : 1f;
+            Vector2 m = move.Rotated(Mathf.DegToRad(deg * sign));
+            if (Open(m)) return m;
+        }
+        return -move;
     }
 
     private static Vector3 Flat(Vector3 v) => new(v.X, 0f, v.Z);
@@ -136,6 +166,8 @@ public sealed class SmartBot : IInputSource
             if (n is Hazard h && h.Covers(p)) { d += 1.5f; urgency = Mathf.Max(urgency, 0.5f); }
             if (n is GlassField g && g.Covers(p)) d += 1f;
         }
+        foreach (Node n in tree.GetNodesInGroup(StageFeature.Group))
+            if (n is StageFeature sf && !sf.Lasting && sf.Covers(p)) { d += 1.5f; urgency = Mathf.Max(urgency, 0.5f); }
         foreach (Node n in Fighter.Live)
             if (n is BossClown b && b.SlamComing && Flat(b.GlobalPosition - p).Length() < BossClown.SlamReach + 0.5f)
             {
@@ -198,7 +230,7 @@ public sealed class SmartBot : IInputSource
         float bestScore = float.MaxValue;
         foreach (Node n in Fighter.Live)
         {
-            if (n is not Fighter f || !f.Hostile || f.IsDead || !f.CanBeHit()) continue;
+            if (n is not Fighter f || !f.Hostile || f.IsDead || !f.CanBeHit() || f is HazardBarrel) continue;   // barrels are left alone
             if (f.GlobalPosition.Y > 1.5f) continue;                        // up on a trapeze
             float dist = Flat(f.GlobalPosition) .DistanceTo(me);
             float score = dist + f.Health / Mathf.Max(1f, f.MaxHealth) * 2f;

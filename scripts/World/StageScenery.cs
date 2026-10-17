@@ -245,9 +245,40 @@ public partial class StageScenery : Node3D
             st.GenerateNormals();
             AddChild(new MeshInstance3D { Mesh = st.Commit(), MaterialOverride = top });
         }
+        // pits: a dark drop with a lip of the world's trim and hazard stripes along the edge
+        var dark = new StandardMaterial3D { AlbedoColor = new Color(0.02f, 0.01f, 0.03f), ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded };
+        var wall = new StandardMaterial3D { AlbedoColor = l.Ground.Darkened(0.55f), Roughness = 1f };
+        var stripeA = new StandardMaterial3D { AlbedoColor = new Color(0.95f, 0.78f, 0.15f), Roughness = 0.6f };
+        var stripeB = new StandardMaterial3D { AlbedoColor = new Color(0.12f, 0.1f, 0.12f), Roughness = 0.6f };
+        foreach (Terrain.Pit p in t.Pits)
+        {
+            float w = p.X1 - p.X0, d = p.Z1 - p.Z0;
+            float cx = (p.X0 + p.X1) * 0.5f, cz = (p.Z0 + p.Z1) * 0.5f;
+            // the floor is drawn over the hole: a black lid just above it hides the floor, walls fall away inside
+            AddChild(new MeshInstance3D { Mesh = new BoxMesh { Size = new Vector3(w, 0.02f, d) }, MaterialOverride = dark, Position = new Vector3(cx, 0.015f, cz) });
+            // the far wall, seen falling away into the dark
+            AddChild(new MeshInstance3D { Mesh = new BoxMesh { Size = new Vector3(w, 0.02f, Mathf.Min(0.45f, d * 0.3f)) }, MaterialOverride = wall, Position = new Vector3(cx, 0.02f, p.Z0 + Mathf.Min(0.45f, d * 0.3f) * 0.5f) });
+            AddChild(new MeshInstance3D { Mesh = new BoxMesh { Size = new Vector3(w, 0.02f, Mathf.Min(0.2f, d * 0.15f)) }, MaterialOverride = side, Position = new Vector3(cx, 0.022f, p.Z0 + Mathf.Min(0.2f, d * 0.15f) * 0.5f) });
+            int n = Mathf.Max(2, Mathf.RoundToInt(w / 0.4f));
+            for (int i = 0; i < n; i++)
+            {
+                float x = p.X0 + (i + 0.5f) * w / n;
+                foreach (float z in new[] { p.Z0 - 0.07f, p.Z1 + 0.07f })
+                    AddChild(new MeshInstance3D { Mesh = new BoxMesh { Size = new Vector3(w / n, 0.05f, 0.14f) }, MaterialOverride = i % 2 == 0 ? stripeA : stripeB, Position = new Vector3(x, 0.03f, z) });
+            }
+            int m = Mathf.Max(2, Mathf.RoundToInt(d / 0.4f));
+            for (int i = 0; i < m; i++)
+            {
+                float z = p.Z0 + (i + 0.5f) * d / m;
+                foreach (float x in new[] { p.X0 - 0.07f, p.X1 + 0.07f })
+                    AddChild(new MeshInstance3D { Mesh = new BoxMesh { Size = new Vector3(0.14f, 0.05f, d / m) }, MaterialOverride = i % 2 == 0 ? stripeA : stripeB, Position = new Vector3(x, 0.03f, z) });
+            }
+        }
+
         (string ka, string kb) = ObstacleKinds[_world - 1];
         foreach (Terrain.Obstacle o in t.Obstacles)
         {
+            if (o.Kind == "cannon") continue;        // a stage feature, built by itself
             Node3D prop = Kit3D.Make(o.Kind == "a" ? ka : kb, _kit, l.A, l.B);
             prop.Position = new Vector3(o.X, 0f, o.Z);
             prop.Scale = Vector3.One * 0.8f;

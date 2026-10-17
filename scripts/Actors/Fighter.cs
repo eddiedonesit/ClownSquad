@@ -276,7 +276,8 @@ public partial class Fighter : CharacterBody3D
         float ground = 0f;
         if (ClownSquad.World.Terrain.Current is ClownSquad.World.Terrain terrain)
         {
-            (ground, bool ledge) = terrain.Settle(this, before);
+            bool careful = AutoClimb && Grounded && !Incapacitated;
+            (ground, bool ledge) = terrain.Settle(this, before, careful);
             // a ledge in the way: enemies (and bots) hop up after you
             if (ledge && Grounded && AutoClimb && ground - GlobalPosition.Y < 1.6f)
             {
@@ -298,7 +299,47 @@ public partial class Fighter : CharacterBody3D
         }
 
         KeepInArena();
+        // Where to come back to after a fall: the last solid ground stood on, clear of any pit's edge.
+        if (Grounded && ground > -0.5f && Terrain_InPit(0.7f) == false) _safeSpot = GlobalPosition;
+        if (GlobalPosition.Y < -1.4f) FellInPit();
         UpdateShadow();
+    }
+
+    private Vector3? _safeSpot;
+
+    private bool Terrain_InPit(float margin) =>
+        ClownSquad.World.Terrain.Current?.InPit(GlobalPosition.X, GlobalPosition.Z, margin) ?? false;
+
+    /// <summary>
+    /// Down a pit: a fifth of their health (bosses lose less), and back up at
+    /// the edge they fell from, blinking. Enemies can be knocked in too.
+    /// </summary>
+    private void FellInPit()
+    {
+        Vector3 back = _safeSpot ?? new Vector3(GlobalPosition.X, 0f, 0f);
+        if (ClownSquad.World.Terrain.Current is ClownSquad.World.Terrain t) back = t.Clear(back, BodyHalfWidth + 0.3f);
+        back.Y = Mathf.Max(0f, ClownSquad.World.Terrain.Current?.HeightAt(back) ?? 0f);
+        GlobalPosition = back + new Vector3(0f, 1.2f, 0f);
+        Velocity = Vector3.Zero;
+        _knockback = Vector3.Zero;
+        _pendingLaunch = 0f;
+        Grounded = false;
+        if (IsDead) return;
+        float loss = MaxHealth * (this is IBoss ? 0.06f : 0.2f);
+        Health = Mathf.Max(0f, Health - loss);
+        HitLanded?.Invoke(null, this, loss);
+        Fx.Sound("slide_down", 1f);
+        Fx.Pop(GetParent(), back + new Vector3(0f, BodyHeight + 0.6f, 0f), "WHOOPS!", new Color(1f, 0.6f, 0.35f), 0.9f, 0.7f);
+        if (IsDead) { Died?.Invoke(this); return; }
+        _invulnerable = Mathf.Max(_invulnerable, 1.2f);
+        _stunRemaining = Mathf.Max(_stunRemaining, 0.3f);
+    }
+
+    /// <summary>Thrown straight up by something underfoot (a trampoline): keeps the run, loses the ground.</summary>
+    public void Bounce(float speed)
+    {
+        Velocity = new Vector3(Velocity.X, speed, Velocity.Z);
+        Grounded = false;
     }
 
     /// <summary>
@@ -477,6 +518,7 @@ public partial class Fighter : CharacterBody3D
         float k = 1f / (1f + h * 0.35f);
         _shadow.GlobalPosition = new Vector3(GlobalPosition.X, floor + 0.012f, GlobalPosition.Z);
         _shadow.Scale = new Vector3(k, 1f, k);
+        _shadow.Visible = floor > -1f;       // nothing to cast on over a pit
         _shadowMat.AlbedoColor = new Color(1f, 1f, 1f, k * (Visual.Visible ? 1f : 0.4f));
     }
 

@@ -364,6 +364,9 @@ public partial class GameRoot
             foreach (Node n in Fighter.Live)
                 if (n is Fighter f && f.Hostile)
                     GD.Print($"  still standing: {f.Name} '{f.DisplayName}' hp {f.Health:F0}/{f.MaxHealth:F0} at {f.GlobalPosition.X:F1},{f.GlobalPosition.Y:F1},{f.GlobalPosition.Z:F1}");
+        if (got == "timeout")
+            foreach (PlayerFighter p in _players)
+                GD.Print($"  player {p.DisplayName} hp {p.Health:F0} at {p.GlobalPosition.X:F1},{p.GlobalPosition.Y:F1},{p.GlobalPosition.Z:F1} v {p.Velocity}");
         var heard = new List<string>();
         foreach (var kv in ClownSquad.Audio.Sfx.Played) heard.Add($"{kv.Key}x{kv.Value}");
         heard.Sort();

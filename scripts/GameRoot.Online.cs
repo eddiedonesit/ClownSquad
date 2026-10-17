@@ -89,7 +89,7 @@ public partial class GameRoot
         ClownSquad.Audio.Sfx.PlayMusic(StageMusic());
         ClownSquad.Services.Platform.SetPresence($"Playing stage {stageId} online");
         // the same ground as the host's, from the stage alone
-        if (_scrolling && _stage is StageDef gs) LayTerrain(EncounterStops(gs), EncounterStops(gs)[^1] + 12f);
+        if (_scrolling && _stage is StageDef gs) LayTerrain(EncounterStops(gs), EncounterStops(gs)[^1] + 12f, host: false);
         AddChild(new NetGuestView(GuestCamera));
         GD.Print($"Online: watching and playing the host's stage {stageId}.");
     }

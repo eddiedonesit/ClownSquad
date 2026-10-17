@@ -342,6 +342,7 @@ public partial class WaveDirector : Node
             at = new Vector3(x, 0f, z);
         }
         _side = -_side;
+        if (Terrain.Current is Terrain t) at = t.Clear(at, enemy.BodyHalfWidth + 0.3f);     // never into a pit or a barrel
         enemy.GlobalPosition = at;
         enemy.Died += OnEnemyDied;
         EnemiesAlive++;
@@ -372,6 +373,7 @@ public partial class WaveDirector : Node
         _world.AddChild(enemy);
         enemy.ApplyEnemyRank(Mathf.Max(LevelFloor, HostLevel()), EnemyRank.Common);
         ApplyDifficulty(enemy);
+        if (Terrain.Current is Terrain t && t.InPit(at.X, at.Z, 0.3f)) at = t.Clear(at, enemy.BodyHalfWidth + 0.3f);
         enemy.GlobalPosition = at;
         enemy.Died += OnEnemyDied;
         EnemiesAlive++;
